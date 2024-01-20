@@ -1,6 +1,6 @@
-import os, xlsxwriter, logging, tabula
-from search import *
+import os, logging, tabula
 from InventoryEntry import *
+from spreadsheetDriver import *
 
 # Get cwd of executable plus folder that contains PDFs
 inventoryDir = os.getcwd() + "/InventoryAvailability/"
@@ -75,17 +75,14 @@ def run():
     # Initialize list of all Inventory Availability PDFs
     allInventories = []
 
-    # Create a list of all the Inventory Availability files to be parsed
-    for filename in os.listdir(inventoryDir):
-        allInventories.append(filename)
-
     # Main loop through all Inventory Availability PDFs
     # Each call to processInventoryFile will return a list
     # of inventory entries pertaining to it's table
-    for filename in allInventories:
+    for filename in os.listdir(inventoryDir):
         allInventories.append(processInventoryFile(filename))
 
     # TODO: Create excel sheet with this information
+    setupSpreadsheet(allInventories)
 
 
         
@@ -94,14 +91,6 @@ if __name__ == "__main__":
 
     # Setup logging
     logging.basicConfig(level = logging.DEBUG, format = "[%(levelname)s] %(asctime)s - %(message)s")
-
-    workbook = xlsxwriter.Workbook("Availability.xlsx")
-    worksheet = workbook.add_worksheet()
-    worksheet.write('A1', 'Hello..')
-    worksheet.write('B1', 'Geeks')
-    worksheet.write('C1', 'For')
-    worksheet.write('D1', 'Geeks')
-    workbook.close()
 
     # Setup and run main program loop
     run()

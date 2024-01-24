@@ -6,6 +6,7 @@ class InventoryEntry:
     def __init__(self):
         self.part         = None  # Part number
         self.description  = None  # Part description
+        self.uom          = None  # Unit of measurement (usually "ea")
         self.onHand       = 0.0   # Number of parts at location
         self.allocated    = 0.0   # Number of parts already allocated to a job (already included in onHand)
         self.notAvailable = 0.0   # Number of parts not available for use
@@ -24,6 +25,7 @@ class InventoryEntry:
         logging.debug("*****************************")
         logging.debug(f"part: {self.part}")
         logging.debug(f"description: {self.description}")
+        logging.debug(f"uom: {self.uom}")
         logging.debug(f"onHand: {self.onHand}")
         logging.debug(f"allocated: {self.allocated}")
         logging.debug(f"notAvailable: {self.notAvailable}")
@@ -44,11 +46,12 @@ class InventoryEntry:
         # splitting delimiter) and make sure to remove any commas in numbers
         self.part         = list[1].lstrip(' ')
         self.description  = list[2].lstrip(' ')
-        self.onHand       = list[3].lstrip(' ').replace(',', '')
-        self.allocated    = list[4].lstrip(' ').replace(',', '')
-        self.notAvailable = list[5].lstrip(' ').replace(',', '')
-        self.dropShip     = list[6].lstrip(' ').replace(',', '')
-        self.available    = list[7].lstrip(' ').replace(',', '')
-        self.onOrder      = list[8].lstrip(' ').replace(',', '')
-        self.committed    = list[9].lstrip(' ').replace(',', '')
-        self.short        = list[10].lstrip(' ').replace(',', '')
+        self.uom          = list[3].lstrip(' ')
+        self.onHand       = list[4].lstrip(' ').replace(',', '')
+        self.allocated    = list[5].lstrip(' ').replace(',', '')
+        self.notAvailable = list[6].lstrip(' ').replace(',', '')
+        self.dropShip     = list[7].lstrip(' ').replace(',', '')
+        self.available    = list[8].lstrip(' ').replace(',', '')
+        self.onOrder      = list[9].lstrip(' ').replace(',', '')
+        self.committed    = list[10].lstrip(' ').replace(',', '')
+        self.short        = list[11].lstrip(' ').replace(',', '')

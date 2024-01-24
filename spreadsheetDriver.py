@@ -1,62 +1,66 @@
 import xlsxwriter
 
-# Global workbook definition
-workbook = xlsxwriter.Workbook("InventoryAvailability.xlsx")
-
 # setupSpreadsheetHeader will write the header information for each column to the spreadsheet
-# params: worksheet, xlsx object, the workbook object to write the header information to
+# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
+# params: worksheet, workbook.worksheet, the sheet to write the header information to
 # returns: N/A 
-def setupSpreadsheetHeader(worksheet):
+def setupSpreadsheetHeader(workbook, worksheet):
+    
+    # TODO: Design UI such that user can choose which columns to show/hide
     worksheet.write('A1', 'Part')
     worksheet.write('B1', 'Description')
-    worksheet.write('C1', 'On Hand')
-    worksheet.write('D1', 'Allocated')
-    worksheet.write('E1', 'Not Available')
-    worksheet.write('F1', 'Drop Ship')
-    worksheet.write('G1', 'Available')
-    worksheet.write('H1', 'On Order')
-    worksheet.write('I1', 'Committed')
-    worksheet.write('J1', 'Short')
+    worksheet.write('C1', 'UOM')
+    worksheet.write('D1', 'On Hand')
+    worksheet.write('E1', 'Allocated')
+    worksheet.write('F1', 'Not Available')
+    worksheet.write('G1', 'Drop Ship')
+    worksheet.write('H1', 'Available')
+    worksheet.write('I1', 'On Order')
+    worksheet.write('J1', 'Committed')
+    worksheet.write('K1', 'Short')
 
 
 # writeEntryToSpreadSheet will write all of the data present in a InventoryEntry object
 # to the corresponding column and row in the workbook
-# params: worksheet, worksheet, the sheet label to write to
+# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
+# params: worksheet, workbook.worksheet, the sheet to write the header information to
 # params: row, int, the row number to write to
 # params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
 # returns: N/A
-def writeEntryToSpreadsheet(worksheet, row, entry):
+def writeEntryToSpreadsheet(workbook, worksheet, row, entry):
     worksheet.write("A" + row, entry.part)
     worksheet.write("B" + row, entry.description)
-    worksheet.write("C" + row, entry.onHand)
-    worksheet.write("D" + row, entry.allocated)
-    worksheet.write("E" + row, entry.notAvailable)
-    worksheet.write("F" + row, entry.dropShip)
-    worksheet.write("G" + row, entry.available)
-    worksheet.write("H" + row, entry.onOrder)
-    worksheet.write("I" + row, entry.committed)
-    worksheet.write("J" + row, entry.short)
+    worksheet.write("C" + row, entry.uom)
+    worksheet.write("D" + row, entry.onHand)
+    worksheet.write("E" + row, entry.allocated)
+    worksheet.write("F" + row, entry.notAvailable)
+    worksheet.write("G" + row, entry.dropShip)
+    worksheet.write("H" + row, entry.available)
+    worksheet.write("I" + row, entry.onOrder)
+    worksheet.write("J" + row, entry.committed)
+    worksheet.write("K" + row, entry.short)
 
 
 # setupSpreadSheet will create a .xlsx file and write all parsed contents to it
-# params: allInventories: list of list of InventoryEntries, all tables to be written
-# to the spreadsheet
+# params: inventory: list of InventoryEntry objects, to be written to spreadsheet
+# params: name: str, the date of the inventory file that is being processed
 # returns: N/A
-def setupSpreadsheet(allInventories):
+def setupSpreadsheet(inventory, name):
+
+    # Spreadsheet Workbook definition
+    workbook = xlsxwriter.Workbook(name + ".xlsx")
     
     # Start writing data on row 2 since header data is written to row 1
     row = 2
 
-    # Loop through all inventory PDF files, set up a worksheet for each of them in
-    # the spreadsheet
-    for table in allInventories:
-        worksheet = workbook.add_worksheet()
-        setupSpreadsheetHeader(worksheet)
+    worksheet = workbook.add_worksheet()
+    setupSpreadsheetHeader(workbook, worksheet)
 
-        # Loop through each table entry in each table and write to contents
-        # to the corresponding worksheet
-        for entry in table:
-            writeEntryToSpreadsheet(worksheet, str(row), entry)
-            row +=1
+    # Loop through each table entry in the table and write to contents
+    # to the corresponding worksheet
+    for entry in inventory:
+        writeEntryToSpreadsheet(workbook, worksheet, str(row), entry)
+        row +=1
 
+    # Save and close the spreadsheet
     workbook.close()

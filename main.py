@@ -1,4 +1,4 @@
-import os, logging, tabula
+import os, glob, logging, tabula, re
 from InventoryEntry import *
 from spreadsheetDriver import *
 
@@ -40,19 +40,19 @@ def processInventoryPage(page, inventoryTable):
 
 # processInventoryFile processes a given inventory table by splitting the pdf into
 # pages and processing each page
-# params: filename, str, the name of the file to be opened and processed
+# params: filepath, str, the path to the file to be opened and processed
 # returns: inventoryTable[], list of InventoryEntry class objects pertaining
 # to filenames inventory entries
-def processInventoryFile(filename):
+def processInventoryFile(filepath):
     
     # Table that will contain InventoryEntry objects
     inventoryTable = []
 
     # Read pdf data
-    data = tabula.read_pdf(inventoryDir + filename, pages="all")
+    data = tabula.read_pdf(filepath, pages="all")
 
     if __debug__:
-        logging.debug(f"Processing file: {filename}")
+        logging.debug(f"Processing file: {filepath}")
         logging.debug(f"Number of Pages in Inventory: {len(data)}")
 
     # Loop through each page of table data and process each page
@@ -72,17 +72,23 @@ def processInventoryFile(filename):
 # returns: N/A
 def run():
     
-    # Initialize list of all Inventory Availability PDFs
-    allInventories = []
+    # Find the most recent inventory file in the /InventoryAvailability/ folder
+    allFiles = glob.glob(inventoryDir + "*")
+    mostRecentInventoryFile = max(allFiles, key=os.path.getctime)
 
-    # Main loop through all Inventory Availability PDFs
-    # Each call to processInventoryFile will return a list
-    # of inventory entries pertaining to it's table
-    for filename in os.listdir(inventoryDir):
-        allInventories.append(processInventoryFile(filename))
+    # Get the date of the inventory file from the name. This will be the name of the excel file
+    filename = (re.search("(\d*).pdf", mostRecentInventoryFile)).group().replace(".pdf", "")
 
-    # TODO: Create excel sheet with this information
-    setupSpreadsheet(allInventories)
+    # If no file found, exit program
+    # TODO: Add UI warning if this happens
+    if filename is None:
+        os.exit()
+
+    # Read in all data from the inventory PDF file
+    inventory = processInventoryFile(mostRecentInventoryFile)
+
+    # Setup a spreadsheet with the inventory availability
+    setupSpreadsheet(inventory, filename)
 
 
         

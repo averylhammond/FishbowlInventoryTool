@@ -1,4 +1,4 @@
-import os, glob, logging, tabula, re
+import os, logging, tabula, re
 import PySimpleGUI as sg
 from InventoryEntry import *
 from spreadsheetDriver import *
@@ -68,6 +68,10 @@ def processInventoryFile(filepath):
     return inventoryTable
 
 
+# buildCheckboxDict will take GUI inputs and build a dictionary representing the
+# checkbox input data from the user
+# params: values: list, all user inputs from the GUI
+# returns: N/A
 def buildCheckboxDict(values):
     return {
         "Part" : values["-PART-"],

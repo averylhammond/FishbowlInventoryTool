@@ -1,4 +1,5 @@
 import os, glob, logging, tabula, re
+import PySimpleGUI as sg
 from InventoryEntry import *
 from spreadsheetDriver import *
 
@@ -65,31 +66,87 @@ def processInventoryFile(filepath):
             i.dumpInventoryEntry()
 
     return inventoryTable
+
+
+def buildCheckboxDict(values):
+    return {
+        "Part" : values["-PART-"],
+        "Description" : values["-DESCRIPTION-"],
+        "UOM" : values["-UOM-"],
+        "OnHand" : values["-ONHAND-"],
+        "Allocated" : values["-ALLOCATED-"],
+        "NotAvailable" : values["-NOTAVAILABLE-"],
+        "DropShip" : values["-DROPSHIP-"],
+        "Available" : values["-AVAILABLE-"],
+        "OnOrder" : values["-ONORDER-"],
+        "Committed" : values["-COMMITTED-"],
+        "Short" : values["-SHORT-"]
+     }
     
     
 # run is the main loop of the program.
 # params: N/A
 # returns: N/A
 def run():
-    
-    # Find the most recent inventory file in the /InventoryAvailability/ folder
-    allFiles = glob.glob(inventoryDir + "*")
-    mostRecentInventoryFile = max(allFiles, key=os.path.getctime)
 
-    # Get the date of the inventory file from the name. This will be the name of the excel file
-    filename = (re.search("(\d*).pdf", mostRecentInventoryFile)).group().replace(".pdf", "")
+    # Instantiate output window
+    output = sg.Text()
 
-    # If no file found, exit program
-    # TODO: Add UI warning if this happens
-    if filename is None:
-        os.exit()
+    # Define GUI layout
+    layout = [
+        [sg.Text("Choose an Inventory Availability PDF to process...")],  # First text window
+        [sg.InputText(key = "-FILE_PATH-"), sg.FileBrowse(initial_folder=inventoryDir, file_types=[("PDF Files", "*.pdf")])],
+        [sg.Text("Please check all elements that you would like to have included on the report:")],  # First text window
+        [sg.Checkbox("Part", key="-PART-"), sg.Checkbox("Description", key="-DESCRIPTION-"), sg.Checkbox("UOM", key="-UOM-"), sg.Checkbox("On Hand", key="-ONHAND-")],
+        [sg.Checkbox("Allocated", key="-ALLOCATED-"), sg.Checkbox("Not Available", key="-NOTAVAILABLE-"), sg.Checkbox("Drop Ship", key="-DROPSHIP-")],
+        [sg.Checkbox("Available", key="-AVAILABLE-"), sg.Checkbox("On Order", key="-ONORDER-"), sg.Checkbox("Committed", key="-COMMITTED-"), sg.Checkbox("Short", key="-SHORT-")],
+        [sg.Button("Process This Inventory"), sg.Exit()],  # Exit button
+        [output]  # Output text window
+    ]
 
-    # Read in all data from the inventory PDF file
-    inventory = processInventoryFile(mostRecentInventoryFile)
+    # Set theme for big style
+    sg.theme("LightGreen5")
 
-    # Setup a spreadsheet with the inventory availability
-    setupSpreadsheet(inventory, filename)
+    # Create window
+    window = sg.Window("Automated Inventory Processor", layout, size=(500,500))
 
+    # Main program loop
+    while True:
+        # Read user input from GUI
+        event, values = window.read()
+
+        # If exit is pressed, break out of loop and close window
+        if event in (sg.WIN_CLOSED, "Exit"):
+            break
+
+        # If the process button is selected, process the invoice
+        elif event == "Process This Inventory":
+
+            # TODO: Revise this if else structure, don't like it
+            if values["-FILE_PATH-"] == "":
+                output.update("Please choose a valid Inventory Availability PDF file!")
+            
+            else:
+                # Update output text
+                output.update("Processing Inventory... Please wait.")
+
+                # Create a dictionary with checkbox input to determine which columns to show
+                # based on user input
+                checkboxDict = buildCheckboxDict(values)
+
+                # Read in all data from the inventory PDF file
+                inventory = processInventoryFile(values["-FILE_PATH-"])
+
+                # Get the date of the inventory file from the name. This will be the name of the excel file
+                filename = (re.search("(\d*).pdf", values["-FILE_PATH-"])).group().replace(".pdf", "")
+            
+                # Setup a spreadsheet with the inventory availability
+                setupSpreadsheet(inventory, filename, checkboxDict)
+            
+                output.update("Successfully processed Inventory Availability!")
+
+    # If break, close app
+    window.close()
 
         
 # Entry point

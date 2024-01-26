@@ -1,7 +1,12 @@
-import os, logging, tabula, re
+import os, logging, tabula, re, win32gui, win32con
 import PySimpleGUI as sg
 from InventoryEntry import *
 from spreadsheetDriver import *
+
+# Uncomment these lines when running pyinstaller to hide the windows terminal
+# upon program execution
+hide = win32gui.GetForegroundWindow()
+win32gui.ShowWindow(hide, win32con.SW_HIDE)
 
 # Get cwd of executable plus folder that contains PDFs
 inventoryDir = os.getcwd() + "/InventoryAvailability/"

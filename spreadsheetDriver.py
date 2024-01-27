@@ -68,29 +68,29 @@ def setupSpreadsheetHeader(workbook, worksheet, checkboxDict):
         col+=1
 
 
-# writeEntryToSpreadSheet will write all of the data present in a InventoryEntry object
+# writeInventoryEntryToSpreadSheet will write all of the data present in a InventoryEntry object
 # to the corresponding column and row in the workbook
 # params: workbook, xlsx.Workbook, the workbook object containing the worksheet
 # params: worksheet, workbook.worksheet, the sheet to write the header information to
 # params: row, str, the row number to write to
 # params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
 # params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: N/A
-def writeEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDict):
+# returns: col, int, the next available free column that can be written to
+def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDict):
 
     # Cast to int (is str initially)
     row = int(row)
     
     # Alternate row colors for visibility
     if row % 2 == 0:
-        infoFormat = workbook.add_format({
+        entryFormat = workbook.add_format({
             "valign": "vcenter",
             "font_size": 12,
             "bg_color": "#F0F0F0",  # Light Blue
             "border": 1
         })
     else:
-        infoFormat = workbook.add_format({
+        entryFormat = workbook.add_format({
             "valign": "vcenter",
             "font_size": 12,
             "bg_color": "#E6F0FF",  # Light Gray
@@ -105,62 +105,102 @@ def writeEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDict):
     # next write.
     col = 0   
     if checkboxDict["Part"] == True:
-        worksheet.write(row, col, entry.part, infoFormat)
+        worksheet.write(row, col, entry.part, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["Description"] == True:
-        worksheet.write(row, col, entry.description, infoFormat)
+        worksheet.write(row, col, entry.description, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
         
     if checkboxDict["UOM"] == True:
-        worksheet.write(row, col, entry.uom, infoFormat)
+        worksheet.write(row, col, entry.uom, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["OnHand"] == True:
-        worksheet.write(row, col, entry.onHand, infoFormat)
+        worksheet.write(row, col, entry.onHand, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["Allocated"] == True:
-        worksheet.write(row, col, entry.allocated, infoFormat)
+        worksheet.write(row, col, entry.allocated, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["NotAvailable"] == True:
-        worksheet.write(row, col, entry.notAvailable, infoFormat)
+        worksheet.write(row, col, entry.notAvailable, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["DropShip"] == True:
-        worksheet.write(row, col, entry.dropShip, infoFormat)
+        worksheet.write(row, col, entry.dropShip, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["Available"] == True:
-        worksheet.write(row, col, entry.available, infoFormat)
+        worksheet.write(row, col, entry.available, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["OnOrder"] == True:
-        worksheet.write(row, col, entry.onOrder, infoFormat)
+        worksheet.write(row, col, entry.onOrder, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["Committed"] == True:
-        worksheet.write(row, col, entry.committed, infoFormat)
+        worksheet.write(row, col, entry.committed, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
     if checkboxDict["Short"] == True:
-        worksheet.write(row, col, entry.short, infoFormat)
+        worksheet.write(row, col, entry.short, entryFormat)
+        entry.rowWrittenTo = row
         col+=1
 
+    return col
 
-# setupSpreadSheet will create a .xlsx file and write all parsed contents to it
-# params: inventory: list of InventoryEntry objects, to be written to spreadsheet
-# params: name: str, the date of the inventory file that is being processed
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
+
+# writeTurnoverEntryToSpreadSheet will write all of the data present in a TurnoverEntry object
+# to the corresponding column and row in the workbook
+# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
+# params: worksheet, workbook.worksheet, the sheet to write the header information to
+# params: row, int, the row number to write to
+# params: col, int, the column to write to
+# params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
 # returns: N/A
-def setupSpreadsheet(inventory, name, checkboxDict):
+def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry):
 
-    # Spreadsheet Workbook definition
-    workbook = xlsxwriter.Workbook(name + ".xlsx")
+    # Alternate row colors for visibility
+    if row % 2 == 0:
+         entryFormat = workbook.add_format({
+            "valign": "vcenter",
+            "font_size": 12,
+            "bg_color": "#F0F0F0",  # Light Blue
+            "border": 1
+        })
+    else:
+        entryFormat = workbook.add_format({
+            "valign": "vcenter",
+            "font_size": 12,
+            "bg_color": "#E6F0FF",  # Light Gray
+            "border": 1
+        })
+
+    worksheet.write(row, col, entry.unitsSold, entryFormat)
+
+
+# setupMainSpreadSheet will create a .xlsx file and write all parsed contents to it
+# params: workbook: xlsx object, the open workbook to be written to
+# params: inventory: list of InventoryEntry objects, to be written to spreadsheet
+# params: checkboxDict, dict, the state of all column checkboxes from GUI
+# returns: nextCol, int, the next column that can be written to
+def setupMainSpreadsheet(workbook, inventory, checkboxDict):
     
     # Start writing data on row 1 since header data is written to row 0
     row = 1
+    nextCol = 0
 
     worksheet = workbook.add_worksheet()
     setupSpreadsheetHeader(workbook, worksheet, checkboxDict)
@@ -168,8 +208,29 @@ def setupSpreadsheet(inventory, name, checkboxDict):
     # Loop through each table entry in the table and write to contents
     # to the corresponding worksheet
     for entry in inventory:
-        writeEntryToSpreadsheet(workbook, worksheet, str(row), entry, checkboxDict)
+        nextCol = writeInventoryEntryToSpreadsheet(workbook, worksheet, str(row), entry, checkboxDict)
         row +=1
 
-    # Save and close the spreadsheet
-    workbook.close()
+    return nextCol
+
+
+# appendTurnoverToSpreadsheet takes a given workbook and writes the turnover pdf data to the most
+# recent unused column, matching the turnover entries to the inventory entries
+# params: workbook: xlsxwriter class, the spreadsheet object
+# params: turnover: list, list of TurnoverEntry objects from the turnover pdf
+# params: inventory: list, list of InventoryEntry objects from the inventory pdf
+# params: nextCol: int, the column to start writing to since the previous columns
+# are holding inventory entry data
+# returns: N/A
+def appendTurnoverToSpreadsheet(workbook, turnover, inventory, nextCol):
+
+    # Only using one worksheet, so it's always index 0
+    worksheet = workbook.get_worksheet_by_name("Sheet1")
+
+    # Need to loop through each TurnoverEntry object and match it to an InventoryEntry object
+    # based on the part name. If the names match, find the row that the InventoryEntry was
+    # written to and write the TurnoverEntry data to that same row, but new column
+    for tEntry in turnover:
+        for iEntry in inventory:
+            if (iEntry.part.replace(' ', '')) == (tEntry.partDescription.replace(' ', '')):
+                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.rowWrittenTo, nextCol, tEntry)

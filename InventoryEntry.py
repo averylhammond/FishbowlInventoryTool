@@ -1,20 +1,21 @@
 import logging
 
-# InventoryLine class to hold all attributes of the InventoryEntry that
+# InventoryEntry class to hold all attributes of the InventoryEntry that
 # passes to the .xlsx file
 class InventoryEntry:
     def __init__(self):
         self.part         = None  # Part number
         self.description  = None  # Part description
         self.uom          = None  # Unit of measurement (usually "ea")
-        self.onHand       = 0.0   # Number of parts at location
-        self.allocated    = 0.0   # Number of parts already allocated to a job (already included in onHand)
-        self.notAvailable = 0.0   # Number of parts not available for use
-        self.dropShip     = 0.0   # Not used, but listed in table
-        self.available    = 0.0   # Number of available parts (onHand - allocated)
-        self.onOrder      = 0.0   # Number of parts on order but not arrived
-        self.committed    = 0.0   # TODO: is this the same as allocated?
-        self.short        = 0.0   # TODO: Is this like being in the negative?
+        self.onHand       = 0     # Number of parts at location
+        self.allocated    = 0     # Number of parts already allocated to a job (already included in onHand)
+        self.notAvailable = 0     # Number of parts not available for use
+        self.dropShip     = 0     # Not used, but listed in table
+        self.available    = 0     # Number of available parts (onHand - allocated)
+        self.onOrder      = 0     # Number of parts on order but not arrived
+        self.committed    = 0     # TODO: is this the same as allocated?
+        self.short        = 0     # TODO: Is this like being in the negative?
+        self.rowWrittenTo = 0     # The row that the entry is written to through the xlsxwriter API
 
     
     # dumpInventoryEntry is a debug function to print the attributes of a given InventoryEntry object
@@ -34,6 +35,7 @@ class InventoryEntry:
         logging.debug(f"onOrder: {self.onOrder}")
         logging.debug(f"committed: {self.committed}")
         logging.debug(f"short: {self.short}")
+        logging.debug(f"rowWrittenTo: {self.rowWrittenTo}")
         logging.debug("*****************************")
 
 

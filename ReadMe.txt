@@ -10,7 +10,7 @@ the .pdf file as the name of the excel .xlsx file.
 2) In the 'Configs' folder, ensure that any sales reps that can appear on the invoice
 are listed in the 'salesReps.txt' file. 
 
-4) Run 'AutoInventoryProc.exe' to begin processing the inventory. Once the tool is 
+3) Run 'AutoInventoryProc.exe' to begin processing the inventory. Once the tool is 
 finished, create/update  mmddyyyy.xlsx, where mm dd yyy represent the date that the
 inventory availability was generated. At this time, the spreadsheet will not be
 spaced correctly, but excel allows you to double click on the column boundries to

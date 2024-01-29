@@ -7,9 +7,6 @@ place it into the 'InventoryAvailability' folder. Do not rename the file. The to
 process only one file at this time, generate an excel file, and use the date listed in
 the .pdf file as the name of the excel .xlsx file.
 
-2) In the 'Configs' folder, ensure that any sales reps that can appear on the invoice
-are listed in the 'salesReps.txt' file. 
-
 3) Run 'AutoInventoryProc.exe' to begin processing the inventory. Once the tool is 
 finished, create/update  mmddyyyy.xlsx, where mm dd yyy represent the date that the
 inventory availability was generated. At this time, the spreadsheet will not be

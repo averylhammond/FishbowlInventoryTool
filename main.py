@@ -99,6 +99,7 @@ def buildCheckboxDict(values):
 # pdf table entries including the page that was just processed
 def processTurnoverPage(page, turnoverTable):
 
+    i=0
     # Loop through all lines in the page but skip first two lines that contain header info
     for line in page.splitlines():
         

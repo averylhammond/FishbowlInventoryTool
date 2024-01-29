@@ -32,8 +32,8 @@ class TurnoverEntry:
         # Make sure to strip off any leading whitespace (result from using double space as the string
         # splitting delimiter) and make sure to remove any commas in numbers
         self.partDescription = list[1].lstrip(' ').replace(' Totals:', '')
-        self.unitsSold       = list[3].lstrip(' ').replace(',', '')
-        self.avgQOH          = list[4].lstrip(' ').replace(',', '')
-        self.avgTODays       = list[5].lstrip(' ').replace(',', '')
-        self.TORate          = list[6].lstrip(' ').replace(',', '')
+        self.unitsSold       = list[-4].lstrip(' ').replace(',', '').replace('.0', '')  # int value, strip .0
+        self.avgQOH          = list[-3].lstrip(' ').replace(',', '')
+        self.avgTODays       = list[-2].lstrip(' ').replace(',', '')
+        self.TORate          = list[-1].lstrip(' ').replace(',', '')
         

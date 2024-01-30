@@ -1,11 +1,37 @@
 import xlsxwriter
 
-# setupSpreadsheetHeader will write the header information for each column to the spreadsheet
+def formatTurnoverRow(workbook, col):
+    
+    evenFormat = workbook.add_format({
+            "valign": "vcenter",
+            "font_size": 12,
+            "bg_color": "#F0F0F0",  # Light Blue
+            "border": 1
+            })
+    oddFormat = workbook.add_format({
+            "valign": "vcenter",
+            "font_size": 12,
+            "bg_color": "#E6F0FF",  # Light Gray
+            "border": 1
+            })
+    
+    # Get worksheet
+    worksheet = workbook.get_worksheet_by_name("Sheet1")
+
+    # Alternate row colors for visibility
+    for row in range(618):
+        if row % 2 == 0 and row != 0:
+            worksheet.write(row, col, 'N/A', evenFormat)
+        elif row % 2 == 1 and row != 0:
+            worksheet.write(row, col, 'N/A', oddFormat)
+
+
+# setupSpreadsheetInventoryHeader will write the header information for each column to the spreadsheet
 # params: workbook, xlsx.Workbook, the workbook object containing the worksheet
 # params: worksheet, workbook.worksheet, the sheet to write the header information to
 # params: checkboxDict, dict, the state of all column checkboxes from GUI
 # returns: N/A 
-def setupSpreadsheetHeader(workbook, worksheet, checkboxDict):
+def setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict):
     
     headerFormat = workbook.add_format({
         "valign": "vcenter",
@@ -65,6 +91,57 @@ def setupSpreadsheetHeader(workbook, worksheet, checkboxDict):
 
     if checkboxDict["Short"] == True:
         worksheet.write(0, col, "Short", headerFormat)
+        col+=1
+
+
+# setupSpreadsheetTurnoverHeader will write the header information for each column to the spreadsheet
+# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
+# params: checkboxDict, dict, the state of all column checkboxes from GUI
+# params: col, int, the leftmost empty column to write to
+# params: filename, str, the filename of the turnover report
+# returns: N/A 
+def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename):
+
+    headerFormat = workbook.add_format({
+        "valign": "vcenter",
+        "align": "center",
+        "bold": True,
+        "font_size": 16,
+        "bg_color": "#F0F0F0",
+        "border": 1
+    })
+
+    # Only using one worksheet, so it's always index 0
+    worksheet = workbook.get_worksheet_by_name("Sheet1")
+
+    # This is the current solution to dynamically settings the columns for different
+    # headers based on which entry attributes the user wants to see. We check each
+    # dictionary entry to see if the user checked the box to see the attribute. If
+    # he/she did, then write to the current column and increment col by one for the
+    # next write.
+    if checkboxDict["tDescription"] == True:
+        worksheet.write(0, col, "TO Description", headerFormat)
+        formatTurnoverRow(workbook, col)
+        col+=1
+
+    if checkboxDict["tUnits Sold"] == True:
+        worksheet.write(0, col, f"Units Sold {filename}", headerFormat)
+        formatTurnoverRow(workbook, col)
+        col+=1
+
+    if checkboxDict["tAvg QOH"] == True:
+        worksheet.write(0, col, f"Avg QOH {filename}", headerFormat)
+        formatTurnoverRow(workbook, col)
+        col+=1
+
+    if checkboxDict["tAvg TO Days"] == True:
+        worksheet.write(0, col, f"Avg TO Days {filename}", headerFormat)
+        formatTurnoverRow(workbook, col)
+        col+=1
+
+    if checkboxDict["tTO Rate"] == True:
+        worksheet.write(0, col, f"TO Rate {filename}", headerFormat)
+        formatTurnoverRow(workbook, col)
         col+=1
 
 
@@ -169,8 +246,9 @@ def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDi
 # params: row, int, the row number to write to
 # params: col, int, the column to write to
 # params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
+# params: checkboxDict, dict, the state of all column checkboxes from GUI
 # returns: N/A
-def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry):
+def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkboxDict):
 
     # Alternate row colors for visibility
     if row % 2 == 0:
@@ -188,7 +266,35 @@ def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry):
             "border": 1
         })
 
-    worksheet.write(row, col, entry.unitsSold, entryFormat)
+    # This is the current solution to dynamically settings the columns for different
+    # headers based on which entry attributes the user wants to see. We check each
+    # dictionary entry to see if the user checked the box to see the attribute. If
+    # he/she did, then write to the current column and increment col by one for the
+    # next write.  
+    if checkboxDict["tDescription"] == True:
+        worksheet.write(row, col, entry.partDescription, entryFormat)
+        entry.rowWrittenTo = row
+        col+=1
+
+    if checkboxDict["tUnits Sold"] == True:
+        worksheet.write(row, col, entry.unitsSold, entryFormat)
+        entry.rowWrittenTo = row
+        col+=1
+        
+    if checkboxDict["tAvg QOH"] == True:
+        worksheet.write(row, col, entry.avgQOH, entryFormat)
+        entry.rowWrittenTo = row
+        col+=1
+
+    if checkboxDict["tAvg TO Days"] == True:
+        worksheet.write(row, col, entry.avgTODays, entryFormat)
+        entry.rowWrittenTo = row
+        col+=1
+
+    if checkboxDict["tTO Rate"] == True:
+        worksheet.write(row, col, entry.TORate, entryFormat)
+        entry.rowWrittenTo = row
+        col+=1
 
 
 # setupMainSpreadSheet will create a .xlsx file and write all parsed contents to it
@@ -203,7 +309,7 @@ def setupMainSpreadsheet(workbook, inventory, checkboxDict):
     nextCol = 0
 
     worksheet = workbook.add_worksheet()
-    setupSpreadsheetHeader(workbook, worksheet, checkboxDict)
+    setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict)
 
     # Loop through each table entry in the table and write to contents
     # to the corresponding worksheet
@@ -219,10 +325,11 @@ def setupMainSpreadsheet(workbook, inventory, checkboxDict):
 # params: workbook: xlsxwriter class, the spreadsheet object
 # params: turnover: list, list of TurnoverEntry objects from the turnover pdf
 # params: inventory: list, list of InventoryEntry objects from the inventory pdf
-# params: nextCol: int, the column to start writing to since the previous columns
+# params: coll: int, the column to start writing to since the previous columns
 # are holding inventory entry data
+# params: checkboxDict, dict, the state of all column checkboxes from GUI
 # returns: N/A
-def appendTurnoverToSpreadsheet(workbook, turnover, inventory, nextCol):
+def appendTurnoverToSpreadsheet(workbook, turnover, inventory, col, checkboxDict):
 
     # Only using one worksheet, so it's always index 0
     worksheet = workbook.get_worksheet_by_name("Sheet1")
@@ -233,4 +340,5 @@ def appendTurnoverToSpreadsheet(workbook, turnover, inventory, nextCol):
     for tEntry in turnover:
         for iEntry in inventory:
             if (iEntry.part.replace(' ', '')) == (tEntry.partDescription.replace(' ', '')):
-                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.rowWrittenTo, nextCol, tEntry)
+                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.rowWrittenTo, 
+                                                col, tEntry, checkboxDict)

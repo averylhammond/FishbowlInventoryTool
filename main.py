@@ -87,7 +87,12 @@ def buildCheckboxDict(values):
         "Available" : values["-AVAILABLE-"],
         "OnOrder" : values["-ONORDER-"],
         "Committed" : values["-COMMITTED-"],
-        "Short" : values["-SHORT-"]
+        "Short" : values["-SHORT-"],
+        "tDescription" : values["-TDESCRIPTION-"],
+        "tUnits Sold" : values["-TUNITSSOLD-"],
+        "tAvg QOH" : values["-TQOH-"],
+        "tAvg TO Days" : values["-TAVGTODAYS-"],
+        "tTO Rate" : values["-TTORATE-"]
      }
 
 
@@ -141,9 +146,9 @@ def processTurnoverFile(filepath):
     for page in data:
         turnoverTable = processTurnoverPage(page.to_string(), turnoverTable)
     
-    #if __debug__:
-        #for i in turnoverTable:
-            #i.dumpTurnoverEntry()
+    if __debug__:
+        for i in turnoverTable:
+            i.dumpTurnoverEntry()
 
     return turnoverTable
     
@@ -160,10 +165,13 @@ def run():
     layout = [
         [sg.Text("Choose an Inventory Availability PDF to process...")],  # First text window
         [sg.InputText(key = "-FILE_PATH-"), sg.FileBrowse(initial_folder=inventoryDir, file_types=[("PDF Files", "*.pdf")])],
-        [sg.Text("Please check all elements that you would like to have included on the report:")],  # First text window
+        [sg.Text("Please check all INVENTORY elements that you would like to have included on the report:")],  # First text window
         [sg.Checkbox("Description", key="-DESCRIPTION-"), sg.Checkbox("UOM", key="-UOM-"), sg.Checkbox("On Hand", key="-ONHAND-"), sg.Checkbox("Allocated", key="-ALLOCATED-")],
         [sg.Checkbox("Not Available", key="-NOTAVAILABLE-"), sg.Checkbox("Drop Ship", key="-DROPSHIP-"), sg.Checkbox("Available", key="-AVAILABLE-")],
         [sg.Checkbox("On Order", key="-ONORDER-"), sg.Checkbox("Committed", key="-COMMITTED-"), sg.Checkbox("Short", key="-SHORT-")],
+        [sg.Text("Please check all TURNOVER elements that you would like to have included on the report:")],  # Second text window
+        [sg.Checkbox("Description", key="-TDESCRIPTION-"), sg.Checkbox("Units Sold", key="-TUNITSSOLD-"), sg.Checkbox("Avg QOH", key="-TQOH-")],
+        [sg.Checkbox("Avg TO Days", key="-TAVGTODAYS-"), sg.Checkbox("TO Rate", key="-TTORATE-")],
         [sg.Button("Process This Inventory"), sg.Exit()],  # Exit button
         [output]  # Output text window
     ]
@@ -172,7 +180,7 @@ def run():
     sg.theme("LightGreen5")
 
     # Create window
-    window = sg.Window("Automated Inventory Processor", layout, size=(500,500))
+    window = sg.Window("Automated Inventory Processor", layout, size=(650,500))
 
     # Main program loop
     while True:
@@ -218,8 +226,10 @@ def run():
                 for file in os.listdir(turnoverDir):
                     turnover = processTurnoverFile(turnoverDir + file)
 
+                    setupSpreadsheetTurnoverHeader(workbook, checkboxDict, nextCol, file.replace('.pdf', ''))
+
                     # Append turnover data to columns in workbook
-                    appendTurnoverToSpreadsheet(workbook, turnover, inventory, nextCol)
+                    appendTurnoverToSpreadsheet(workbook, turnover, inventory, nextCol, checkboxDict)
                     nextCol += 1
 
                 # Save and close the spreadsheet

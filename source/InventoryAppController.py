@@ -40,13 +40,19 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> process_inventory_page()         ###
     ###########################################################################
-    # process_inventory_page is responsibile for parsing a page worth of PDF table data
-    # and converting each line into an InventoryEntry object
-    # params: page: str, the page of PDF table data
-    # params: inventory_table[], InventoryEntry: the current list of table entries
-    # returns: inventory_table[], InventoryEntry: the new up-to-date list of all
-    # pdf table entries including the page that was just processed
-    def process_inventory_page(self, page, inventory_table):
+    def process_inventory_page(self, page: str, inventory_table: list) -> list:
+        """
+        Parses a page worth of PDF table data, converting each line into an
+        InventoryEntry object and appending it to the running table
+
+        Args:
+            page (str): The page of PDF table data.
+            inventory_table (list): The current list of InventoryEntry table entries
+
+        Returns:
+            list: The up-to-date list of InventoryEntry objects, including the page
+                that was just processed
+        """
 
         # Loop through all lines in the page but skip first two lines that contain header info
         for line in page.splitlines()[2:]:
@@ -76,12 +82,17 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> process_inventory_file()         ###
     ###########################################################################
-    # process_inventory_file processes a given inventory table by splitting the pdf into
-    # pages and processing each page
-    # params: filepath, str, the path to the file to be opened and processed
-    # returns: inventory_table[], list of InventoryEntry class objects pertaining
-    # to filenames inventory entries
-    def process_inventory_file(self, filepath):
+    def process_inventory_file(self, filepath: str) -> list:
+        """
+        Processes an inventory PDF by splitting it into pages and processing each
+        page in turn
+
+        Args:
+            filepath (str): The path to the inventory PDF to be opened and processed
+
+        Returns:
+            list: A list of InventoryEntry objects for the file's inventory entries
+        """
 
         # Table that will contain InventoryEntry objects
         inventory_table = []
@@ -105,11 +116,18 @@ class InventoryAppController:
     ###########################################################################
     ###           InventoryAppController -> build_checkbox_dict()           ###
     ###########################################################################
-    # build_checkbox_dict will take GUI inputs and build a dictionary representing the
-    # checkbox input data from the user
-    # params: values: list, all user inputs from the GUI
-    # returns: N/A
-    def build_checkbox_dict(self, values):
+    def build_checkbox_dict(self, values: dict) -> dict:
+        """
+        Builds a dictionary representing the checkbox input data from the user,
+        used to determine which columns to include in the report
+
+        Args:
+            values (dict): All user inputs read from the GUI window
+
+        Returns:
+            dict: A mapping of column name to bool indicating whether each column
+                should be included in the output spreadsheet
+        """
         return {
             "Part": True,  # Always include part
             "Description": values["-DESCRIPTION-"],
@@ -132,13 +150,19 @@ class InventoryAppController:
     ###########################################################################
     ###           InventoryAppController -> process_turnover_page()         ###
     ###########################################################################
-    # process_turnover_page is responsibile for parsing a page worth of PDF table data
-    # and converting each "totals" line into a TurnoverEntry object
-    # params: page: str, the page of PDF table data
-    # params: turnover_table[], TurnoverEntry: the current list of table entries
-    # returns: turnover_table[], TurnoverEntry: the new up-to-date list of all
-    # pdf table entries including the page that was just processed
-    def process_turnover_page(self, page, turnover_table):
+    def process_turnover_page(self, page: str, turnover_table: list) -> list:
+        """
+        Parses a page worth of PDF table data, converting each "Totals:" line into
+        a TurnoverEntry object and appending it to the running table
+
+        Args:
+            page (str): The page of PDF table data
+            turnover_table (list): The current list of TurnoverEntry table entries
+
+        Returns:
+            list: The up-to-date list of TurnoverEntry objects, including the page
+                that was just processed
+        """
 
         i = 0
         # Loop through all lines in the page but skip first two lines that contain header info
@@ -162,12 +186,18 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> process_turnover_file()          ###
     ###########################################################################
-    # process_turnover_file processes a given turnover table by splitting the pdf into
-    # pages and processing each page
-    # params: filepath, str, the path to the file to be opened and processed
-    # returns: turnover_table[], list of TurnoverEntry class objects pertaining
-    # to filenames turnover entries
-    def process_turnover_file(self, filepath):
+    def process_turnover_file(self, filepath: str) -> list:
+        """
+        Processes a turnover report PDF by splitting it into pages and processing
+        each page in turn
+
+        Args:
+            filepath (str): The path to the turnover report PDF to be opened and
+                processed
+
+        Returns:
+            list: A list of TurnoverEntry objects for the file's turnover entries
+        """
 
         # Table that will contain InventoryEntry objects
         turnover_table = []
@@ -182,7 +212,9 @@ class InventoryAppController:
         # Loop through each page of table data and process each page
         # Update inventory_table with each new page processed
         for page in data:
-            turnover_table = self.process_turnover_page(page.to_string(), turnover_table)
+            turnover_table = self.process_turnover_page(
+                page.to_string(), turnover_table
+            )
 
         if __debug__:
             for i in turnover_table:
@@ -193,10 +225,11 @@ class InventoryAppController:
     ###########################################################################
     ###            InventoryAppController -> start_application()            ###
     ###########################################################################
-    # start_application is the main loop of the program.
-    # params: N/A
-    # returns: N/A
     def start_application(self):
+        """
+        Starts the application by building the GUI window and running the main
+        event loop until the user exits.
+        """
 
         # Instantiate output window
         output = sg.Text()
@@ -209,7 +242,8 @@ class InventoryAppController:
             [
                 sg.InputText(key="-FILE_PATH-"),
                 sg.FileBrowse(
-                    initial_folder=self.inventory_dir, file_types=[("PDF Files", "*.pdf")]
+                    initial_folder=self.inventory_dir,
+                    file_types=[("PDF Files", "*.pdf")],
                 ),
             ],
             [
@@ -271,7 +305,9 @@ class InventoryAppController:
 
                 # TODO: Revise this if else structure, don't like it
                 if values["-FILE_PATH-"] == "":
-                    output.update("Please choose a valid Inventory Availability PDF file!")
+                    output.update(
+                        "Please choose a valid Inventory Availability PDF file!"
+                    )
 
                 else:
                     # Update output text

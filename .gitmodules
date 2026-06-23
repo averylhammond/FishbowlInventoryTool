@@ -1,0 +1,3 @@
+[submodule "automated-inventory-testing"]
+	path = automated-inventory-testing
+	url = git@github.com:averylhammond/automated-inventory-testing.git

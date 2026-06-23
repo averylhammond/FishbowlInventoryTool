@@ -1,6 +1,8 @@
-import os, logging, tabula, re
+import logging, re
+from pathlib import Path
 import PySimpleGUI as sg
-import xlsxwriter
+from source.constants import INVENTORY_DIR
+from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryEntry import *
 from source.TurnoverEntry import *
 from source.spreadsheetDriver import *
@@ -23,9 +25,8 @@ class InventoryAppController:
         """
         Initializes the InventoryAppController object.
 
-        Sets up the directories that hold the inventory and turnover report PDFs
-        (relative to the executable's current working directory) and configures
-        logging for the application.
+        Configures logging for the application and constructs the file I/O
+        controller that owns all reading/writing of files.
         """
 
         # Setup logging
@@ -33,9 +34,8 @@ class InventoryAppController:
             level=logging.DEBUG, format="[%(levelname)s] %(asctime)s - %(message)s"
         )
 
-        # Get cwd of executable plus folder that contains PDFs
-        self.inventory_dir = os.getcwd() + "/InventoryAvailability/"
-        self.turnover_dir = os.getcwd() + "/TurnoverReports/"
+        # Create the file I/O controller
+        self.file_io = InventoryAppFileIO()
 
     ###########################################################################
     ###          InventoryAppController -> process_inventory_page()         ###
@@ -98,7 +98,7 @@ class InventoryAppController:
         inventory_table = []
 
         # Read pdf data
-        data = tabula.read_pdf(filepath, pages="all")
+        data = self.file_io.read_pdf(filepath)
 
         if __debug__:
             logging.debug(f"Processing inventory file: {filepath}")
@@ -186,13 +186,13 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> process_turnover_file()          ###
     ###########################################################################
-    def process_turnover_file(self, filepath: str) -> list:
+    def process_turnover_file(self, filepath: Path) -> list:
         """
         Processes a turnover report PDF by splitting it into pages and processing
         each page in turn
 
         Args:
-            filepath (str): The path to the turnover report PDF to be opened and
+            filepath (Path): The path to the turnover report PDF to be opened and
                 processed
 
         Returns:
@@ -203,7 +203,7 @@ class InventoryAppController:
         turnover_table = []
 
         # Read pdf data
-        data = tabula.read_pdf(filepath, pages="all")
+        data = self.file_io.read_pdf(filepath)
 
         if __debug__:
             logging.debug(f"Processing turnover file: {filepath}")
@@ -242,7 +242,7 @@ class InventoryAppController:
             [
                 sg.InputText(key="-FILE_PATH-"),
                 sg.FileBrowse(
-                    initial_folder=self.inventory_dir,
+                    initial_folder=str(INVENTORY_DIR),
                     file_types=[("PDF Files", "*.pdf")],
                 ),
             ],
@@ -291,6 +291,13 @@ class InventoryAppController:
         # Create window
         window = sg.Window("Automated Inventory Processor", layout, size=(650, 500))
 
+        # Now that the output element exists, surface any file I/O failure both to
+        # the log and to the GUI output line so the app never crashes on bad files.
+        self.file_io.report_error = lambda title, message: (
+            logging.error(f"{title}: {message}"),
+            output.update(f"{title}: {message}"),
+        )
+
         # Main program loop
         while True:
             # Read user input from GUI
@@ -320,15 +327,30 @@ class InventoryAppController:
                     # Read in all data from the inventory PDF file
                     inventory = self.process_inventory_file(values["-FILE_PATH-"])
 
-                    # Get the date of the inventory file from the name. This will be the name of the excel file
+                    # Bail gracefully if the inventory PDF could not be read (the
+                    # file I/O controller has already surfaced the underlying error)
+                    if not inventory:
+                        output.update(
+                            "Could not read the selected Inventory PDF. See log for details."
+                        )
+                        continue
+
+                    # Get the date of the inventory file from the name. This will be the name of the excel file.
+                    # Fall back to a generic name if the path has no digit/.pdf to match.
+                    match = re.search(r"(\d*)\.pdf", values["-FILE_PATH-"])
                     filename = (
-                        (re.search("(\d*).pdf", values["-FILE_PATH-"]))
-                        .group()
-                        .replace(".pdf", "")
+                        match.group().replace(".pdf", "")
+                        if match
+                        else "InventoryReport"
                     )
 
                     # Spreadsheet Workbook definition
-                    workbook = xlsxwriter.Workbook(filename + ".xlsx")
+                    workbook = self.file_io.create_workbook(filename)
+                    if workbook is None:
+                        output.update(
+                            "Could not create the output spreadsheet. See log for details."
+                        )
+                        continue
 
                     # Setup a spreadsheet with the inventory availability
                     nextCol = setupMainSpreadsheet(workbook, inventory, checkboxDict)
@@ -338,11 +360,11 @@ class InventoryAppController:
                             i.dumpInventoryEntry()
 
                     # Process each turnover report file in the TurnoverReports directory
-                    for file in os.listdir(self.turnover_dir):
-                        turnover = self.process_turnover_file(self.turnover_dir + file)
+                    for file in self.file_io.list_turnover_files():
+                        turnover = self.process_turnover_file(file)
 
                         setupSpreadsheetTurnoverHeader(
-                            workbook, checkboxDict, nextCol, file.replace(".pdf", "")
+                            workbook, checkboxDict, nextCol, file.stem
                         )
 
                         # Append turnover data to columns in workbook
@@ -352,9 +374,12 @@ class InventoryAppController:
                         nextCol += 1
 
                     # Save and close the spreadsheet
-                    workbook.close()
-
-                    output.update("Successfully processed Inventory Availability!")
+                    if self.file_io.save_workbook(workbook):
+                        output.update("Successfully processed Inventory Availability!")
+                    else:
+                        output.update(
+                            "Could not save the output spreadsheet. See log for details."
+                        )
 
         # If break, close app
         window.close()

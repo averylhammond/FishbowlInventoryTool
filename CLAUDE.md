@@ -42,29 +42,47 @@ focused, single-responsibility classes.
 - Byte-compile sanity check: `python -m py_compile main.py source/*.py`
 
 There is currently **no test suite, dev requirements file, or CI** in this repo (unlike
-`FishbowlInvoiceTool`). When test infrastructure is added, document the commands here.
+`FishbowlInvoiceTool`). When test infrastructure is added, document the commands here. A
+planned follow-up is to stand up `pytest` and add `tests/InventoryAppFileIO_tests.py`
+mirroring the sibling's `tests/InvoiceAppFileIO_tests.py` mocking conventions.
 
 ## Architecture
 
-The application flow is: **entry point → controller → entry data classes + spreadsheet
-writer**.
+The application flow is: **entry point → controller → file I/O + entry data classes +
+spreadsheet writer**.
 
 - **`main.py`** — thin entry point. Constructs an `InventoryAppController` and calls
   `start_application()`. Contains no application logic.
-- **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator
-  and current home of all application logic. Responsibilities:
-  - `__init__` configures logging and resolves the `InventoryAvailability/` and
-    `TurnoverReports/` directories (relative to the executable's CWD).
+- **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator.
+  It owns the GUI and parsing flow and delegates all file I/O to `InventoryAppFileIO`.
+  Responsibilities:
+  - `__init__` configures logging and constructs the `InventoryAppFileIO` collaborator.
   - `start_application()` builds the PySimpleGUI window (file picker + inventory/turnover
-    column checkboxes + Process button) and runs the event loop. On "Process This
-    Inventory" it parses the chosen inventory PDF, derives the output filename from the
-    PDF name via regex, builds the workbook, then loops over every PDF in
-    `TurnoverReports/` appending turnover columns.
+    column checkboxes + Process button), wires the file I/O controller's `report_error`
+    callback to the log + GUI output line, and runs the event loop. On "Process This
+    Inventory" it parses the chosen inventory PDF (bailing gracefully if it can't be
+    read), derives the output filename from the PDF name via regex (falling back to a
+    generic name when the regex doesn't match), creates the workbook via the file I/O
+    controller, then loops over every turnover PDF appending turnover columns and saves.
   - PDF parsing helpers: `process_inventory_file` / `process_inventory_page` and
-    `process_turnover_file` / `process_turnover_page` read PDFs with `tabula.read_pdf`
-    and convert table rows into `InventoryEntry` / `TurnoverEntry` objects.
+    `process_turnover_file` / `process_turnover_page` source raw pages from
+    `InventoryAppFileIO.read_pdf()` and convert table rows into `InventoryEntry` /
+    `TurnoverEntry` objects.
   - `build_checkbox_dict()` snapshots the GUI checkbox state into a dict consumed by the
     spreadsheet writer to decide which columns to emit.
+- **`InventoryAppFileIO`** (`source/InventoryAppFileIO.py`) — home of all file I/O. Reads
+  inventory and turnover PDFs via `tabula.read_pdf` (`read_pdf()`), lists the turnover
+  report PDFs as full `Path`s ready to read (`list_turnover_files()`), and owns the
+  output spreadsheet lifecycle — opening (`create_workbook()`) and saving
+  (`save_workbook()`) the `xlsxwriter` workbook. Directory paths come from
+  `source/constants.py`. Every method wraps its I/O in `try/except`, returns a safe empty
+  value (`[]`/`None`/`False`) on failure, and surfaces the error through an injected
+  `report_error(title, message)` callback (a no-op by default until the controller wires
+  it to the GUI), so missing/unreadable files never crash the app. The in-memory cell
+  writing still lives in `spreadsheetDriver.py`, which receives the already-open workbook.
+- **`constants.py`** (`source/constants.py`) — relative `Path` constants for the input
+  directories (`INVENTORY_DIR`, `TURNOVER_DIR`), resolved against the executable's CWD
+  (mirrors the sibling invoice tool's `constants.py`).
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — plain data holder for one
   inventory row (part, description, uom, onHand, allocated, available, etc.).
   `populateInventoryEntry(list)` maps a split PDF row onto its fields (stripping

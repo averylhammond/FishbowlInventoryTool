@@ -12,5 +12,9 @@ build/
 *.spec
 release/
 
+# Ignore Inventory and Turnover files used for testing
+InventoryAvailability/*
+TurnoverReports/*
+
 # Ignore output files
 *.xlsx

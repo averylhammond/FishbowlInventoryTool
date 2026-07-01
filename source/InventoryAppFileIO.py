@@ -4,7 +4,7 @@ import xlsxwriter
 from pathlib import Path
 from typing import Callable, Optional
 
-from source.constants import TURNOVER_DIR
+from source.constants import RESULTS_FILE, TURNOVER_DIR
 
 # Exceptions tabula.read_pdf may raise: a missing PDF surfaces as FileNotFoundError
 # (an OSError), a missing Java runtime as JavaNotFoundError, malformed table output
@@ -25,7 +25,9 @@ class InventoryAppFileIO:
     ###########################################################################
     ###                 InventoryAppFileIO -> __init__()                    ###
     ###########################################################################
-    def __init__(self, report_error: Callable[[str, str], None] = lambda *_: None):
+    def __init__(
+        self, report_error: Callable[[str, str], None] = lambda *_: None
+    ):
         """
         Initializes the InventoryAppFileIO object
 
@@ -38,6 +40,51 @@ class InventoryAppFileIO:
 
         # Callback used to report file I/O failures to the user
         self.report_error = report_error
+
+    ###########################################################################
+    ###            InventoryAppFileIO -> reset_results_file()               ###
+    ###########################################################################
+    def reset_results_file(self) -> None:
+        """
+        Clears the results file so each run starts with a clean log, creating the
+        logs directory if it does not yet exist
+        """
+
+        try:
+            RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            RESULTS_FILE.write_text("", encoding="utf-8")
+
+        except OSError:
+            self.report_error(
+                "File Error",
+                f"Could not write to the results file: {RESULTS_FILE}",
+            )
+            pass
+
+    ###########################################################################
+    ###           InventoryAppFileIO -> write_to_results_file()             ###
+    ###########################################################################
+    def write_to_results_file(self, contents: str) -> None:
+        """
+        Writes a line to the results file, which holds the inventory/turnover
+        processing output the app would otherwise print to the terminal. Errors are
+        not written here — they go to the GUI via report_error.
+
+        Args:
+            contents (str): The text to append (a trailing newline is added)
+        """
+
+        try:
+            # mkdir is a safety net in case reset_results_file could not create it
+            RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(RESULTS_FILE, "a", encoding="utf-8") as f:
+                f.write(contents + "\n")
+
+        except OSError:
+            self.report_error(
+                "File Error",
+                f"Could not write to the results file: {RESULTS_FILE}",
+            )
 
     ###########################################################################
     ###                  InventoryAppFileIO -> read_pdf()                   ###

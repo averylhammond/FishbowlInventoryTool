@@ -1,4 +1,4 @@
-import logging, re
+import re
 from pathlib import Path
 import PySimpleGUI as sg
 from source.constants import INVENTORY_DIR
@@ -24,18 +24,13 @@ class InventoryAppController:
     def __init__(self):
         """
         Initializes the InventoryAppController object.
-
-        Configures logging for the application and constructs the file I/O
-        controller that owns all reading/writing of files.
         """
-
-        # Setup logging
-        logging.basicConfig(
-            level=logging.DEBUG, format="[%(levelname)s] %(asctime)s - %(message)s"
-        )
 
         # Create the file I/O controller
         self.file_io = InventoryAppFileIO()
+
+        # Start each run with a clean results file
+        self.file_io.reset_results_file()
 
     ###########################################################################
     ###          InventoryAppController -> process_inventory_page()         ###
@@ -100,9 +95,12 @@ class InventoryAppController:
         # Read pdf data
         data = self.file_io.read_pdf(filepath)
 
-        if __debug__:
-            logging.debug(f"Processing inventory file: {filepath}")
-            logging.debug(f"Number of Pages in Inventory: {len(data)}")
+        self.file_io.write_to_results_file(
+            f"Processing inventory file: {filepath}"
+        )
+        self.file_io.write_to_results_file(
+            f"Number of Pages in Inventory: {len(data)}"
+        )
 
         # Loop through each page of table data and process each page
         # Update inventory_table with each new page processed
@@ -205,9 +203,12 @@ class InventoryAppController:
         # Read pdf data
         data = self.file_io.read_pdf(filepath)
 
-        if __debug__:
-            logging.debug(f"Processing turnover file: {filepath}")
-            logging.debug(f"Number of Pages in turnover report: {len(data)}")
+        self.file_io.write_to_results_file(
+            f"Processing turnover file: {filepath}"
+        )
+        self.file_io.write_to_results_file(
+            f"Number of Pages in turnover report: {len(data)}"
+        )
 
         # Loop through each page of table data and process each page
         # Update inventory_table with each new page processed
@@ -216,9 +217,8 @@ class InventoryAppController:
                 page.to_string(), turnover_table
             )
 
-        if __debug__:
-            for i in turnover_table:
-                i.dumpTurnoverEntry()
+        for i in turnover_table:
+            self.file_io.write_to_results_file(i.to_formatted_string())
 
         return turnover_table
 
@@ -289,13 +289,14 @@ class InventoryAppController:
         sg.theme("LightGreen5")
 
         # Create window
-        window = sg.Window("Automated Inventory Processor", layout, size=(650, 500))
+        window = sg.Window(
+            "Automated Inventory Processor", layout, size=(650, 500)
+        )
 
-        # Now that the output element exists, surface any file I/O failure both to
-        # the log and to the GUI output line so the app never crashes on bad files.
-        self.file_io.report_error = lambda title, message: (
-            logging.error(f"{title}: {message}"),
-            output.update(f"{title}: {message}"),
+        # Now that the output element exists, surface any file I/O failure to the GUI
+        # output line so the app never crashes on bad files.
+        self.file_io.report_error = lambda title, message: output.update(
+            f"{title}: {message}"
         )
 
         # Main program loop
@@ -325,7 +326,9 @@ class InventoryAppController:
                     checkboxDict = self.build_checkbox_dict(values)
 
                     # Read in all data from the inventory PDF file
-                    inventory = self.process_inventory_file(values["-FILE_PATH-"])
+                    inventory = self.process_inventory_file(
+                        values["-FILE_PATH-"]
+                    )
 
                     # Bail gracefully if the inventory PDF could not be read (the
                     # file I/O controller has already surfaced the underlying error)
@@ -353,11 +356,14 @@ class InventoryAppController:
                         continue
 
                     # Setup a spreadsheet with the inventory availability
-                    nextCol = setupMainSpreadsheet(workbook, inventory, checkboxDict)
+                    nextCol = setupMainSpreadsheet(
+                        workbook, inventory, checkboxDict
+                    )
 
-                    if __debug__:
-                        for i in inventory:
-                            i.dumpInventoryEntry()
+                    for i in inventory:
+                        self.file_io.write_to_results_file(
+                            i.to_formatted_string()
+                        )
 
                     # Process each turnover report file in the TurnoverReports directory
                     for file in self.file_io.list_turnover_files():
@@ -369,13 +375,19 @@ class InventoryAppController:
 
                         # Append turnover data to columns in workbook
                         appendTurnoverToSpreadsheet(
-                            workbook, turnover, inventory, nextCol, checkboxDict
+                            workbook,
+                            turnover,
+                            inventory,
+                            nextCol,
+                            checkboxDict,
                         )
                         nextCol += 1
 
                     # Save and close the spreadsheet
                     if self.file_io.save_workbook(workbook):
-                        output.update("Successfully processed Inventory Availability!")
+                        output.update(
+                            "Successfully processed Inventory Availability!"
+                        )
                     else:
                         output.update(
                             "Could not save the output spreadsheet. See log for details."

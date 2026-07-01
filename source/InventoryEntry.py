@@ -1,5 +1,3 @@
-import logging
-
 # InventoryEntry class to hold all attributes of the InventoryEntry that
 # passes to the .xlsx file
 class InventoryEntry:
@@ -18,25 +16,27 @@ class InventoryEntry:
         self.rowWrittenTo = 0     # The row that the entry is written to through the xlsxwriter API
 
     
-    # dumpInventoryEntry is a debug function to print the attributes of a given InventoryEntry object
-    # to the terminal
+    # to_formatted_string returns a formatted string of the attributes of a given
+    # InventoryEntry object, for writing to the results file
     # params: N/A
-    # returns: N/A
-    def dumpInventoryEntry(self):
-        logging.debug("*****************************")
-        logging.debug(f"part: {self.part}")
-        logging.debug(f"description: {self.description}")
-        logging.debug(f"uom: {self.uom}")
-        logging.debug(f"onHand: {self.onHand}")
-        logging.debug(f"allocated: {self.allocated}")
-        logging.debug(f"notAvailable: {self.notAvailable}")
-        logging.debug(f"dropShip: {self.dropShip}")
-        logging.debug(f"available: {self.available}")
-        logging.debug(f"onOrder: {self.onOrder}")
-        logging.debug(f"committed: {self.committed}")
-        logging.debug(f"short: {self.short}")
-        logging.debug(f"rowWrittenTo: {self.rowWrittenTo}")
-        logging.debug("*****************************")
+    # returns: str, the formatted attribute dump
+    def to_formatted_string(self):
+        return (
+            "*****************************\n"
+            f"part: {self.part}\n"
+            f"description: {self.description}\n"
+            f"uom: {self.uom}\n"
+            f"onHand: {self.onHand}\n"
+            f"allocated: {self.allocated}\n"
+            f"notAvailable: {self.notAvailable}\n"
+            f"dropShip: {self.dropShip}\n"
+            f"available: {self.available}\n"
+            f"onOrder: {self.onOrder}\n"
+            f"committed: {self.committed}\n"
+            f"short: {self.short}\n"
+            f"rowWrittenTo: {self.rowWrittenTo}\n"
+            "*****************************"
+        )
 
 
     # populateInventoryEntry initializes the appropriate fields of a given InventoryEntry object

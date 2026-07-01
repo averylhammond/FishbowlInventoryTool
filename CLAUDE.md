@@ -56,10 +56,11 @@ spreadsheet writer**.
 - **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator.
   It owns the GUI and parsing flow and delegates all file I/O to `InventoryAppFileIO`.
   Responsibilities:
-  - `__init__` configures logging and constructs the `InventoryAppFileIO` collaborator.
+  - `__init__` constructs the `InventoryAppFileIO` collaborator and clears the results
+    file (`reset_results_file()`) so each run starts with a fresh diagnostics log.
   - `start_application()` builds the PySimpleGUI window (file picker + inventory/turnover
     column checkboxes + Process button), wires the file I/O controller's `report_error`
-    callback to the log + GUI output line, and runs the event loop. On "Process This
+    callback to the GUI output line, and runs the event loop. On "Process This
     Inventory" it parses the chosen inventory PDF (bailing gracefully if it can't be
     read), derives the output filename from the PDF name via regex (falling back to a
     generic name when the regex doesn't match), creates the workbook via the file I/O
@@ -74,23 +75,32 @@ spreadsheet writer**.
   inventory and turnover PDFs via `tabula.read_pdf` (`read_pdf()`), lists the turnover
   report PDFs as full `Path`s ready to read (`list_turnover_files()`), and owns the
   output spreadsheet lifecycle — opening (`create_workbook()`) and saving
-  (`save_workbook()`) the `xlsxwriter` workbook. Directory paths come from
+  (`save_workbook()`) the `xlsxwriter` workbook. It also owns the results log at
+  `logs/results.txt` — `reset_results_file()` clears it on startup and
+  `write_to_results_file()` appends a line; the inventory/turnover processing output
+  that the app once printed to the terminal via `logging` now flows through the latter
+  (the `logging` dependency has been removed). Errors are **not** written there — they go
+  only to the GUI output line via `report_error`. Directory and file paths come from
   `source/constants.py`. Every method wraps its I/O in `try/except`, returns a safe empty
   value (`[]`/`None`/`False`) on failure, and surfaces the error through an injected
   `report_error(title, message)` callback (a no-op by default until the controller wires
-  it to the GUI), so missing/unreadable files never crash the app. The in-memory cell
-  writing still lives in `spreadsheetDriver.py`, which receives the already-open workbook.
+  it to the GUI), so missing/unreadable files never crash the app. The two results-file
+  helpers swallow their own write failures silently. The in-memory cell writing still
+  lives in `spreadsheetDriver.py`, which receives the already-open workbook.
 - **`constants.py`** (`source/constants.py`) — relative `Path` constants for the input
-  directories (`INVENTORY_DIR`, `TURNOVER_DIR`), resolved against the executable's CWD
-  (mirrors the sibling invoice tool's `constants.py`).
+  directories (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`,
+  `RESULTS_FILE`), resolved against the executable's CWD (mirrors the sibling invoice
+  tool's `constants.py`).
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — plain data holder for one
   inventory row (part, description, uom, onHand, allocated, available, etc.).
   `populateInventoryEntry(list)` maps a split PDF row onto its fields (stripping
-  whitespace/commas); `dumpInventoryEntry()` is a `__debug__` logging helper. Tracks
-  `rowWrittenTo` so turnover data can be matched back to the same spreadsheet row.
+  whitespace/commas); `to_formatted_string()` returns a formatted-string dump that the
+  controller writes to the results file. Tracks `rowWrittenTo` so turnover data can be
+  matched back to the same spreadsheet row.
 - **`TurnoverEntry`** (`source/TurnoverEntry.py`) — plain data holder for one turnover
   "Totals:" row (partDescription, unitsSold, avgQOH, avgTODays, TORate), with a parallel
-  `populateTurnoverEntry()` / `dumpTurnoverEntry()`.
+  `populateTurnoverEntry()` / `to_formatted_string()` (the latter returns a formatted
+  string dump).
 - **`spreadsheetDriver.py`** (`source/spreadsheetDriver.py`) — all `xlsxwriter` output.
   Module-level functions (not a class) build the workbook: `setupMainSpreadsheet` writes
   the inventory header + rows; `setupSpreadsheetTurnoverHeader` /
@@ -109,11 +119,12 @@ spreadsheet writer**.
   or columns and data will desync.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
-- `__debug__`-gated code (debug logging / entry dumps) is intended to be stripped in a
-  PyInstaller release build (`python -O`), matching the sibling invoice tool's approach.
 - The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
   Windows console for the packaged executable — uncomment only when building with
   PyInstaller.
+- Keep comments concise: a comment should explain only what the immediately adjacent
+  code does. Do not document the behavior of other objects, functions, or modules from
+  within a comment — describe those where they are defined, not at the call site.
 
 ## Git Workflow (when working on a GitHub issue)
 

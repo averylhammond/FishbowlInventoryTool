@@ -122,6 +122,9 @@ spreadsheet writer**.
 - The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
   Windows console for the packaged executable — uncomment only when building with
   PyInstaller.
+- Keep comments concise: a comment should explain only what the immediately adjacent
+  code does. Do not document the behavior of other objects, functions, or modules from
+  within a comment — describe those where they are defined, not at the call site.
 
 ## Git Workflow (when working on a GitHub issue)
 

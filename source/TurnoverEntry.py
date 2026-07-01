@@ -11,7 +11,7 @@ class TurnoverEntry:
         # fmt:on
 
     # to_formatted_string returns a formatted string of the attributes of a given
-    # TurnoverEntry object, for writing to the results file
+    # TurnoverEntry object
     # params: N/A
     # returns: str, the formatted attribute dump
     def to_formatted_string(self):

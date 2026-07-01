@@ -17,7 +17,7 @@ class InventoryEntry:
 
     
     # to_formatted_string returns a formatted string of the attributes of a given
-    # InventoryEntry object, for writing to the results file
+    # InventoryEntry object
     # params: N/A
     # returns: str, the formatted attribute dump
     def to_formatted_string(self):

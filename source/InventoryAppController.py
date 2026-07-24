@@ -1,6 +1,8 @@
 import re
+from collections import defaultdict
 from pathlib import Path
 import PySimpleGUI as sg
+from fishbowl_common import ArgumentProvider
 from source.constants import INVENTORY_DIR
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryEntry import *
@@ -28,6 +30,11 @@ class InventoryAppController:
 
         # Create the file I/O controller
         self.file_io = InventoryAppFileIO()
+
+        # Argument provider to check for integration test (headless) mode
+        self.argument_provider = ArgumentProvider(
+            description="Fishbowl inventory availability report generator"
+        )
 
         # Start each run with a clean results file
         self.file_io.reset_results_file()
@@ -223,13 +230,123 @@ class InventoryAppController:
         return turnover_table
 
     ###########################################################################
+    ###             InventoryAppController -> process_inventory()           ###
+    ###########################################################################
+    def process_inventory(
+        self, inventory_pdf_path: str, checkbox_dict: dict, report_status
+    ) -> bool:
+        """
+        Processes a single inventory availability PDF into an output spreadsheet,
+        appending each turnover report's columns, then saves the workbook. Shared by
+        the GUI event loop and the headless integration-test path.
+
+        Args:
+            inventory_pdf_path (str): Path to the inventory availability PDF to process
+            checkbox_dict (dict): Column-selection dict deciding which columns to emit
+            report_status (Callable[[str], None]): Callback for user-facing status
+                messages (the GUI output line, or stdout in headless mode)
+
+        Returns:
+            bool: True if the spreadsheet was saved, False if any step failed
+        """
+
+        report_status("Processing Inventory... Please wait.")
+
+        # Read in all data from the inventory PDF file
+        inventory = self.process_inventory_file(inventory_pdf_path)
+
+        # Bail gracefully if the inventory PDF could not be read (the file I/O
+        # controller has already surfaced the underlying error)
+        if not inventory:
+            report_status(
+                "Could not read the selected Inventory PDF. See log for details."
+            )
+            return False
+
+        # Get the date of the inventory file from the name. This will be the name of
+        # the excel file. Fall back to a generic name if the path has no digit/.pdf.
+        match = re.search(r"(\d*)\.pdf", inventory_pdf_path)
+        filename = (
+            match.group().replace(".pdf", "") if match else "InventoryReport"
+        )
+
+        # Spreadsheet Workbook definition
+        workbook = self.file_io.create_workbook(filename)
+        if workbook is None:
+            report_status(
+                "Could not create the output spreadsheet. See log for details."
+            )
+            return False
+
+        # Setup a spreadsheet with the inventory availability
+        nextCol = setupMainSpreadsheet(workbook, inventory, checkbox_dict)
+
+        for i in inventory:
+            self.file_io.write_to_results_file(i.to_formatted_string())
+
+        # Process each turnover report file in the TurnoverReports directory
+        for file in self.file_io.list_turnover_files():
+            turnover = self.process_turnover_file(file)
+
+            setupSpreadsheetTurnoverHeader(
+                workbook, checkbox_dict, nextCol, file.stem
+            )
+
+            # Append turnover data to columns in workbook
+            appendTurnoverToSpreadsheet(
+                workbook, turnover, inventory, nextCol, checkbox_dict
+            )
+            nextCol += 1
+
+        # Save and close the spreadsheet
+        if self.file_io.save_workbook(workbook):
+            report_status("Successfully processed Inventory Availability!")
+            return True
+
+        report_status(
+            "Could not save the output spreadsheet. See log for details."
+        )
+        return False
+
+    ###########################################################################
+    ###           InventoryAppController -> run_integration_test()          ###
+    ###########################################################################
+    def run_integration_test(self):
+        """
+        Runs the application headless (no GUI): every inventory/turnover column is
+        included and every inventory PDF in the inventory directory is processed. This
+        lets a CI workflow generate the results file without any GUI interaction.
+        """
+
+        # Surface I/O failures to stdout since there is no GUI output line here
+        self.file_io.report_error = lambda title, message: print(
+            f"{title}: {message}"
+        )
+
+        # Include every column, reusing build_checkbox_dict as the single source of
+        # the column keys (defaultdict returns True for every checkbox lookup)
+        checkbox_dict = self.build_checkbox_dict(defaultdict(lambda: True))
+
+        # Process every inventory PDF, routing status to stdout (not the results file)
+        for path in self.file_io.list_inventory_files():
+            self.process_inventory(str(path), checkbox_dict, print)
+
+    ###########################################################################
     ###            InventoryAppController -> start_application()            ###
     ###########################################################################
     def start_application(self):
         """
         Starts the application by building the GUI window and running the main
         event loop until the user exits.
+
+        Note: In integration test mode the GUI is skipped entirely and every inventory
+        PDF is processed headless instead.
         """
+
+        # In integration test mode, process all inventories headless without a GUI
+        if self.argument_provider.integration_test_mode:
+            self.run_integration_test()
+            return
 
         # Instantiate output window
         output = sg.Text()
@@ -308,90 +425,22 @@ class InventoryAppController:
             if event in (sg.WIN_CLOSED, "Exit"):
                 break
 
-            # If the process button is selected, process the invoice
+            # If the process button is selected, process the inventory
             elif event == "Process This Inventory":
 
-                # TODO: Revise this if else structure, don't like it
                 if values["-FILE_PATH-"] == "":
                     output.update(
                         "Please choose a valid Inventory Availability PDF file!"
                     )
 
                 else:
-                    # Update output text
-                    output.update("Processing Inventory... Please wait.")
-
-                    # Create a dictionary with checkbox input to determine which columns to show
-                    # based on user input
-                    checkboxDict = self.build_checkbox_dict(values)
-
-                    # Read in all data from the inventory PDF file
-                    inventory = self.process_inventory_file(
-                        values["-FILE_PATH-"]
+                    # Process the chosen inventory PDF, surfacing status to the GUI
+                    # output line
+                    self.process_inventory(
+                        values["-FILE_PATH-"],
+                        self.build_checkbox_dict(values),
+                        output.update,
                     )
-
-                    # Bail gracefully if the inventory PDF could not be read (the
-                    # file I/O controller has already surfaced the underlying error)
-                    if not inventory:
-                        output.update(
-                            "Could not read the selected Inventory PDF. See log for details."
-                        )
-                        continue
-
-                    # Get the date of the inventory file from the name. This will be the name of the excel file.
-                    # Fall back to a generic name if the path has no digit/.pdf to match.
-                    match = re.search(r"(\d*)\.pdf", values["-FILE_PATH-"])
-                    filename = (
-                        match.group().replace(".pdf", "")
-                        if match
-                        else "InventoryReport"
-                    )
-
-                    # Spreadsheet Workbook definition
-                    workbook = self.file_io.create_workbook(filename)
-                    if workbook is None:
-                        output.update(
-                            "Could not create the output spreadsheet. See log for details."
-                        )
-                        continue
-
-                    # Setup a spreadsheet with the inventory availability
-                    nextCol = setupMainSpreadsheet(
-                        workbook, inventory, checkboxDict
-                    )
-
-                    for i in inventory:
-                        self.file_io.write_to_results_file(
-                            i.to_formatted_string()
-                        )
-
-                    # Process each turnover report file in the TurnoverReports directory
-                    for file in self.file_io.list_turnover_files():
-                        turnover = self.process_turnover_file(file)
-
-                        setupSpreadsheetTurnoverHeader(
-                            workbook, checkboxDict, nextCol, file.stem
-                        )
-
-                        # Append turnover data to columns in workbook
-                        appendTurnoverToSpreadsheet(
-                            workbook,
-                            turnover,
-                            inventory,
-                            nextCol,
-                            checkboxDict,
-                        )
-                        nextCol += 1
-
-                    # Save and close the spreadsheet
-                    if self.file_io.save_workbook(workbook):
-                        output.update(
-                            "Successfully processed Inventory Availability!"
-                        )
-                    else:
-                        output.update(
-                            "Could not save the output spreadsheet. See log for details."
-                        )
 
         # If break, close app
         window.close()

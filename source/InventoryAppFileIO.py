@@ -4,7 +4,7 @@ import xlsxwriter
 from pathlib import Path
 from typing import Callable, Optional
 
-from source.constants import RESULTS_FILE, TURNOVER_DIR
+from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR
 
 # Exceptions tabula.read_pdf may raise: a missing PDF surfaces as FileNotFoundError
 # (an OSError), a missing Java runtime as JavaNotFoundError, malformed table output
@@ -110,6 +110,33 @@ class InventoryAppFileIO:
             self.report_error(
                 "File Error",
                 f"Could not read the PDF at {filepath}: {error}",
+            )
+            return []
+
+    ###########################################################################
+    ###            InventoryAppFileIO -> list_inventory_files()             ###
+    ###########################################################################
+    def list_inventory_files(self) -> list:
+        """
+        Lists the inventory availability PDFs found in the inventory directory
+
+        Returns:
+            list: A sorted list of full Paths to the *.pdf files in the inventory
+                directory, or an empty list if the directory is missing or could
+                not be read
+        """
+
+        try:
+            # Only return PDFs (the directory may hold other files), sorted so the
+            # inventory files are processed in a deterministic order
+            return sorted(
+                f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"
+            )
+
+        except OSError as error:
+            self.report_error(
+                "File Error",
+                f"Could not read the inventory directory at {INVENTORY_DIR}: {error}",
             )
             return []
 

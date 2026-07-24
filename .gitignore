@@ -16,6 +16,8 @@ release/
 # Ignore Inventory and Turnover files used for testing
 InventoryAvailability/*
 TurnoverReports/*
+# Parked inventory PDFs copied in by copy_resources.sh (excluded from the test)
+InventoryAvailabilityPendingParserFix/
 
 # Ignore output files
 *.xlsx

@@ -1,5 +1,7 @@
 # NOTE: tabula-py requires a Java runtime (JRE 8+) installed on the system.
 
+# Shared infrastructure (ArgumentProvider, etc.) installed from GitHub, pinned to a git tag.
+fishbowl-common @ git+https://github.com/averylhammond/fishbowl-common.git@v0.1.0
 tabula-py==2.9.0
 pandas==2.2.3
 XlsxWriter==3.2.0

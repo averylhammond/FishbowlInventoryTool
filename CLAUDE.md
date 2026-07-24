@@ -34,11 +34,16 @@ focused, single-responsibility classes.
   PDF tables. The app/parsing will fail without a JRE on `PATH`.
 - Virtual env: `python -m venv venv`, then `source venv/Scripts/activate` (Windows) or
   `source venv/bin/activate` (Linux/Mac).
-- Install deps: `pip install -r requirements/release.txt`.
+- Install deps: `pip install -r requirements/release.txt`. This pulls `fishbowl-common`
+  (import name `fishbowl_common`) from GitHub — the shared package providing
+  `ArgumentProvider`; see the sibling `FishbowlInvoiceTool` for the shared-package story.
 
 ## Common Commands
 
 - Run the app (GUI): `python main.py`
+- Run headless (no GUI): `python main.py --integration-test` — processes every PDF in
+  `InventoryAvailability/` with all columns included and writes `logs/results.txt`.
+  Intended for a future CI workflow to validate output without GUI interaction.
 - Byte-compile sanity check: `python -m py_compile main.py source/*.py`
 
 There is currently **no test suite, dev requirements file, or CI** in this repo (unlike
@@ -56,15 +61,29 @@ spreadsheet writer**.
 - **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator.
   It owns the GUI and parsing flow and delegates all file I/O to `InventoryAppFileIO`.
   Responsibilities:
-  - `__init__` constructs the `InventoryAppFileIO` collaborator and clears the results
-    file (`reset_results_file()`) so each run starts with a fresh diagnostics log.
-  - `start_application()` builds the PySimpleGUI window (file picker + inventory/turnover
-    column checkboxes + Process button), wires the file I/O controller's `report_error`
-    callback to the GUI output line, and runs the event loop. On "Process This
-    Inventory" it parses the chosen inventory PDF (bailing gracefully if it can't be
-    read), derives the output filename from the PDF name via regex (falling back to a
-    generic name when the regex doesn't match), creates the workbook via the file I/O
-    controller, then loops over every turnover PDF appending turnover columns and saves.
+  - `__init__` constructs the `InventoryAppFileIO` collaborator, constructs the shared
+    `ArgumentProvider` (from the `fishbowl-common` package) to detect headless mode, and
+    clears the results file (`reset_results_file()`) so each run starts with a fresh
+    diagnostics log.
+  - `start_application()` first checks `argument_provider.integration_test_mode`: when set
+    (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
+    `run_integration_test()`. Otherwise it builds the PySimpleGUI window (file picker +
+    inventory/turnover column checkboxes + Process button), wires the file I/O
+    controller's `report_error` callback to the GUI output line, and runs the event loop.
+    On "Process This Inventory" it delegates to `process_inventory()`.
+  - `process_inventory(inventory_pdf_path, checkbox_dict, report_status)` — the shared
+    per-file processing routine used by both the GUI and headless paths. It parses the
+    inventory PDF (bailing gracefully if it can't be read), derives the output filename
+    from the PDF name via regex (falling back to a generic name when the regex doesn't
+    match), creates the workbook via the file I/O controller, then loops over every
+    turnover PDF appending turnover columns and saves. Status strings go to the injected
+    `report_status` callback (the GUI output line, or `print`/stdout in headless mode) —
+    never to the results file — so the results log stays deterministic for CI diffing.
+  - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout,
+    builds an all-columns-checked `checkbox_dict` (reusing `build_checkbox_dict` with a
+    `defaultdict(lambda: True)` so the column keys stay defined in one place), and calls
+    `process_inventory()` for every PDF from `InventoryAppFileIO.list_inventory_files()`.
+    Lets a CI workflow generate `logs/results.txt` with no GUI interaction.
   - PDF parsing helpers: `process_inventory_file` / `process_inventory_page` and
     `process_turnover_file` / `process_turnover_page` source raw pages from
     `InventoryAppFileIO.read_pdf()` and convert table rows into `InventoryEntry` /
@@ -72,8 +91,9 @@ spreadsheet writer**.
   - `build_checkbox_dict()` snapshots the GUI checkbox state into a dict consumed by the
     spreadsheet writer to decide which columns to emit.
 - **`InventoryAppFileIO`** (`source/InventoryAppFileIO.py`) — home of all file I/O. Reads
-  inventory and turnover PDFs via `tabula.read_pdf` (`read_pdf()`), lists the turnover
-  report PDFs as full `Path`s ready to read (`list_turnover_files()`), and owns the
+  inventory and turnover PDFs via `tabula.read_pdf` (`read_pdf()`), lists the inventory
+  availability PDFs (`list_inventory_files()`, used by headless mode) and the turnover
+  report PDFs (`list_turnover_files()`) as full `Path`s ready to read, and owns the
   output spreadsheet lifecycle — opening (`create_workbook()`) and saving
   (`save_workbook()`) the `xlsxwriter` workbook. It also owns the results log at
   `logs/results.txt` — `reset_results_file()` clears it on startup and

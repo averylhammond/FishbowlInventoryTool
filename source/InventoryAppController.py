@@ -1,7 +1,6 @@
 import re
 from collections import defaultdict
 from pathlib import Path
-import PySimpleGUI as sg
 from fishbowl_common import ArgumentProvider
 from source.constants import INVENTORY_DIR
 from source.InventoryAppFileIO import InventoryAppFileIO
@@ -102,8 +101,10 @@ class InventoryAppController:
         # Read pdf data
         data = self.file_io.read_pdf(filepath)
 
+        # Log the bare filename, not the path, so the results file reads the same
+        # regardless of the platform or how the file was selected
         self.file_io.write_to_results_file(
-            f"Processing inventory file: {filepath}"
+            f"Processing inventory file: {Path(filepath).name}"
         )
         self.file_io.write_to_results_file(
             f"Number of Pages in Inventory: {len(data)}"
@@ -211,7 +212,7 @@ class InventoryAppController:
         data = self.file_io.read_pdf(filepath)
 
         self.file_io.write_to_results_file(
-            f"Processing turnover file: {filepath}"
+            f"Processing turnover file: {Path(filepath).name}"
         )
         self.file_io.write_to_results_file(
             f"Number of Pages in turnover report: {len(data)}"
@@ -347,6 +348,10 @@ class InventoryAppController:
         if self.argument_provider.integration_test_mode:
             self.run_integration_test()
             return
+
+        # Imported here rather than at module scope so headless runs never pull in
+        # PySimpleGUI (and the tkinter it imports), which they have no use for
+        import PySimpleGUI as sg
 
         # Instantiate output window
         output = sg.Text()

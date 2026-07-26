@@ -52,7 +52,7 @@ class InventoryAppFileIO:
 
         try:
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            RESULTS_FILE.write_text("", encoding="utf-8")
+            RESULTS_FILE.write_text("", encoding="utf-8", newline="\n")
 
         except OSError:
             self.report_error(
@@ -77,7 +77,10 @@ class InventoryAppFileIO:
         try:
             # mkdir is a safety net in case reset_results_file could not create it
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(RESULTS_FILE, "a", encoding="utf-8") as f:
+
+            # newline="\n" disables the platform newline translation that would
+            # otherwise write CRLF on Windows; CI diffs this file byte-for-byte
+            with open(RESULTS_FILE, "a", encoding="utf-8", newline="\n") as f:
                 f.write(contents + "\n")
 
         except OSError:
@@ -127,10 +130,12 @@ class InventoryAppFileIO:
         """
 
         try:
-            # Only return PDFs (the directory may hold other files), sorted so the
-            # inventory files are processed in a deterministic order
+            # Only return PDFs (the directory may hold other files), sorted by name so
+            # the inventory files are processed in the same order on every platform
+            # (Path comparison is case-insensitive on Windows, case-sensitive on POSIX)
             return sorted(
-                f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"
+                (f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"),
+                key=lambda f: f.name,
             )
 
         except OSError as error:
@@ -154,10 +159,11 @@ class InventoryAppFileIO:
         """
 
         try:
-            # Only return PDFs (the directory may hold other files), sorted so the
-            # turnover columns are emitted in a deterministic order
+            # Only return PDFs (the directory may hold other files), sorted by name so
+            # the turnover columns are emitted in the same order on every platform
             return sorted(
-                f for f in TURNOVER_DIR.iterdir() if f.suffix.lower() == ".pdf"
+                (f for f in TURNOVER_DIR.iterdir() if f.suffix.lower() == ".pdf"),
+                key=lambda f: f.name,
             )
 
         except OSError as error:

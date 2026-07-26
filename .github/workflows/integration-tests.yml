@@ -14,14 +14,7 @@ jobs:
     # Give the job a name to link into the Github Rules UI
     name: Integration Tests CI Check
 
-    # Must stay on windows: the canonical results file records Windows-style relative
-    # paths, which a Linux runner would not reproduce
-    runs-on: windows-latest
-
-    # Make sure that windows is using bash shell, since all terminal commands in this job are bash style
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
 
     # Checkout repo, including the private submodule holding the test data
     steps:

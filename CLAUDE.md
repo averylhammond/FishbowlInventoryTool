@@ -52,16 +52,20 @@ focused, single-responsibility classes.
 ### CI
 
 `.github/workflows/integration-tests.yml` — the only workflow, run on pull requests to
-`main` and on manual dispatch. On `windows-latest` (the canonical results file records
-Windows-style relative paths, so a Linux runner would fail the diff on every path line) it
-installs `requirements/release.txt`, sets up a Temurin JRE for `tabula-py`, stages the test
-PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails the check unless
+`main` and on manual dispatch. On `ubuntu-latest` it installs `requirements/release.txt`,
+sets up a Temurin JRE for `tabula-py`, stages the test PDFs with
+`scripts/copy_resources.sh`, runs the app headless, and fails the check unless
 `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Checking out
 the private submodule needs the `CUSTOMER_DATA_PAT` repo secret. The diff is inlined in the
 workflow; the submodule's `run_automated_tests.sh` is a local convenience script only and
 is not invoked by CI. When the parser changes output intentionally, regenerate
 `canonical_correct_results.txt` in the `automated-inventory-testing` repo and bump the
 submodule pointer.
+
+The job runs on Linux while the app ships as a Windows executable, which is only safe
+because the results file is platform-independent by construction (see the results-file
+convention below). Nothing enforces that continuously — if a Windows-specific regression
+ever slips through, add a `windows-latest` leg to a `strategy.matrix`.
 
 There is still **no unit test suite or dev requirements file** in this repo (unlike
 `FishbowlInvoiceTool`). When that infrastructure is added, document the commands here. A
@@ -156,6 +160,12 @@ spreadsheet writer**.
   or columns and data will desync.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
+- **The results file is a CI fixture, not a log.** It is diffed byte-for-byte against
+  `canonical_correct_results.txt`, so nothing platform-varying may reach it: LF endings
+  only (`write_to_results_file` opens with `newline="\n"`), bare filenames rather than
+  paths, and explicitly-keyed sorts in `list_inventory_files`/`list_turnover_files` rather
+  than relying on `Path` ordering. Errors and user-facing status go to `report_error` /
+  `report_status`, never here — they would make the diff depend on the environment.
 - The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
   Windows console for the packaged executable — uncomment only when building with
   PyInstaller.

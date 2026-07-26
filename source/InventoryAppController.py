@@ -9,7 +9,8 @@ from source.TurnoverEntry import *
 from source.spreadsheetDriver import *
 
 # Uncomment these lines when running pyinstaller to hide the windows terminal
-# upon program execution
+# upon program execution. pywin32 is not in requirements/release.txt since nothing
+# imports it while these lines are commented out, so install it before uncommenting.
 # import win32gui, win32con
 # hide = win32gui.GetForegroundWindow()
 # win32gui.ShowWindow(hide, win32con.SW_HIDE)
@@ -350,7 +351,9 @@ class InventoryAppController:
             return
 
         # Imported here rather than at module scope so headless runs never pull in
-        # PySimpleGUI (and the tkinter it imports), which they have no use for
+        # PySimpleGUI (and the tkinter it imports), which they have no use for.
+        # Remove this local import once the GUI moves into its own class — the
+        # controller should not be importing GUI modules at all.
         import PySimpleGUI as sg
 
         # Instantiate output window

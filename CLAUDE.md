@@ -160,12 +160,16 @@ spreadsheet writer**.
   or columns and data will desync.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
-- **The results file is a CI fixture, not a log.** It is diffed byte-for-byte against
-  `canonical_correct_results.txt`, so nothing platform-varying may reach it: LF endings
-  only (`write_to_results_file` opens with `newline="\n"`), bare filenames rather than
-  paths, and explicitly-keyed sorts in `list_inventory_files`/`list_turnover_files` rather
-  than relying on `Path` ordering. Errors and user-facing status go to `report_error` /
-  `report_status`, never here — they would make the diff depend on the environment.
+- **The results file is a CI fixture, not a log.** It is diffed against
+  `canonical_correct_results.txt`, so its *content* must not vary by platform: log bare
+  filenames rather than paths, and use explicitly-keyed sorts in
+  `list_inventory_files`/`list_turnover_files` rather than relying on `Path` ordering
+  (which is case-insensitive on Windows, case-sensitive on POSIX). Errors and user-facing
+  status go to `report_error`/`report_status`, never here — they would make the diff depend
+  on the environment. Line endings are the one thing that may differ: the file is written
+  in text mode, so it is CRLF on Windows and LF on Linux, and git's `core.autocrlf`
+  translation of the canonical file cancels this out on both. Do not "fix" that asymmetry
+  in one place without the other.
 - The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
   Windows console for the packaged executable — uncomment only when building with
   PyInstaller.

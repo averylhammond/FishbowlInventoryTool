@@ -52,7 +52,7 @@ class InventoryAppFileIO:
 
         try:
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            RESULTS_FILE.write_text("", encoding="utf-8", newline="\n")
+            RESULTS_FILE.write_text("", encoding="utf-8")
 
         except OSError:
             self.report_error(
@@ -77,10 +77,7 @@ class InventoryAppFileIO:
         try:
             # mkdir is a safety net in case reset_results_file could not create it
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-            # newline="\n" disables the platform newline translation that would
-            # otherwise write CRLF on Windows; CI diffs this file byte-for-byte
-            with open(RESULTS_FILE, "a", encoding="utf-8", newline="\n") as f:
+            with open(RESULTS_FILE, "a", encoding="utf-8") as f:
                 f.write(contents + "\n")
 
         except OSError:

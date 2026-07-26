@@ -170,10 +170,6 @@ spreadsheet writer**.
   in text mode, so it is CRLF on Windows and LF on Linux, and git's `core.autocrlf`
   translation of the canonical file cancels this out on both. Do not "fix" that asymmetry
   in one place without the other.
-- The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
-  Windows console for the packaged executable — uncomment only when building with
-  PyInstaller, and `pip install pywin32` first. It is deliberately not in
-  `requirements/release.txt`: nothing imports it while those lines are commented out.
 - `start_application()` imports `PySimpleGUI` locally rather than at module scope, so a
   headless run never loads tkinter. This is a stopgap — when the GUI is extracted into its
   own class the controller should stop importing GUI modules entirely and the local import

@@ -8,13 +8,6 @@ from source.InventoryEntry import *
 from source.TurnoverEntry import *
 from source.spreadsheetDriver import *
 
-# Uncomment these lines when running pyinstaller to hide the windows terminal
-# upon program execution. pywin32 is not in requirements/release.txt since nothing
-# imports it while these lines are commented out, so install it before uncommenting.
-# import win32gui, win32con
-# hide = win32gui.GetForegroundWindow()
-# win32gui.ShowWindow(hide, win32con.SW_HIDE)
-
 
 # InventoryAppController class to drive logic for processing inventory and
 # turnover report PDFs.

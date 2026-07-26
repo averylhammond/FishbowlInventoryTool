@@ -42,12 +42,29 @@ focused, single-responsibility classes.
 
 - Run the app (GUI): `python main.py`
 - Run headless (no GUI): `python main.py --integration-test` — processes every PDF in
-  `InventoryAvailability/` with all columns included and writes `logs/results.txt`.
-  Intended for a future CI workflow to validate output without GUI interaction.
+  `InventoryAvailability/` with all columns included and writes `logs/results.txt`. This
+  is what CI runs to validate output without GUI interaction.
 - Byte-compile sanity check: `python -m py_compile main.py source/*.py`
+- Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
+  `python main.py --integration-test` then
+  `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`.
 
-There is currently **no test suite, dev requirements file, or CI** in this repo (unlike
-`FishbowlInvoiceTool`). When test infrastructure is added, document the commands here. A
+### CI
+
+`.github/workflows/integration-tests.yml` — the only workflow, run on pull requests to
+`main` and on manual dispatch. On `windows-latest` (the canonical results file records
+Windows-style relative paths, so a Linux runner would fail the diff on every path line) it
+installs `requirements/release.txt`, sets up a Temurin JRE for `tabula-py`, stages the test
+PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails the check unless
+`logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Checking out
+the private submodule needs the `CUSTOMER_DATA_PAT` repo secret. The diff is inlined in the
+workflow; the submodule's `run_automated_tests.sh` is a local convenience script only and
+is not invoked by CI. When the parser changes output intentionally, regenerate
+`canonical_correct_results.txt` in the `automated-inventory-testing` repo and bump the
+submodule pointer.
+
+There is still **no unit test suite or dev requirements file** in this repo (unlike
+`FishbowlInvoiceTool`). When that infrastructure is added, document the commands here. A
 planned follow-up is to stand up `pytest` and add `tests/InventoryAppFileIO_tests.py`
 mirroring the sibling's `tests/InvoiceAppFileIO_tests.py` mocking conventions.
 

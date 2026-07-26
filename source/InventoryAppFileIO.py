@@ -127,10 +127,12 @@ class InventoryAppFileIO:
         """
 
         try:
-            # Only return PDFs (the directory may hold other files), sorted so the
-            # inventory files are processed in a deterministic order
+            # Only return PDFs (the directory may hold other files), sorted by name so
+            # the inventory files are processed in the same order on every platform
+            # (Path comparison is case-insensitive on Windows, case-sensitive on POSIX)
             return sorted(
-                f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"
+                (f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"),
+                key=lambda f: f.name,
             )
 
         except OSError as error:
@@ -154,10 +156,11 @@ class InventoryAppFileIO:
         """
 
         try:
-            # Only return PDFs (the directory may hold other files), sorted so the
-            # turnover columns are emitted in a deterministic order
+            # Only return PDFs (the directory may hold other files), sorted by name so
+            # the turnover columns are emitted in the same order on every platform
             return sorted(
-                f for f in TURNOVER_DIR.iterdir() if f.suffix.lower() == ".pdf"
+                (f for f in TURNOVER_DIR.iterdir() if f.suffix.lower() == ".pdf"),
+                key=lambda f: f.name,
             )
 
         except OSError as error:

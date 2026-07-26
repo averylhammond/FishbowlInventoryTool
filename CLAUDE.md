@@ -42,12 +42,33 @@ focused, single-responsibility classes.
 
 - Run the app (GUI): `python main.py`
 - Run headless (no GUI): `python main.py --integration-test` — processes every PDF in
-  `InventoryAvailability/` with all columns included and writes `logs/results.txt`.
-  Intended for a future CI workflow to validate output without GUI interaction.
+  `InventoryAvailability/` with all columns included and writes `logs/results.txt`. This
+  is what CI runs to validate output without GUI interaction.
 - Byte-compile sanity check: `python -m py_compile main.py source/*.py`
+- Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
+  `python main.py --integration-test` then
+  `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`.
 
-There is currently **no test suite, dev requirements file, or CI** in this repo (unlike
-`FishbowlInvoiceTool`). When test infrastructure is added, document the commands here. A
+### CI
+
+`.github/workflows/integration-tests.yml` — the only workflow, run on pull requests to
+`main` and on manual dispatch. On `ubuntu-latest` it installs `requirements/release.txt`,
+sets up a Temurin JRE for `tabula-py`, stages the test PDFs with
+`scripts/copy_resources.sh`, runs the app headless, and fails the check unless
+`logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Checking out
+the private submodule needs the `CUSTOMER_DATA_PAT` repo secret. The diff is inlined in the
+workflow; the submodule's `run_automated_tests.sh` is a local convenience script only and
+is not invoked by CI. When the parser changes output intentionally, regenerate
+`canonical_correct_results.txt` in the `automated-inventory-testing` repo and bump the
+submodule pointer.
+
+The job runs on Linux while the app ships as a Windows executable, which is only safe
+because the results file is platform-independent by construction (see the results-file
+convention below). Nothing enforces that continuously — if a Windows-specific regression
+ever slips through, add a `windows-latest` leg to a `strategy.matrix`.
+
+There is still **no unit test suite or dev requirements file** in this repo (unlike
+`FishbowlInvoiceTool`). When that infrastructure is added, document the commands here. A
 planned follow-up is to stand up `pytest` and add `tests/InventoryAppFileIO_tests.py`
 mirroring the sibling's `tests/InvoiceAppFileIO_tests.py` mocking conventions.
 
@@ -139,9 +160,20 @@ spreadsheet writer**.
   or columns and data will desync.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
-- The commented-out `win32gui`/`win32con` block in `InventoryAppController` hides the
-  Windows console for the packaged executable — uncomment only when building with
-  PyInstaller.
+- **The results file is a CI fixture, not a log.** It is diffed against
+  `canonical_correct_results.txt`, so its *content* must not vary by platform: log bare
+  filenames rather than paths, and use explicitly-keyed sorts in
+  `list_inventory_files`/`list_turnover_files` rather than relying on `Path` ordering
+  (which is case-insensitive on Windows, case-sensitive on POSIX). Errors and user-facing
+  status go to `report_error`/`report_status`, never here — they would make the diff depend
+  on the environment. Line endings are the one thing that may differ: the file is written
+  in text mode, so it is CRLF on Windows and LF on Linux, and git's `core.autocrlf`
+  translation of the canonical file cancels this out on both. Do not "fix" that asymmetry
+  in one place without the other.
+- `start_application()` imports `PySimpleGUI` locally rather than at module scope, so a
+  headless run never loads tkinter. This is a stopgap — when the GUI is extracted into its
+  own class the controller should stop importing GUI modules entirely and the local import
+  should go.
 - Keep comments concise: a comment should explain only what the immediately adjacent
   code does. Do not document the behavior of other objects, functions, or modules from
   within a comment — describe those where they are defined, not at the call site.

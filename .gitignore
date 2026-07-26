@@ -21,3 +21,6 @@ InventoryAvailabilityPendingParserFix/
 
 # Ignore output files
 *.xlsx
+
+# Copy of the submodule's canonical results left behind by running the CI steps locally
+canonical_correct_results.txt

@@ -30,13 +30,6 @@ jobs:
       with:
         python-version: "3.11.9"
 
-    # tabula-py reads PDF tables by shelling out to a bundled Java jar
-    - name: Set up Java runtime
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: "17"
-
     # Install project dependencies
     - name: Install dependencies
       run: |

@@ -30,8 +30,6 @@ focused, single-responsibility classes.
   private company data) — never commit data sourced from it.
 - `./scripts/copy_resources.sh` copies the submodule's `resources/` (e.g.
   `InventoryAvailability/`, `TurnoverReports/`) into the project root before running.
-- **Java (JRE 8+) is required** — `tabula-py` shells out to a bundled Java jar to read
-  PDF tables. The app/parsing will fail without a JRE on `PATH`.
 - Virtual env: `python -m venv venv`, then `source venv/Scripts/activate` (Windows) or
   `source venv/bin/activate` (Linux/Mac).
 - Install deps: `pip install -r requirements/release.txt`. This pulls `fishbowl-common`
@@ -53,8 +51,8 @@ focused, single-responsibility classes.
 
 `.github/workflows/integration-tests.yml` — the only workflow, run on pull requests to
 `main` and on manual dispatch. On `ubuntu-latest` it installs `requirements/release.txt`,
-sets up a Temurin JRE for `tabula-py`, stages the test PDFs with
-`scripts/copy_resources.sh`, runs the app headless, and fails the check unless
+stages the test PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails
+the check unless
 `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Checking out
 the private submodule needs the `CUSTOMER_DATA_PAT` repo secret. The diff is inlined in the
 workflow; the submodule's `run_automated_tests.sh` is a local convenience script only and
@@ -105,14 +103,24 @@ spreadsheet writer**.
     `defaultdict(lambda: True)` so the column keys stay defined in one place), and calls
     `process_inventory()` for every PDF from `InventoryAppFileIO.list_inventory_files()`.
     Lets a CI workflow generate `logs/results.txt` with no GUI interaction.
-  - PDF parsing helpers: `process_inventory_file` / `process_inventory_page` and
-    `process_turnover_file` / `process_turnover_page` source raw pages from
-    `InventoryAppFileIO.read_pdf()` and convert table rows into `InventoryEntry` /
-    `TurnoverEntry` objects.
+  - PDF parsing helpers: `process_inventory_file` and `process_turnover_file` source page
+    text from `InventoryAppFileIO.read_pdf()`, delegate column parsing to
+    `PdfTableParser`, and map the resulting rows onto `InventoryEntry` / `TurnoverEntry`
+    objects. Every page is parsed before any entry is built, because a row's part or
+    description can wrap from the bottom of one page onto the top of the next.
   - `build_checkbox_dict()` snapshots the GUI checkbox state into a dict consumed by the
     spreadsheet writer to decide which columns to emit.
+- **`PdfTableParser`** (`source/PdfTableParser.py`) — turns one page of layout-extracted
+  text into positional field lists, with no knowledge of the filesystem, `pypdf`, the
+  entry classes, or the GUI. `parse_inventory_page(page, rows)` and
+  `parse_turnover_page(page, rows)` each take the rows parsed so far and return them
+  extended, so a row wrapped across a page boundary can be folded back into the row it
+  continues. `align_to_columns()` assigns each numeric value to the column whose header
+  right edge it lines up with, so a column the report leaves blank stays blank instead of
+  shifting every later value one column left.
 - **`InventoryAppFileIO`** (`source/InventoryAppFileIO.py`) — home of all file I/O. Reads
-  inventory and turnover PDFs via `tabula.read_pdf` (`read_pdf()`), lists the inventory
+  inventory and turnover PDFs via `pypdf` (`read_pdf()`), returning one string of page
+  text per page, lists the inventory
   availability PDFs (`list_inventory_files()`, used by headless mode) and the turnover
   report PDFs (`list_turnover_files()`) as full `Path`s ready to read, and owns the
   output spreadsheet lifecycle — opening (`create_workbook()`) and saving
@@ -160,6 +168,16 @@ spreadsheet writer**.
   or columns and data will desync.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
+- **`extraction_mode="layout"` is mandatory in `read_pdf()`.** `pypdf`'s default mode
+  discards the horizontal spacing the whole parser rests on, running adjacent columns
+  together (`UOMOn`, `LABEL180 MINUTE DOOR LABEL`). Column offsets also drift by a
+  character or two from page to page, so `PdfTableParser` re-derives them from each
+  page's own header line rather than hardcoding them — and it slices `Part` off at the
+  `Description` offset rather than splitting on the gap, since a part number can itself
+  contain a run of spaces (`3/4"  BLANK HINGE`).
+- `PdfTableParser.CONTINUATION_SEPARATOR` is the single knob for how the fragments of a
+  part or description wrapped across several lines are rejoined. It is a space, matching
+  how the report reads; set it to `""` to concatenate with nothing between.
 - **The results file is a CI fixture, not a log.** It is diffed against
   `canonical_correct_results.txt`, so its *content* must not vary by platform: log bare
   filenames rather than paths, and use explicitly-keyed sorts in

@@ -31,24 +31,21 @@ INSTRUCTIONS TO SET UP FOR DEVELOPMENT
               └── Q1-2024.pdf
               └── etc</PRE>
 
-4) Install a Java runtime (JRE 8+)
-    - tabula-py shells out to a bundled Java jar to read PDF tables, so parsing will
-      fail without a JRE on your PATH.
-
-5) Open a Python virtual environment
+4) Open a Python virtual environment
     - python -m venv venv
 
-6) Activate virtual environment
+5) Activate virtual environment
     - Linux
         - source venv/bin/activate
     - Windows
         - source venv/Scripts/activate
 
-7) Install dependencies
+6) Install dependencies
     - pip install -r requirements/release.txt
 
     - NOTE: If on Linux, you need to install tkinter separately since it's not
-            included in the standard library. Then run step 5.
+            included in the standard library. Then activate the virtual environment
+            again.
 
         - For Debian based distros:
             - sudo apt-get install python3-tk for deb based distros
@@ -57,10 +54,10 @@ INSTRUCTIONS TO SET UP FOR DEVELOPMENT
         - For Arch based distros:
             - sudo pacman -S python3-tk
 
-8) Run application
+7) Run application
     - python main.py
 
-9) Run the integration test locally
+8) Run the integration test locally
     - python main.py --integration-test
         - Runs headless, processing every PDF in InventoryAvailability/ with all columns
           included, and writes logs/results.txt

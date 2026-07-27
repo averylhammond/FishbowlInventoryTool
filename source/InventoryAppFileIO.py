@@ -1,22 +1,9 @@
-import subprocess
-import tabula
+import pypdf
 import xlsxwriter
 from pathlib import Path
 from typing import Callable, Optional
 
 from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR
-
-# Exceptions tabula.read_pdf may raise: a missing PDF surfaces as FileNotFoundError
-# (an OSError), a missing Java runtime as JavaNotFoundError, malformed table output
-# as CSVParseError, the bundled jar exiting non-zero as CalledProcessError, and bad
-# arguments as ValueError. Catching them all lets a read fail gracefully.
-PDF_READ_ERRORS = (
-    OSError,
-    ValueError,
-    subprocess.CalledProcessError,
-    tabula.errors.CSVParseError,
-    tabula.errors.JavaNotFoundError,
-)
 
 
 # InventoryAppFileIO class to handle all file input/output operations
@@ -91,22 +78,30 @@ class InventoryAppFileIO:
     ###########################################################################
     def read_pdf(self, filepath) -> list:
         """
-        Reads all pages of a PDF into a list of table DataFrames via tabula.
+        Reads every page of a PDF into a list of strings, one string per page.
         Backs both inventory and turnover reads since the two are identical.
 
         Args:
             filepath: The path to the PDF to read
 
         Returns:
-            list: One DataFrame per page of table data, or an empty list if the
-                PDF could not be read
+            list: One string of page text per page, or an empty list if the PDF
+                could not be read
         """
 
         try:
-            # Read every page of the PDF as table data
-            return tabula.read_pdf(filepath, pages="all")
+            pdf = pypdf.PdfReader(stream=filepath)
 
-        except PDF_READ_ERRORS as error:
+            # Layout mode preserves the horizontal spacing that separates one
+            # column from the next; the default mode runs adjacent columns
+            # together and is unusable for a table
+            pages = []
+            for page in pdf.pages:
+                pages.append(page.extract_text(extraction_mode="layout"))
+
+            return pages
+
+        except (OSError, pypdf.errors.PdfReadError) as error:
             self.report_error(
                 "File Error",
                 f"Could not read the PDF at {filepath}: {error}",

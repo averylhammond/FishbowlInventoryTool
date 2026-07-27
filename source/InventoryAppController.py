@@ -4,6 +4,7 @@ from pathlib import Path
 from fishbowl_common import ArgumentProvider
 from source.constants import INVENTORY_DIR
 from source.InventoryAppFileIO import InventoryAppFileIO
+from source.PdfTableParser import PdfTableParser
 from source.InventoryEntry import *
 from source.TurnoverEntry import *
 from source.spreadsheetDriver import *
@@ -24,6 +25,9 @@ class InventoryAppController:
         # Create the file I/O controller
         self.file_io = InventoryAppFileIO()
 
+        # Parser that turns page text into the rows the entry classes are built from
+        self.parser = PdfTableParser()
+
         # Argument provider to check for integration test (headless) mode
         self.argument_provider = ArgumentProvider(
             description="Fishbowl inventory availability report generator"
@@ -33,54 +37,12 @@ class InventoryAppController:
         self.file_io.reset_results_file()
 
     ###########################################################################
-    ###          InventoryAppController -> process_inventory_page()         ###
-    ###########################################################################
-    def process_inventory_page(self, page: str, inventory_table: list) -> list:
-        """
-        Parses a page worth of PDF table data, converting each line into an
-        InventoryEntry object and appending it to the running table
-
-        Args:
-            page (str): The page of PDF table data.
-            inventory_table (list): The current list of InventoryEntry table entries
-
-        Returns:
-            list: The up-to-date list of InventoryEntry objects, including the page
-                that was just processed
-        """
-
-        # Loop through all lines in the page but skip first two lines that contain header info
-        for line in page.splitlines()[2:]:
-
-            # Use double space to separate white space from strings
-            data = line.split("  ")
-
-            # Strip out excess spaces
-            data = [i for i in data if i != ""]
-
-            # Case: This row is the first, contains all data to populate an entry
-            if data[-1] != "NaN":
-                entry = InventoryEntry()
-                entry.populateInventoryEntry(data)
-                inventory_table.append(entry)
-
-            # Case: Not the first row, see if part or description data needs to be updated
-            else:
-                if data[1].lstrip() != "NaN":
-                    inventory_table[-1].part += data[1]
-                if data[2].lstrip() != "NaN":
-                    inventory_table[-1].description += data[2]
-
-        # Return up to date list with new entries
-        return inventory_table
-
-    ###########################################################################
     ###          InventoryAppController -> process_inventory_file()         ###
     ###########################################################################
     def process_inventory_file(self, filepath: str) -> list:
         """
-        Processes an inventory PDF by splitting it into pages and processing each
-        page in turn
+        Processes an inventory PDF by parsing every page into rows, then converting
+        each row into an InventoryEntry
 
         Args:
             filepath (str): The path to the inventory PDF to be opened and processed
@@ -89,11 +51,8 @@ class InventoryAppController:
             list: A list of InventoryEntry objects for the file's inventory entries
         """
 
-        # Table that will contain InventoryEntry objects
-        inventory_table = []
-
         # Read pdf data
-        data = self.file_io.read_pdf(filepath)
+        pages = self.file_io.read_pdf(filepath)
 
         # Log the bare filename, not the path, so the results file reads the same
         # regardless of the platform or how the file was selected
@@ -101,15 +60,21 @@ class InventoryAppController:
             f"Processing inventory file: {Path(filepath).name}"
         )
         self.file_io.write_to_results_file(
-            f"Number of Pages in Inventory: {len(data)}"
+            f"Number of Pages in Inventory: {len(pages)}"
         )
 
-        # Loop through each page of table data and process each page
-        # Update inventory_table with each new page processed
-        for page in data:
-            inventory_table = self.process_inventory_page(
-                page.to_string(), inventory_table
-            )
+        # Parse every page before building entries, since a row's part or
+        # description may wrap from the bottom of one page onto the top of the next
+        rows = []
+        for page in pages:
+            rows = self.parser.parse_inventory_page(page, rows)
+
+        # Table that will contain InventoryEntry objects
+        inventory_table = []
+        for row in rows:
+            entry = InventoryEntry()
+            entry.populateInventoryEntry(row)
+            inventory_table.append(entry)
 
         return inventory_table
 
@@ -148,48 +113,12 @@ class InventoryAppController:
         }
 
     ###########################################################################
-    ###           InventoryAppController -> process_turnover_page()         ###
-    ###########################################################################
-    def process_turnover_page(self, page: str, turnover_table: list) -> list:
-        """
-        Parses a page worth of PDF table data, converting each "Totals:" line into
-        a TurnoverEntry object and appending it to the running table
-
-        Args:
-            page (str): The page of PDF table data
-            turnover_table (list): The current list of TurnoverEntry table entries
-
-        Returns:
-            list: The up-to-date list of TurnoverEntry objects, including the page
-                that was just processed
-        """
-
-        i = 0
-        # Loop through all lines in the page but skip first two lines that contain header info
-        for line in page.splitlines():
-
-            # Use double space to separate white space from strings
-            data = line.split("  ")
-
-            # Strip out excess spaces
-            data = [i for i in data if i != ""]
-
-            # Second word will always contain 'Totals:' if a valid total line
-            if "Totals:" in data[1]:
-                entry = TurnoverEntry()
-                entry.populateTurnoverEntry(data)
-                turnover_table.append(entry)
-
-        # Return up to date list with new entries
-        return turnover_table
-
-    ###########################################################################
     ###          InventoryAppController -> process_turnover_file()          ###
     ###########################################################################
     def process_turnover_file(self, filepath: Path) -> list:
         """
-        Processes a turnover report PDF by splitting it into pages and processing
-        each page in turn
+        Processes a turnover report PDF by parsing every page into rows, then
+        converting each row into a TurnoverEntry
 
         Args:
             filepath (Path): The path to the turnover report PDF to be opened and
@@ -199,28 +128,29 @@ class InventoryAppController:
             list: A list of TurnoverEntry objects for the file's turnover entries
         """
 
-        # Table that will contain InventoryEntry objects
-        turnover_table = []
-
         # Read pdf data
-        data = self.file_io.read_pdf(filepath)
+        pages = self.file_io.read_pdf(filepath)
 
         self.file_io.write_to_results_file(
             f"Processing turnover file: {Path(filepath).name}"
         )
         self.file_io.write_to_results_file(
-            f"Number of Pages in turnover report: {len(data)}"
+            f"Number of Pages in turnover report: {len(pages)}"
         )
 
-        # Loop through each page of table data and process each page
-        # Update inventory_table with each new page processed
-        for page in data:
-            turnover_table = self.process_turnover_page(
-                page.to_string(), turnover_table
-            )
+        rows = []
+        for page in pages:
+            rows = self.parser.parse_turnover_page(page, rows)
 
-        for i in turnover_table:
-            self.file_io.write_to_results_file(i.to_formatted_string())
+        # Table that will contain TurnoverEntry objects
+        turnover_table = []
+        for row in rows:
+            entry = TurnoverEntry()
+            entry.populateTurnoverEntry(row)
+            turnover_table.append(entry)
+
+        for entry in turnover_table:
+            self.file_io.write_to_results_file(entry.to_formatted_string())
 
         return turnover_table
 

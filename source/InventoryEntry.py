@@ -44,16 +44,18 @@ class InventoryEntry:
     # returns: N/A
     def populateInventoryEntry(self, list):
         
-        # Make sure to strip off any leading whitespace (result from using double space as the string
-        # splitting delimiter) and make sure to remove any commas in numbers
-        self.part         = list[1].lstrip(' ')
-        self.description  = list[2].lstrip(' ')
-        self.uom          = list[3].lstrip(' ')
-        self.onHand       = list[4].lstrip(' ').replace(',', '')
-        self.allocated    = list[5].lstrip(' ').replace(',', '')
-        self.notAvailable = list[6].lstrip(' ').replace(',', '')
-        self.dropShip     = list[7].lstrip(' ').replace(',', '')
-        self.available    = list[8].lstrip(' ').replace(',', '')
-        self.onOrder      = list[9].lstrip(' ').replace(',', '')
-        self.committed    = list[10].lstrip(' ').replace(',', '')
-        self.short        = list[11].lstrip(' ').replace(',', '')
+        # The parser has already trimmed each field; commas are the thousands
+        # separators the report prints inside its numbers
+        # fmt:off
+        self.part         = list[0]
+        self.description  = list[1]
+        self.uom          = list[2]
+        self.onHand       = list[3].replace(',', '')
+        self.allocated    = list[4].replace(',', '')
+        self.notAvailable = list[5].replace(',', '')
+        self.dropShip     = list[6].replace(',', '')
+        self.available    = list[7].replace(',', '')
+        self.onOrder      = list[8].replace(',', '')
+        self.committed    = list[9].replace(',', '')
+        self.short        = list[10].replace(',', '')
+        # fmt:on

@@ -30,12 +30,13 @@ class TurnoverEntry:
     # returns: N/A
     def populateTurnoverEntry(self, list):
 
-        # Make sure to strip off any leading whitespace (result from using double space as the string
-        # splitting delimiter) and make sure to remove any commas in numbers
+        # Index from the front rather than counting back from the end: the report
+        # leaves a column blank now and then, and the parser preserves that as an
+        # empty field. Commas are the thousands separators inside the numbers.
         # fmt:off
-        self.partDescription = list[1].lstrip(' ').replace(' Totals:', '')
-        self.unitsSold       = list[-4].lstrip(' ').replace(',', '').replace('.0', '')  # int value, strip .0
-        self.avgQOH          = list[-3].lstrip(' ').replace(',', '')
-        self.avgTODays       = list[-2].lstrip(' ').replace(',', '')
-        self.TORate          = list[-1].lstrip(' ').replace(',', '')
+        self.partDescription = list[0]
+        self.unitsSold       = list[1].replace(',', '')
+        self.avgQOH          = list[2].replace(',', '')
+        self.avgTODays       = list[3].replace(',', '')
+        self.TORate          = list[4].replace(',', '')
         # fmt:on

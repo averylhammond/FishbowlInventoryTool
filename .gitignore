@@ -1,6 +1,11 @@
 # No need to track cache files or IDE-specific files
 __pycache__/
 .vscode/
+.pytest_cache/
+
+# Ignore code coverage files
+.coverage
+coverage.xml
 
 # Ignore virtual environment and log files
 venv/

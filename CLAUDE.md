@@ -32,9 +32,11 @@ focused, single-responsibility classes.
   `InventoryAvailability/`, `TurnoverReports/`) into the project root before running.
 - Virtual env: `python -m venv venv`, then `source venv/Scripts/activate` (Windows) or
   `source venv/bin/activate` (Linux/Mac).
-- Install deps: `pip install -r requirements/release.txt`. This pulls `fishbowl-common`
-  (import name `fishbowl_common`) from GitHub — the shared package providing
-  `ArgumentProvider`; see the sibling `FishbowlInvoiceTool` for the shared-package story.
+- Install deps: `pip install -r requirements/dev.txt` for development (pulls in
+  `release.txt` plus `pytest`/`pytest-cov`); `requirements/release.txt` alone is what the
+  shipped app needs. `release.txt` pulls `fishbowl-common` (import name
+  `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider`; see
+  the sibling `FishbowlInvoiceTool` for the shared-package story.
 
 ## Common Commands
 
@@ -42,10 +44,15 @@ focused, single-responsibility classes.
 - Run headless (no GUI): `python main.py --integration-test` — processes every PDF in
   `InventoryAvailability/` with all columns included and writes `logs/results.txt`. This
   is what CI runs to validate output without GUI interaction.
-- Byte-compile sanity check: `python -m py_compile main.py source/*.py`
+- Byte-compile sanity check: `python -m py_compile main.py source/*.py tests/*.py`
 - Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
   `python main.py --integration-test` then
   `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`.
+- Run all unit tests: `pytest tests/*` (from the repo root)
+- Run a single test file: `pytest tests/InventoryAppFileIO_tests.py`
+- Run a single test:
+  `pytest tests/InventoryAppFileIO_tests.py::test_read_pdf_extracts_each_page_in_layout_mode`
+- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/*`
 
 ### CI
 
@@ -65,10 +72,13 @@ because the results file is platform-independent by construction (see the result
 convention below). Nothing enforces that continuously — if a Windows-specific regression
 ever slips through, add a `windows-latest` leg to a `strategy.matrix`.
 
-There is still **no unit test suite or dev requirements file** in this repo (unlike
-`FishbowlInvoiceTool`). When that infrastructure is added, document the commands here. A
-planned follow-up is to stand up `pytest` and add `tests/InventoryAppFileIO_tests.py`
-mirroring the sibling's `tests/InvoiceAppFileIO_tests.py` mocking conventions.
+The unit tests in `tests/` are **not yet run by any workflow** — `integration-tests.yml`
+remains the only one. The planned follow-up is to mirror the sibling's two workflows:
+`unit-tests.yml` (`pytest tests/*`) and `code-coverage.yml`
+(`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*` plus
+`codecov/codecov-action@v4`, which needs a `CODECOV_TOKEN` repo secret). The coverage gate
+is deliberately not set yet: only `InventoryAppFileIO` has tests, so a repo-wide 90%
+threshold would fail. Raise it into CI once the remaining classes are covered.
 
 ## Architecture
 
@@ -195,6 +205,67 @@ spreadsheet writer**.
 - Keep comments concise: a comment should explain only what the immediately adjacent
   code does. Do not document the behavior of other objects, functions, or modules from
   within a comment — describe those where they are defined, not at the call site.
+
+## Unit Testing
+
+Unit tests live in `tests/` and run under `pytest`. `tests/InventoryAppFileIO_tests.py` is
+the reference implementation — mirror it (and the sibling's `tests/` suite) rather than
+inventing new patterns.
+
+### Test one object in isolation
+
+Every unit test exercises exactly **one** class or function. Replace **all** collaborators
+with mocks so a failure points unambiguously at the unit under test — never let a unit test
+touch the real filesystem, a real PDF, or the GUI.
+
+- **Construct the unit under test in a pytest fixture** (the `file_io` fixture) so each
+  test starts from a clean, identically-configured object, with `report_error` injected as
+  a bare `MagicMock()`. Every failure-path test ends with
+  `file_io.report_error.assert_called_once()`; the title/message text is never asserted.
+- **Patch module-level names at the point of use, not their definition site.**
+  `InventoryAppFileIO` does `from source.constants import INVENTORY_DIR, RESULTS_FILE,
+  TURNOVER_DIR`, so the patch targets are `source.InventoryAppFileIO.RESULTS_FILE` — never
+  `source.constants.RESULTS_FILE`.
+- **Patch `pypdf.PdfReader` and `xlsxwriter.Workbook`, never the whole module.** The
+  methods under test catch `pypdf.errors.PdfReadError` and
+  `xlsxwriter.exceptions.XlsxWriterException`; replacing the module object with a
+  `MagicMock` makes those `except` clauses reference a non-exception and raise `TypeError`
+  while handling the error.
+- **Mock injected collaborators with `MagicMock(spec=Collaborator)`** so the mock only
+  allows attributes the real class defines.
+- **Name unasserted mock parameters with a leading underscore** (`_mock_file`) and reserve
+  plain names (`mock_results_file`) for mocks you assert against.
+
+### Follow the FIRST principles
+
+- **Fast** — no real file, PDF, or GUI I/O; mock it. The whole run should stay under a
+  second.
+- **Independent** — no ordering dependencies or shared mutable state between tests.
+- **Repeatable** — deterministic on every machine. Do not depend on the
+  `automated-inventory-testing` submodule; that drives the *integration* test, not the
+  unit tests. After a run, `git status` must show no new `logs/`, `*.xlsx`, or
+  `InventoryAvailability/` artifacts.
+- **Self-validating** — each test asserts a clear pass/fail; never require reading
+  `logs/results.txt` to judge the result.
+- **Timely** — add or extend tests alongside any new branch or utility function, in the
+  same change.
+
+### Conventions
+
+- Test files are named `<ClassName>_tests.py` (suffix, not the pytest-default `test_`
+  prefix), which is why pytest is always invoked as `pytest tests/*` rather than relying on
+  default discovery.
+- Flat module-level `test_<method>_<behavior>` functions — no test classes. Error paths are
+  suffixed `_reports_on_error` / `_reports_and_returns_<x>_on_error`.
+- `tests/__init__.py` and `source/__init__.py` are empty but **load-bearing**: with
+  `tests/__init__.py` present, pytest's prepend import mode walks up past `tests/` and puts
+  the repo root on `sys.path`, which is what makes `from source.InventoryAppFileIO import
+  *` resolve. There is deliberately no `conftest.py` and no pytest config file.
+- `.coveragerc` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
+  `tests/`, and the virtualenv.
+- Group tests under the `###`-bordered banners used throughout the file, and give each test
+  a docstring describing what it verifies with an `Args:` block documenting every
+  mock/fixture parameter.
 
 ## Git Workflow (when working on a GitHub issue)
 

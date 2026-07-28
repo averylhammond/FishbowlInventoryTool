@@ -1,3 +1,5 @@
+Unit Test Status: [![Unit Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml)
+
 Integration Test Status: [![Integration Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml)
 
 **************************************
@@ -42,6 +44,8 @@ INSTRUCTIONS TO SET UP FOR DEVELOPMENT
 
 6) Install dependencies
     - pip install -r requirements/release.txt
+        - Or pip install -r requirements/dev.txt to also pull in pytest and pytest-cov,
+          which are needed to run the unit tests
 
     - NOTE: If on Linux, you need to install tkinter separately since it's not
             included in the standard library. Then activate the virtual environment
@@ -65,3 +69,10 @@ INSTRUCTIONS TO SET UP FOR DEVELOPMENT
         - This is the same comparison CI performs on every pull request to main. When the
           parser changes output intentionally, regenerate canonical_correct_results.txt in
           the automated-inventory-testing repo and bump the submodule pointer.
+
+9) Run the unit tests locally
+    - pytest tests/*
+        - This is the same command CI runs on every pull request to main. The glob is
+          required because test files use the _tests.py suffix, which pytest's default
+          discovery does not match.
+        - Requires the dev dependencies from step 6

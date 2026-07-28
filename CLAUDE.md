@@ -56,8 +56,9 @@ focused, single-responsibility classes.
 
 ### CI
 
-`.github/workflows/integration-tests.yml` — the only workflow, run on pull requests to
-`main` and on manual dispatch. On `ubuntu-latest` it installs `requirements/release.txt`,
+Two workflows, both run on pull requests to `main` and on manual dispatch.
+
+`.github/workflows/integration-tests.yml`. On `ubuntu-latest` it installs `requirements/release.txt`,
 stages the test PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails
 the check unless
 `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Checking out
@@ -72,9 +73,18 @@ because the results file is platform-independent by construction (see the result
 convention below). Nothing enforces that continuously — if a Windows-specific regression
 ever slips through, add a `windows-latest` leg to a `strategy.matrix`.
 
-The unit tests in `tests/` are **not yet run by any workflow** — `integration-tests.yml`
-remains the only one. The planned follow-up is to mirror the sibling's two workflows:
-`unit-tests.yml` (`pytest tests/*`) and `code-coverage.yml`
+`.github/workflows/unit-tests.yml` runs the unit tests. On `ubuntu-latest` it installs
+`requirements/dev.txt` (`release.txt` plus `pytest`/`pytest-cov`) and runs `pytest tests/*`.
+The glob is required because the test files use the `_tests.py` suffix, which pytest's
+default discovery does not match. Unlike the integration job it checks out **without** the
+submodule and needs no repo secret — unit tests mock all their I/O, so pulling the private
+test data would only slow the job and tie it to `CUSTOMER_DATA_PAT`. Keep it that way: a
+unit test that needs a real PDF belongs in the integration test instead. The job installs
+`PySimpleGUI` transitively but never imports it (the controller imports it locally inside
+`start_application()`), so no `python3-tk` system package is installed; a future test that
+imports a GUI module at module scope would need one added.
+
+Still missing is `code-coverage.yml`, mirroring the sibling's
 (`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*` plus
 `codecov/codecov-action@v4`, which needs a `CODECOV_TOKEN` repo secret). The coverage gate
 is deliberately not set yet: only `InventoryAppFileIO` has tests, so a repo-wide 90%

@@ -1,0 +1,71 @@
+name: Code Coverage Workflow
+
+# Run the coverage pipeline on pull requests to main (so Codecov can post the PR
+# coverage comment/diff) and on pushes to main (so Codecov records the main-branch
+# baseline that PRs are compared against, and the README badge stays current).
+on:
+  pull_request:
+    branches: [ main ]
+
+  push:
+    branches: [ main ]
+
+# Allow for the job to be ran manually from the GitHub Actions UI
+  workflow_dispatch:
+
+# Read-only access is all this job needs: it runs the tests and hands the report
+# to Codecov, which hosts the badge and posts PR comments via its GitHub App.
+permissions:
+  contents: read
+
+jobs:
+  test:
+
+    # Give the job a name to link into the Github Rules UI
+    name: Code Coverage CI Check
+    runs-on: ubuntu-latest
+
+    # Checkout repo. The unit tests mock all of their I/O, so the private
+    # submodule holding the test data is deliberately not checked out and no
+    # PAT is needed.
+    steps:
+    - uses: actions/checkout@v4
+
+    # Set up Python environment
+    - name: Set up Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+        cache-dependency-path: requirements/dev.txt
+
+    # Install development project dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/dev.txt
+
+    # Run unit tests with pytest, and generate code coverage report xml. The
+    # tests/* glob is required: test files use the _tests.py suffix, which
+    # pytest's default discovery does not match.
+    # --cov-fail-under=25 fails this job (and thus blocks the PR, once this check
+    # is marked required in branch protection) whenever total coverage drops below 25%.
+    # 25 is a temporary floor just under the current 30%; raise it toward 80/90% as
+    # the untested modules gain tests.
+    # Note: replace --cov-report=xml with --cov-report=html to generate HTML report instead
+    # which can be easier to manual use
+    - name: Run tests and code coverage
+      run: |
+        pytest --cov=./ --cov-report=xml --cov-fail-under=25 tests/*
+
+    # Upload the coverage report to Codecov, which serves the README badge and
+    # posts the PR coverage comment. CODECOV_TOKEN is the repo upload token.
+    # always() so the report still uploads when the test step fails the coverage
+    # gate above -- that is exactly when the PR coverage comment is most useful.
+    - name: Upload coverage to Codecov
+      if: always()
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false

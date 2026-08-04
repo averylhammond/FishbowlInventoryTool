@@ -1,5 +1,7 @@
 Unit Test Status: [![Unit Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml)
 
+Code Coverage Status: [![codecov](https://codecov.io/gh/averylhammond/FishbowlInventoryTool/branch/main/graph/badge.svg)](https://codecov.io/gh/averylhammond/FishbowlInventoryTool)
+
 Integration Test Status: [![Integration Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml)
 
 **************************************
@@ -76,3 +78,11 @@ INSTRUCTIONS TO SET UP FOR DEVELOPMENT
           required because test files use the _tests.py suffix, which pytest's default
           discovery does not match.
         - Requires the dev dependencies from step 6
+
+10) Check code coverage locally
+    - pytest --cov=./ --cov-report=term-missing tests/*
+        - Prints a per-file coverage table with the line numbers that are not covered
+    - CI runs the same tests as pytest --cov=./ --cov-report=xml --cov-fail-under=25 tests/*
+      on every pull request to main and on every push to main, and fails the check if total
+      coverage falls below 25%. That threshold is a temporary floor and will be raised as
+      more of the application gets unit tests.

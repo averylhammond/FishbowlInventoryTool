@@ -56,7 +56,8 @@ focused, single-responsibility classes.
 
 ### CI
 
-Two workflows, both run on pull requests to `main` and on manual dispatch.
+Three workflows, all of which run on pull requests to `main` and on manual dispatch. The
+code-coverage one additionally runs on pushes to `main`.
 
 `.github/workflows/integration-tests.yml`. On `ubuntu-latest` it installs `requirements/release.txt`,
 stages the test PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails
@@ -84,13 +85,23 @@ unit test that needs a real PDF belongs in the integration test instead. The job
 `start_application()`), so no `python3-tk` system package is installed; a future test that
 imports a GUI module at module scope would need one added.
 
-Still missing is `code-coverage.yml`, mirroring the sibling's
-(`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*` plus
-`codecov/codecov-action@v4`, which needs a `CODECOV_TOKEN` repo secret). The coverage gate
-is deliberately not set yet: only `InventoryAppFileIO` and `PdfTableParser` have tests
-(both at 100%), so a repo-wide 90% threshold would still fail on
-`InventoryAppController`, `spreadsheetDriver`, and the two entry classes. Raise it into CI
-once those are covered.
+`.github/workflows/code-coverage.yml` runs the same unit tests under coverage
+(`pytest --cov=./ --cov-report=xml --cov-fail-under=25 tests/*`) and uploads `coverage.xml`
+to Codecov, which serves the README badge and posts the PR coverage comment. The upload step
+is `if: always()` so the report still lands when the gate fails — that is when the comment is
+most useful. It needs the `CODECOV_TOKEN` repo secret, and like the unit-test job it checks
+out **without** the submodule. The extra `push: branches: [main]` trigger exists so Codecov
+records a main-branch baseline for PR diffs; without it the badge never updates.
+
+**The 25% gate is a temporary floor, not the target.** Measured coverage is 30%
+(`InventoryAppFileIO` and `PdfTableParser` at 100%, everything else at 0%), so 25 leaves a
+little headroom for in-progress refactors. Ratchet it upward as `InventoryAppController`,
+`spreadsheetDriver`, `InventoryEntry`, and `TurnoverEntry` gain tests; 80–90% is the goal,
+matching the sibling.
+
+This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
+uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
+`.coveragerc` scopes what is measured (see the unit-testing section).
 
 ## Architecture
 

@@ -87,8 +87,10 @@ imports a GUI module at module scope would need one added.
 Still missing is `code-coverage.yml`, mirroring the sibling's
 (`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*` plus
 `codecov/codecov-action@v4`, which needs a `CODECOV_TOKEN` repo secret). The coverage gate
-is deliberately not set yet: only `InventoryAppFileIO` has tests, so a repo-wide 90%
-threshold would fail. Raise it into CI once the remaining classes are covered.
+is deliberately not set yet: only `InventoryAppFileIO` and `PdfTableParser` have tests
+(both at 100%), so a repo-wide 90% threshold would still fail on
+`InventoryAppController`, `spreadsheetDriver`, and the two entry classes. Raise it into CI
+once those are covered.
 
 ## Architecture
 
@@ -218,9 +220,14 @@ spreadsheet writer**.
 
 ## Unit Testing
 
-Unit tests live in `tests/` and run under `pytest`. `tests/InventoryAppFileIO_tests.py` is
-the reference implementation — mirror it (and the sibling's `tests/` suite) rather than
-inventing new patterns.
+Unit tests live in `tests/` and run under `pytest`. Two reference implementations — mirror
+them (and the sibling's `tests/` suite) rather than inventing new patterns:
+
+- `tests/InventoryAppFileIO_tests.py` — a class with collaborators and I/O. Follow it for
+  the mocking and error-path conventions below.
+- `tests/PdfTableParser_tests.py` — a pure-logic class with no collaborators, so nothing
+  is mocked and the fixture just constructs the object. Follow it for parser-style tests,
+  including the synthetic-fixture rule below.
 
 ### Test one object in isolation
 
@@ -276,6 +283,13 @@ touch the real filesystem, a real PDF, or the GUI.
 - Group tests under the `###`-bordered banners used throughout the file, and give each test
   a docstring describing what it verifies with an `Args:` block documenting every
   mock/fixture parameter.
+- **Sample page text is synthetic, never copied from the submodule.** The
+  `automated-inventory-testing` reports are private company data, so a parser fixture
+  reproduces the report's *geometry* — header offsets, column gaps, the wrapped `Avg. TO`
+  label, the page footer — under invented part numbers and descriptions, at reduced column
+  widths so the lines stay readable. Because those column positions are load-bearing, build
+  a page by joining explicit line literals (`build_page()` in `PdfTableParser_tests.py`)
+  rather than dedenting a triple-quoted block an editor could reflow.
 
 ## Git Workflow (when working on a GitHub issue)
 

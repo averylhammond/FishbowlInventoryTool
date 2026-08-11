@@ -12,8 +12,10 @@ from source.TurnoverEntry import TurnoverEntry
 ###                    spreadsheetDriver -> Test Fixtures                   ###
 ###############################################################################
 # Every checkbox key the spreadsheet writers consult, in the order they walk them.
-# The canonical list lives in InventoryAppController.build_checkbox_dict(); it is
-# repeated here rather than imported so a unit test never pulls in the controller.
+# The canonical list lives in source/columns.py; it is duplicated here rather than
+# imported so that a reordering there fails this file's layout assertions loudly
+# instead of silently following along. The test at the bottom of this file is what
+# keeps the two provably identical.
 # Note the irregular turnover keys: "tDescription" has no space, the rest do.
 COLUMN_KEYS = (
     "Part",
@@ -833,3 +835,20 @@ def test_append_turnover_skips_an_entry_with_no_matching_part(
 
     # Nothing is written for the unmatched part
     mock_write_entry.assert_not_called()
+
+
+###############################################################################
+###                spreadsheetDriver -> Tests Column Key Sync                ###
+###############################################################################
+def test_column_keys_match_the_canonical_column_list():
+    """
+    Tests that this file's local COLUMN_KEYS, which every layout assertion above
+    is written against, is still identical to the canonical list in
+    source/columns.py. The duplication is deliberate, so a reordering fails the
+    assertions above rather than silently following along; this test is what makes
+    the two provably agree.
+    """
+
+    from source.columns import COLUMN_KEYS as CANONICAL_COLUMN_KEYS
+
+    assert COLUMN_KEYS == CANONICAL_COLUMN_KEYS

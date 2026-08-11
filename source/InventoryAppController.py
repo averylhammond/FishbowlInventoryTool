@@ -1,8 +1,7 @@
 import re
-from collections import defaultdict
 from pathlib import Path
 from fishbowl_common import ArgumentProvider
-from source.constants import INVENTORY_DIR
+from source.columns import all_columns_selected
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.PdfTableParser import PdfTableParser
 from source.InventoryEntry import InventoryEntry
@@ -32,6 +31,10 @@ class InventoryAppController:
         self.argument_provider = ArgumentProvider(
             description="Fishbowl inventory availability report generator"
         )
+
+        # The GUI, constructed in start_application() rather than here so that a
+        # headless run never builds a window it has no display for
+        self.display = None
 
         # Start each run with a clean results file
         self.file_io.reset_results_file()
@@ -74,40 +77,6 @@ class InventoryAppController:
         inventory_table = [InventoryEntry(*row) for row in rows]
 
         return inventory_table
-
-    ###########################################################################
-    ###           InventoryAppController -> build_checkbox_dict()           ###
-    ###########################################################################
-    def build_checkbox_dict(self, values: dict) -> dict:
-        """
-        Builds a dictionary representing the checkbox input data from the user,
-        used to determine which columns to include in the report
-
-        Args:
-            values (dict): All user inputs read from the GUI window
-
-        Returns:
-            dict: A mapping of column name to bool indicating whether each column
-                should be included in the output spreadsheet
-        """
-        return {
-            "Part": True,  # Always include part
-            "Description": values["-DESCRIPTION-"],
-            "UOM": values["-UOM-"],
-            "OnHand": values["-ONHAND-"],
-            "Allocated": values["-ALLOCATED-"],
-            "NotAvailable": values["-NOTAVAILABLE-"],
-            "DropShip": values["-DROPSHIP-"],
-            "Available": values["-AVAILABLE-"],
-            "OnOrder": values["-ONORDER-"],
-            "Committed": values["-COMMITTED-"],
-            "Short": values["-SHORT-"],
-            "tDescription": values["-TDESCRIPTION-"],
-            "tUnits Sold": values["-TUNITSSOLD-"],
-            "tAvg QOH": values["-TQOH-"],
-            "tAvg TO Days": values["-TAVGTODAYS-"],
-            "tTO Rate": values["-TTORATE-"],
-        }
 
     ###########################################################################
     ###          InventoryAppController -> process_turnover_file()          ###
@@ -227,6 +196,29 @@ class InventoryAppController:
         return False
 
     ###########################################################################
+    ###         InventoryAppController -> handle_process_inventory()        ###
+    ###########################################################################
+    def handle_process_inventory(
+        self, inventory_pdf_path: str, checkbox_dict: dict
+    ) -> bool:
+        """
+        Processes the inventory PDF the user chose in the GUI, routing status
+        messages to the GUI's output box. Wired into the display as its process
+        callback.
+
+        Args:
+            inventory_pdf_path (str): Path to the inventory availability PDF to process
+            checkbox_dict (dict): Column-selection dict deciding which columns to emit
+
+        Returns:
+            bool: True if the spreadsheet was saved, False if any step failed
+        """
+
+        return self.process_inventory(
+            inventory_pdf_path, checkbox_dict, self.display.write_output
+        )
+
+    ###########################################################################
     ###           InventoryAppController -> run_integration_test()          ###
     ###########################################################################
     def run_integration_test(self):
@@ -241,9 +233,9 @@ class InventoryAppController:
             f"{title}: {message}"
         )
 
-        # Include every column, reusing build_checkbox_dict as the single source of
-        # the column keys (defaultdict returns True for every checkbox lookup)
-        checkbox_dict = self.build_checkbox_dict(defaultdict(lambda: True))
+        # Include every column. The keys come from source/columns.py, the single
+        # source of truth the GUI's checkbox grid is also built from.
+        checkbox_dict = all_columns_selected()
 
         # Process every inventory PDF, routing status to stdout (not the results file)
         for path in self.file_io.list_inventory_files():
@@ -254,8 +246,8 @@ class InventoryAppController:
     ###########################################################################
     def start_application(self):
         """
-        Starts the application by building the GUI window and running the main
-        event loop until the user exits.
+        Starts the application by building the GUI and running the tkinter main
+        loop until the user exits.
 
         Note: In integration test mode the GUI is skipped entirely and every inventory
         PDF is processed headless instead.
@@ -266,105 +258,20 @@ class InventoryAppController:
             self.run_integration_test()
             return
 
-        # Imported here rather than at module scope so headless runs never pull in
-        # PySimpleGUI (and the tkinter it imports), which they have no use for.
-        # Remove this local import once the GUI moves into its own class — the
-        # controller should not be importing GUI modules at all.
-        import PySimpleGUI as sg
+        # Imported here, after the check above, rather than at module scope so a
+        # headless run never loads tkinter. Keep it here: the integration test
+        # runs on a machine with no display attached.
+        from source.gui.InventoryAppDisplay import InventoryAppDisplay
 
-        # Instantiate output window
-        output = sg.Text()
-
-        # Define GUI layout
-        layout = [
-            [
-                sg.Text("Choose an Inventory Availability PDF to process...")
-            ],  # First text window
-            [
-                sg.InputText(key="-FILE_PATH-"),
-                sg.FileBrowse(
-                    initial_folder=str(INVENTORY_DIR),
-                    file_types=[("PDF Files", "*.pdf")],
-                ),
-            ],
-            [
-                sg.Text(
-                    "Please check all INVENTORY elements that you would like to have included on the report:"
-                )
-            ],  # First text window
-            [
-                sg.Checkbox("Description", key="-DESCRIPTION-"),
-                sg.Checkbox("UOM", key="-UOM-"),
-                sg.Checkbox("On Hand", key="-ONHAND-"),
-                sg.Checkbox("Allocated", key="-ALLOCATED-"),
-            ],
-            [
-                sg.Checkbox("Not Available", key="-NOTAVAILABLE-"),
-                sg.Checkbox("Drop Ship", key="-DROPSHIP-"),
-                sg.Checkbox("Available", key="-AVAILABLE-"),
-            ],
-            [
-                sg.Checkbox("On Order", key="-ONORDER-"),
-                sg.Checkbox("Committed", key="-COMMITTED-"),
-                sg.Checkbox("Short", key="-SHORT-"),
-            ],
-            [
-                sg.Text(
-                    "Please check all TURNOVER elements that you would like to have included on the report:"
-                )
-            ],  # Second text window
-            [
-                sg.Checkbox("Description", key="-TDESCRIPTION-"),
-                sg.Checkbox("Units Sold", key="-TUNITSSOLD-"),
-                sg.Checkbox("Avg QOH", key="-TQOH-"),
-            ],
-            [
-                sg.Checkbox("Avg TO Days", key="-TAVGTODAYS-"),
-                sg.Checkbox("TO Rate", key="-TTORATE-"),
-            ],
-            [sg.Button("Process This Inventory"), sg.Exit()],  # Exit button
-            [output],  # Output text window
-        ]
-
-        # Set theme for big style
-        sg.theme("LightGreen5")
-
-        # Create window
-        window = sg.Window(
-            "Automated Inventory Processor", layout, size=(650, 500)
+        # Create the GUI, giving it the callback that processes a chosen inventory
+        self.display = InventoryAppDisplay(
+            process_callback=self.handle_process_inventory,
+            title="Automated Inventory Processor",
+            window_resolution="700x700",
         )
 
-        # Now that the output element exists, surface any file I/O failure to the GUI
-        # output line so the app never crashes on bad files.
-        self.file_io.report_error = lambda title, message: output.update(
-            f"{title}: {message}"
-        )
+        # Wire the GUI's popup into the file I/O controller so file failures reach
+        # the user without coupling file I/O to the GUI
+        self.file_io.report_error = self.display.show_popup
 
-        # Main program loop
-        while True:
-            # Read user input from GUI
-            event, values = window.read()
-
-            # If exit is pressed, break out of loop and close window
-            if event in (sg.WIN_CLOSED, "Exit"):
-                break
-
-            # If the process button is selected, process the inventory
-            elif event == "Process This Inventory":
-
-                if values["-FILE_PATH-"] == "":
-                    output.update(
-                        "Please choose a valid Inventory Availability PDF file!"
-                    )
-
-                else:
-                    # Process the chosen inventory PDF, surfacing status to the GUI
-                    # output line
-                    self.process_inventory(
-                        values["-FILE_PATH-"],
-                        self.build_checkbox_dict(values),
-                        output.update,
-                    )
-
-        # If break, close app
-        window.close()
+        self.display.mainloop()

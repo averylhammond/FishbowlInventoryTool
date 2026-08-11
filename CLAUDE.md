@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Python desktop app (PySimpleGUI) that parses Fishbowl-generated **Inventory
+A Python desktop app (tkinter) that parses Fishbowl-generated **Inventory
 Availability** and **Turnover Report** PDFs and produces a formatted Excel (`.xlsx`)
 report. The user picks an inventory availability PDF and checks which inventory and
 turnover columns to include; the app parses the inventory PDF plus every turnover
@@ -44,7 +44,8 @@ focused, single-responsibility classes.
 - Run headless (no GUI): `python main.py --integration-test` — processes every PDF in
   `InventoryAvailability/` with all columns included and writes `logs/results.txt`. This
   is what CI runs to validate output without GUI interaction.
-- Byte-compile sanity check: `python -m py_compile main.py source/*.py tests/*.py`
+- Byte-compile sanity check:
+  `python -m py_compile main.py source/*.py source/gui/*.py tests/*.py`
 - Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
   `python main.py --integration-test` then
   `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`.
@@ -80,24 +81,26 @@ The glob is required because the test files use the `_tests.py` suffix, which py
 default discovery does not match. Unlike the integration job it checks out **without** the
 submodule and needs no repo secret — unit tests mock all their I/O, so pulling the private
 test data would only slow the job and tie it to `CUSTOMER_DATA_PAT`. Keep it that way: a
-unit test that needs a real PDF belongs in the integration test instead. The job installs
-`PySimpleGUI` transitively but never imports it (the controller imports it locally inside
-`start_application()`), so no `python3-tk` system package is installed; a future test that
-imports a GUI module at module scope would need one added.
+unit test that needs a real PDF belongs in the integration test instead. The GUI test files
+do import `tkinter` at module scope, and no `python3-tk` system package is installed — none
+is needed, because `actions/setup-python`'s CPython builds bundle `_tkinter` and its Tcl/Tk
+libraries. No X display is needed either: the display tests patch `tk.Tk.__init__` and every
+widget class, so a real window is never created. The sibling's identical job has been
+running tkinter GUI tests on `ubuntu-latest` this way for months.
 
 `.github/workflows/code-coverage.yml` runs the same unit tests under coverage
-(`pytest --cov=./ --cov-report=xml --cov-fail-under=75 tests/*`) and uploads `coverage.xml`
+(`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*`) and uploads `coverage.xml`
 to Codecov, which serves the README badge and posts the PR coverage comment. The upload step
 is `if: always()` so the report still lands when the gate fails — that is when the comment is
 most useful. It needs the `CODECOV_TOKEN` repo secret, and like the unit-test job it checks
 out **without** the submodule. The extra `push: branches: [main]` trigger exists so Codecov
 records a main-branch baseline for PR diffs; without it the badge never updates.
 
-**The 75% gate is a temporary floor, not the target.** Measured coverage is 79%
-(`InventoryAppFileIO`, `PdfTableParser`, `InventoryEntry`, `TurnoverEntry` and
-`spreadsheetDriver` at 100%, `InventoryAppController` at 0%), so 75 leaves a little
-headroom for in-progress refactors. Ratchet it upward as `InventoryAppController` gains
-tests; 80–90% is the goal, matching the sibling.
+**Every measured module is at 100%**, so the 90% gate is headroom for an in-progress
+refactor rather than a target to climb toward, and it matches the gate the sibling uses.
+Keep it there: a new module landing untested should fail the check, not quietly lower the
+average. `source/gui/color_theme.py` and `source/gui/font_settings.py` are omitted from
+measurement (see `.coveragerc`) because they are inert data with no behavior to test.
 
 This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
 uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
@@ -105,24 +108,27 @@ uses `@v4` and no cache — a deliberate mirror of the sibling's file rather tha
 
 ## Architecture
 
-The application flow is: **entry point → controller → file I/O + entry data classes +
+The application flow is: **entry point → controller → GUI + file I/O + entry data classes +
 spreadsheet writer**.
 
 - **`main.py`** — thin entry point. Constructs an `InventoryAppController` and calls
   `start_application()`. Contains no application logic.
 - **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator.
-  It owns the GUI and parsing flow and delegates all file I/O to `InventoryAppFileIO`.
-  Responsibilities:
+  It wires the components together and owns the parsing flow, delegating all file I/O to
+  `InventoryAppFileIO` and everything visual to `InventoryAppDisplay`. Responsibilities:
   - `__init__` constructs the `InventoryAppFileIO` collaborator, constructs the shared
-    `ArgumentProvider` (from the `fishbowl-common` package) to detect headless mode, and
-    clears the results file (`reset_results_file()`) so each run starts with a fresh
-    diagnostics log.
+    `ArgumentProvider` (from the `fishbowl-common` package) to detect headless mode, sets
+    `self.display = None`, and clears the results file (`reset_results_file()`) so each run
+    starts with a fresh diagnostics log. It deliberately does **not** build the GUI; see
+    `start_application()` below.
   - `start_application()` first checks `argument_provider.integration_test_mode`: when set
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
-    `run_integration_test()`. Otherwise it builds the PySimpleGUI window (file picker +
-    inventory/turnover column checkboxes + Process button), wires the file I/O
-    controller's `report_error` callback to the GUI output line, and runs the event loop.
-    On "Process This Inventory" it delegates to `process_inventory()`.
+    `run_integration_test()`. Otherwise it imports and constructs `InventoryAppDisplay`,
+    wires the file I/O controller's `report_error` callback to the display's `show_popup`,
+    and enters `mainloop()`.
+  - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to
+    the display. It runs `process_inventory()` with status routed to the display's output
+    box, keeping the display's callback contract to two arguments.
   - `process_inventory(inventory_pdf_path, checkbox_dict, report_status)` — the shared
     per-file processing routine used by both the GUI and headless paths. It parses the
     inventory PDF (bailing gracefully if it can't be read), derives the output filename
@@ -132,17 +138,39 @@ spreadsheet writer**.
     `report_status` callback (the GUI output line, or `print`/stdout in headless mode) —
     never to the results file — so the results log stays deterministic for CI diffing.
   - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout,
-    builds an all-columns-checked `checkbox_dict` (reusing `build_checkbox_dict` with a
-    `defaultdict(lambda: True)` so the column keys stay defined in one place), and calls
-    `process_inventory()` for every PDF from `InventoryAppFileIO.list_inventory_files()`.
-    Lets a CI workflow generate `logs/results.txt` with no GUI interaction.
+    takes an all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and
+    calls `process_inventory()` for every PDF from
+    `InventoryAppFileIO.list_inventory_files()`. Lets a CI workflow generate
+    `logs/results.txt` with no GUI interaction.
   - PDF parsing helpers: `process_inventory_file` and `process_turnover_file` source page
     text from `InventoryAppFileIO.read_pdf()`, delegate column parsing to
     `PdfTableParser`, and map the resulting rows onto `InventoryEntry` / `TurnoverEntry`
     objects. Every page is parsed before any entry is built, because a row's part or
     description can wrap from the bottom of one page onto the top of the next.
-  - `build_checkbox_dict()` snapshots the GUI checkbox state into a dict consumed by the
-    spreadsheet writer to decide which columns to emit.
+- **`source/gui/`** — the GUI subpackage, the only place tkinter appears.
+  - **`InventoryAppDisplay`** (`source/gui/InventoryAppDisplay.py`) — a `tk.Tk` subclass
+    that takes every dependency as a constructor argument (`process_callback`, `title`,
+    `window_resolution`, and the defaulted `theme`/`font_family`/`font_size`) and never
+    imports the controller. It owns the file picker, the two checkbox grids, the
+    Process/Exit buttons and the `ScrolledText` output box, and exposes `show_popup()`,
+    `write_output()`, `clear_output()` and `get_selected_columns()`. `write_output()` calls
+    `update_idletasks()` because processing runs on the GUI thread, so without it a status
+    line would not paint until the work it announces had already finished.
+  - **`ThemedSubwindow`** / **`MessageWindow`** — ported verbatim from the sibling: a
+    `tk.Toplevel` base that snapshots the active theme/font and centers over its parent,
+    and the themed OK-button popup `show_popup()` builds.
+  - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
+    sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
+    consistent; they are omitted from coverage for the same reason.
+  - **Deliberately absent**, each a follow-up: menu bar, `SettingsRepository` settings
+    persistence, runtime theme/font switching, `Tooltip`, and the sibling's other
+    subwindows. Only `DARK` ships today, but the theme is a constructor argument rather
+    than a hardcoded value, so adding a picker later needs no surgery on the display.
+- **`columns.py`** (`source/columns.py`) — the single source of truth for the (column key,
+  GUI label, section) triple: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
+  `TURNOVER_COLUMNS`, `ALL_COLUMNS`, `COLUMN_KEYS` and `all_columns_selected()`. The tuple
+  a `Column` lives in *is* its GUI section. It imports only `dataclasses`, which is what
+  lets the headless path reach `all_columns_selected()` without loading tkinter.
 - **`PdfTableParser`** (`source/PdfTableParser.py`) — turns one page of layout-extracted
   text into positional field lists, with no knowledge of the filesystem, `pypdf`, the
   entry classes, or the GUI. `parse_inventory_page(page, rows)` and
@@ -210,7 +238,13 @@ spreadsheet writer**.
   index only when that box is checked. Inventory keys are plain (`"Part"`, `"OnHand"`);
   turnover keys are `t`-prefixed (`"tUnits Sold"`, `"tTO Rate"`). Keep the header writer
   and the row writer in lockstep — both must consult identical keys in identical order
-  or columns and data will desync.
+  or columns and data will desync. **Those keys and their GUI labels live in
+  `source/columns.py`**, and `InventoryAppDisplay` builds its checkbox grid by iterating
+  the same tuples the writers walk, so the GUI cannot offer a column the spreadsheet does
+  not know about or miss one it does. Add a column there, not in three places.
+- **`get_selected_columns()` wraps every value in `bool()`, and that is load-bearing.**
+  The spreadsheet writers test `if checkboxDict["Part"] == True`, which a `tk.BooleanVar`
+  fails — the column would be silently dropped from the report rather than raising.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
 - **`extraction_mode="layout"` is mandatory in `read_pdf()`.** `pypdf`'s default mode
@@ -243,10 +277,27 @@ spreadsheet writer**.
   in text mode, so it is CRLF on Windows and LF on Linux, and git's `core.autocrlf`
   translation of the canonical file cancels this out on both. Do not "fix" that asymmetry
   in one place without the other.
-- `start_application()` imports `PySimpleGUI` locally rather than at module scope, so a
-  headless run never loads tkinter. This is a stopgap — when the GUI is extracted into its
-  own class the controller should stop importing GUI modules entirely and the local import
-  should go.
+- **`start_application()` imports `InventoryAppDisplay` inside the function, after the
+  `integration_test_mode` early return, and it must stay that way.** This is not the
+  stopgap the old PySimpleGUI import was: the integration-test job runs on `ubuntu-latest`
+  with no display attached, so a headless run must never import tkinter or construct a
+  window. That is also why the display is built here rather than in `__init__`, which is
+  where the sibling builds its own — the sibling's integration job runs on Windows and can
+  afford it. Do not "clean this up" into a module-scope import.
+  `tests/InventoryAppController_tests.py` guards this with
+  `mock_display_cls.assert_not_called()`.
+- **GUI styling conventions, ported from the sibling.** Pure `tk`, zero `ttk`; a
+  `###`-bordered banner above every method; a `# fmt:off` block of aligned
+  `self.widget: tk.X | None = None` declarations in `__init__`, with `build_widgets()`
+  called last; `pack` for the vertical page flow and `grid` inside frames. Buttons use one
+  recipe — `bg=theme.button_bg, fg=theme.button_fg, activebackground=theme.accent,
+  activeforeground=theme.fg_text, relief="flat", font=(family, size, "bold")` — with the
+  Exit button set apart by `bg=theme.bg_entry, activebackground=RED`.
+- **Checkbuttons need `selectcolor=theme.bg_entry` and `highlightthickness=0`.** This is
+  the one styling recipe with no sibling precedent. Without them Tk paints the check box
+  interior white and draws a light focus ring, both of which read as rendering artifacts
+  against a dark `bg_main`. Their font is deliberately not bold: fifteen bold labels crowd
+  the two grids.
 - Keep comments concise: a comment should explain only what the immediately adjacent
   code does. Do not document the behavior of other objects, functions, or modules from
   within a comment — describe those where they are defined, not at the call site.
@@ -279,6 +330,28 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they are inert data
   holders with no I/O — but each is given a distinct value per field so a column/data
   desync fails loudly instead of matching by coincidence.
+- `tests/InventoryAppDisplay_tests.py` — a tkinter GUI class. The `display` fixture
+  neutralizes `tk.Tk.__init__`, mocks the inherited Tk methods the constructor calls
+  (`patch.object(InventoryAppDisplay, "title"/"geometry"/"resizable"/"configure")`), and
+  replaces every widget class at its point of use
+  (`patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget)`), so no
+  real window is created and each widget attribute is a distinct assertable mock. It
+  `yield`s a `SimpleNamespace` **from inside** the `with` block so the patches stay live for
+  the whole test. Per-test constructor arguments come from indirect parametrization
+  (`@pytest.mark.parametrize("display", [{"theme": FOREST}], indirect=True)`).
+  - **`tk.StringVar` and `tk.BooleanVar` are patched with the `_FakeStringVar` /
+    `_FakeBooleanVar` stubs, not bare `MagicMock`s.** A tkinter variable cannot be built
+    without a default root window, so the real classes raise "Too early to create variable";
+    and a `MagicMock` would defeat the assertions that `get_selected_columns()` returns real
+    booleans, which is the property the spreadsheet writers depend on.
+- `tests/InventoryAppController_tests.py` — the orchestrator, with `ArgumentProvider`,
+  `InventoryAppFileIO` and `PdfTableParser` patched at `source.InventoryAppController.<name>`
+  as usual. **The display is the one exception to the patch-at-the-point-of-use rule:**
+  `start_application()` imports it inside the function, so the name never exists at module
+  scope and the target is its definition site,
+  `patch("source.gui.InventoryAppDisplay.InventoryAppDisplay")`. A function-local
+  `from X import Y` resolves `Y` as an attribute of module `X` at call time, which is why
+  patching there works.
 
 ### Test one object in isolation
 
@@ -325,12 +398,14 @@ touch the real filesystem, a real PDF, or the GUI.
   default discovery.
 - Flat module-level `test_<method>_<behavior>` functions — no test classes. Error paths are
   suffixed `_reports_on_error` / `_reports_and_returns_<x>_on_error`.
-- `tests/__init__.py` and `source/__init__.py` are empty but **load-bearing**: with
-  `tests/__init__.py` present, pytest's prepend import mode walks up past `tests/` and puts
-  the repo root on `sys.path`, which is what makes `from source.InventoryAppFileIO import
-  *` resolve. There is deliberately no `conftest.py` and no pytest config file.
+- `tests/__init__.py`, `source/__init__.py` and `source/gui/__init__.py` are empty but
+  **load-bearing**: with `tests/__init__.py` present, pytest's prepend import mode walks up
+  past `tests/` and puts the repo root on `sys.path`, which is what makes
+  `from source.InventoryAppFileIO import *` resolve. There is deliberately no `conftest.py`
+  and no pytest config file.
 - `.coveragerc` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
-  `tests/`, and the virtualenv.
+  `tests/`, the virtualenv, and the two inert GUI data modules (`source/gui/color_theme.py`,
+  `source/gui/font_settings.py`).
 - Group tests under the `###`-bordered banners used throughout the file, and give each test
   a docstring describing what it verifies with an `Args:` block documenting every
   mock/fixture parameter.

@@ -86,18 +86,18 @@ unit test that needs a real PDF belongs in the integration test instead. The job
 imports a GUI module at module scope would need one added.
 
 `.github/workflows/code-coverage.yml` runs the same unit tests under coverage
-(`pytest --cov=./ --cov-report=xml --cov-fail-under=25 tests/*`) and uploads `coverage.xml`
+(`pytest --cov=./ --cov-report=xml --cov-fail-under=75 tests/*`) and uploads `coverage.xml`
 to Codecov, which serves the README badge and posts the PR coverage comment. The upload step
 is `if: always()` so the report still lands when the gate fails — that is when the comment is
 most useful. It needs the `CODECOV_TOKEN` repo secret, and like the unit-test job it checks
 out **without** the submodule. The extra `push: branches: [main]` trigger exists so Codecov
 records a main-branch baseline for PR diffs; without it the badge never updates.
 
-**The 35% gate is a temporary floor, not the target.** Measured coverage is 41%
-(`InventoryAppFileIO`, `PdfTableParser`, `InventoryEntry` and `TurnoverEntry` at 100%,
-everything else at 0%), so 35 leaves a little headroom for in-progress refactors. Ratchet
-it upward as `InventoryAppController` and `spreadsheetDriver` gain tests; 80–90% is the
-goal, matching the sibling.
+**The 75% gate is a temporary floor, not the target.** Measured coverage is 79%
+(`InventoryAppFileIO`, `PdfTableParser`, `InventoryEntry`, `TurnoverEntry` and
+`spreadsheetDriver` at 100%, `InventoryAppController` at 0%), so 75 leaves a little
+headroom for in-progress refactors. Ratchet it upward as `InventoryAppController` gains
+tests; 80–90% is the goal, matching the sibling.
 
 This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
 uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
@@ -266,6 +266,19 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   subset of keyword arguments, positional construction from a `PARSED_ROW` module constant
   shaped like the parser's output, and `to_formatted_string()` asserted against the
   report's labels rather than the field names.
+- `tests/spreadsheetDriver_tests.py` — module-level functions writing through a mocked
+  `xlsxwriter` workbook. Follow it for spreadsheet-writer tests: `workbook` and `worksheet`
+  fixtures (`MagicMock(spec=xlsxwriter.Workbook)` / `spec=Worksheet)`, with
+  `add_format.side_effect = lambda spec: dict(spec)` so each format is the spec dict it was
+  built from and one format is distinguishable from another; `written_cells()` /
+  `written_formats()` helpers reducing `worksheet.write.call_args_list` to
+  `(row, col, value)` tuples and format dicts, so assertions read as column layout; a
+  `checkboxes()` helper building the checkbox dict from a local `COLUMN_KEYS` tuple rather
+  than importing the controller; and sibling functions in the same module patched at
+  `source.spreadsheetDriver.<name>` so each test exercises one function. Real
+  `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they are inert data
+  holders with no I/O — but each is given a distinct value per field so a column/data
+  desync fails loudly instead of matching by coincidence.
 
 ### Test one object in isolation
 

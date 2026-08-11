@@ -180,60 +180,60 @@ def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDi
     # dictionary entry to see if the user checked the box to see the attribute. If
     # he/she did, then write to the current column and increment col by one for the
     # next write.
-    col = 0   
+    col = 0
     if checkboxDict["Part"] == True:
         worksheet.write(row, col, entry.part, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Description"] == True:
         worksheet.write(row, col, entry.description, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
-        
+
     if checkboxDict["UOM"] == True:
         worksheet.write(row, col, entry.uom, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["OnHand"] == True:
-        worksheet.write(row, col, entry.onHand, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.on_hand, entryFormat)
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Allocated"] == True:
         worksheet.write(row, col, entry.allocated, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["NotAvailable"] == True:
-        worksheet.write(row, col, entry.notAvailable, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.not_available, entryFormat)
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["DropShip"] == True:
-        worksheet.write(row, col, entry.dropShip, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.drop_ship, entryFormat)
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Available"] == True:
         worksheet.write(row, col, entry.available, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["OnOrder"] == True:
-        worksheet.write(row, col, entry.onOrder, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.on_order, entryFormat)
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Committed"] == True:
         worksheet.write(row, col, entry.committed, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Short"] == True:
         worksheet.write(row, col, entry.short, entryFormat)
-        entry.rowWrittenTo = row
+        entry.row_written_to = row
         col+=1
 
     return col
@@ -245,7 +245,7 @@ def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDi
 # params: worksheet, workbook.worksheet, the sheet to write the header information to
 # params: row, int, the row number to write to
 # params: col, int, the column to write to
-# params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
+# params: entry, TurnoverEntry, the object holding all turnover entry data to be written to the row
 # params: checkboxDict, dict, the state of all column checkboxes from GUI
 # returns: N/A
 def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkboxDict):
@@ -272,28 +272,23 @@ def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkb
     # he/she did, then write to the current column and increment col by one for the
     # next write.  
     if checkboxDict["tDescription"] == True:
-        worksheet.write(row, col, entry.partDescription, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.part_description, entryFormat)
         col+=1
 
     if checkboxDict["tUnits Sold"] == True:
-        worksheet.write(row, col, entry.unitsSold, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.units_sold, entryFormat)
         col+=1
-        
+
     if checkboxDict["tAvg QOH"] == True:
-        worksheet.write(row, col, entry.avgQOH, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.avg_qoh, entryFormat)
         col+=1
 
     if checkboxDict["tAvg TO Days"] == True:
-        worksheet.write(row, col, entry.avgTODays, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.avg_to_days, entryFormat)
         col+=1
 
     if checkboxDict["tTO Rate"] == True:
-        worksheet.write(row, col, entry.TORate, entryFormat)
-        entry.rowWrittenTo = row
+        worksheet.write(row, col, entry.to_rate, entryFormat)
         col+=1
 
 
@@ -339,6 +334,6 @@ def appendTurnoverToSpreadsheet(workbook, turnover, inventory, col, checkboxDict
     # written to and write the TurnoverEntry data to that same row, but new column
     for tEntry in turnover:
         for iEntry in inventory:
-            if (iEntry.part.replace(' ', '')) == (tEntry.partDescription.replace(' ', '')):
-                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.rowWrittenTo, 
+            if (iEntry.part.replace(' ', '')) == (tEntry.part_description.replace(' ', '')):
+                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.row_written_to,
                                                 col, tEntry, checkboxDict)

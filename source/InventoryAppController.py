@@ -5,8 +5,8 @@ from fishbowl_common import ArgumentProvider
 from source.constants import INVENTORY_DIR
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.PdfTableParser import PdfTableParser
-from source.InventoryEntry import *
-from source.TurnoverEntry import *
+from source.InventoryEntry import InventoryEntry
+from source.TurnoverEntry import TurnoverEntry
 from source.spreadsheetDriver import *
 
 
@@ -69,12 +69,9 @@ class InventoryAppController:
         for page in pages:
             rows = self.parser.parse_inventory_page(page, rows)
 
-        # Table that will contain InventoryEntry objects
-        inventory_table = []
-        for row in rows:
-            entry = InventoryEntry()
-            entry.populateInventoryEntry(row)
-            inventory_table.append(entry)
+        # Table that will contain InventoryEntry objects. Each row holds one field
+        # per column in declaration order, so it expands straight into the constructor
+        inventory_table = [InventoryEntry(*row) for row in rows]
 
         return inventory_table
 
@@ -143,11 +140,7 @@ class InventoryAppController:
             rows = self.parser.parse_turnover_page(page, rows)
 
         # Table that will contain TurnoverEntry objects
-        turnover_table = []
-        for row in rows:
-            entry = TurnoverEntry()
-            entry.populateTurnoverEntry(row)
-            turnover_table.append(entry)
+        turnover_table = [TurnoverEntry(*row) for row in rows]
 
         for entry in turnover_table:
             self.file_io.write_to_results_file(entry.to_formatted_string())

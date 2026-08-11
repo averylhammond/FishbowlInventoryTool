@@ -41,7 +41,7 @@ CONTINUATION_SEPARATOR = " "
 
 
 # PdfTableParser class to turn layout-extracted PDF page text into the positional
-# field lists the entry data classes are populated from
+# field lists the entry data classes are constructed from
 class PdfTableParser:
 
     ###########################################################################
@@ -60,8 +60,8 @@ class PdfTableParser:
 
         Returns:
             list: The rows parsed so far plus this page's, each one a list of
-                [part, description, uom, onHand, allocated, notAvailable, dropShip,
-                available, onOrder, committed, short]
+                [part, description, uom, on_hand, allocated, not_available, drop_ship,
+                available, on_order, committed, short], the quantities as numbers
         """
 
         lines = page.splitlines()
@@ -113,7 +113,12 @@ class PdfTableParser:
                 if not has_uom_column:
                     trailing.insert(0, "")
 
-                rows.append([part, description] + trailing)
+                # UOM is a label; everything after it is a quantity
+                uom, *numbers = trailing
+                rows.append(
+                    [part, description, uom]
+                    + [self.to_number(number) for number in numbers]
+                )
 
             elif rows:
                 if part:
@@ -137,7 +142,8 @@ class PdfTableParser:
 
         Returns:
             list: The rows parsed so far plus this page's, each one a list of
-                [partDescription, unitsSold, avgQOH, avgTODays, TORate]
+                [part_description, units_sold, avg_qoh, avg_to_days, to_rate], the
+                trailing four as numbers
         """
 
         lines = page.splitlines()
@@ -178,7 +184,9 @@ class PdfTableParser:
                 )
                 label = f"{wrapped[:numbers_column].strip()} {label}".strip()
 
-            rows.append([label] + values)
+            # Convert only once the wrapped-row check above is done, since that check
+            # reads the values as the strings align_to_columns produced
+            rows.append([label] + [self.to_number(value) for value in values])
 
         return rows
 
@@ -213,3 +221,36 @@ class PdfTableParser:
             values[column] = value.group()
 
         return values
+
+    ###########################################################################
+    ###                  PdfTableParser -> to_number()                      ###
+    ###########################################################################
+    def to_number(self, text: str):
+        """
+        Converts one numeric cell of the report into the number it holds, dropping
+        the thousands separators the report prints inside it. The cell is typed by
+        what it says rather than by which column it came from, so a column mixing
+        whole and fractional values keeps each one as written.
+
+        Args:
+            text (str): The cell as the report printed it
+
+        Returns:
+            int: The value of a cell holding no decimal point
+            float: The value of a cell holding one
+            None: For a cell the report left blank, keeping that distinct from a
+                value of zero
+        """
+
+        text = text.replace(",", "")
+
+        if not text:
+            return None
+
+        # NUMERIC_VALUE matches runs of digits and punctuation, so a stray token
+        # like "-" can reach here. Handing it back unconverted keeps a malformed
+        # cell out of the numbers instead of failing the whole report over it.
+        try:
+            return float(text) if "." in text else int(text)
+        except ValueError:
+            return text

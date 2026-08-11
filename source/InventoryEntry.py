@@ -1,61 +1,54 @@
-# InventoryEntry class to hold all attributes of the InventoryEntry that
-# passes to the .xlsx file
-class InventoryEntry:
-    def __init__(self):
-        self.part         = None  # Part number
-        self.description  = None  # Part description
-        self.uom          = None  # Unit of measurement (usually "ea")
-        self.onHand       = 0     # Number of parts at location
-        self.allocated    = 0     # Number of parts already allocated to a job (already included in onHand)
-        self.notAvailable = 0     # Number of parts not available for use
-        self.dropShip     = 0     # Not used, but listed in table
-        self.available    = 0     # Number of available parts (onHand - allocated)
-        self.onOrder      = 0     # Number of parts on order but not arrived
-        self.committed    = 0     # TODO: is this the same as allocated?
-        self.short        = 0     # TODO: Is this like being in the negative?
-        self.rowWrittenTo = 0     # The row that the entry is written to through the xlsxwriter API
+from dataclasses import dataclass
 
-    
-    # to_formatted_string returns a formatted string of the attributes of a given
-    # InventoryEntry object
-    # params: N/A
-    # returns: str, the formatted attribute dump
+
+# InventoryEntry class to hold all attributes of the InventoryEntry that
+# passes to the .xlsx file. The quantities arrive from PdfTableParser already
+# converted to numbers, so they reach the spreadsheet as numeric cells. Every field
+# has a default, so InventoryEntry() default-constructs while callers may also build
+# one straight from a parsed row, e.g. InventoryEntry(*row).
+@dataclass
+class InventoryEntry:
+
+    # fmt:off
+    part: str                    = ""  # Part number
+    description: str             = ""  # Part description
+    uom: str                     = ""  # Unit of measurement (usually "ea"), blank in reports omitting the column
+    on_hand: int | float         = 0   # Number of parts at location
+    allocated: int | float       = 0   # Number of parts already allocated to a job (already included in on_hand)
+    not_available: int | float   = 0   # Number of parts not available for use
+    drop_ship: int | float       = 0   # Not used, but listed in table
+    available: int | float       = 0   # Number of available parts (on_hand - allocated)
+    on_order: int | float        = 0   # Number of parts on order but not arrived
+    committed: int | float       = 0   # TODO: is this the same as allocated?
+    short: int | float           = 0   # TODO: Is this like being in the negative?
+    row_written_to: int          = 0   # The row that the entry is written to through the xlsxwriter API
+    # fmt:on
+
+    ###########################################################################
+    ###               InventoryEntry -> to_formatted_string()               ###
+    ###########################################################################
     def to_formatted_string(self):
+        """
+        Returns a formatted string of the attributes of a given InventoryEntry object
+
+        Returns:
+            str: A formatted string containing all of the entry's fields on separate
+                lines
+        """
+
         return (
             "*****************************\n"
             f"part: {self.part}\n"
             f"description: {self.description}\n"
             f"uom: {self.uom}\n"
-            f"onHand: {self.onHand}\n"
+            f"onHand: {self.on_hand}\n"
             f"allocated: {self.allocated}\n"
-            f"notAvailable: {self.notAvailable}\n"
-            f"dropShip: {self.dropShip}\n"
+            f"notAvailable: {self.not_available}\n"
+            f"dropShip: {self.drop_ship}\n"
             f"available: {self.available}\n"
-            f"onOrder: {self.onOrder}\n"
+            f"onOrder: {self.on_order}\n"
             f"committed: {self.committed}\n"
             f"short: {self.short}\n"
-            f"rowWrittenTo: {self.rowWrittenTo}\n"
+            f"rowWrittenTo: {self.row_written_to}\n"
             "*****************************"
         )
-
-
-    # populateInventoryEntry initializes the appropriate fields of a given InventoryEntry object
-    # params: list: list, a list of parameters in order of definition to be mapped to the object
-    # returns: N/A
-    def populateInventoryEntry(self, list):
-        
-        # The parser has already trimmed each field; commas are the thousands
-        # separators the report prints inside its numbers
-        # fmt:off
-        self.part         = list[0]
-        self.description  = list[1]
-        self.uom          = list[2]
-        self.onHand       = list[3].replace(',', '')
-        self.allocated    = list[4].replace(',', '')
-        self.notAvailable = list[5].replace(',', '')
-        self.dropShip     = list[6].replace(',', '')
-        self.available    = list[7].replace(',', '')
-        self.onOrder      = list[8].replace(',', '')
-        self.committed    = list[9].replace(',', '')
-        self.short        = list[10].replace(',', '')
-        # fmt:on

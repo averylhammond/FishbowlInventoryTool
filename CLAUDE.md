@@ -93,11 +93,11 @@ most useful. It needs the `CODECOV_TOKEN` repo secret, and like the unit-test jo
 out **without** the submodule. The extra `push: branches: [main]` trigger exists so Codecov
 records a main-branch baseline for PR diffs; without it the badge never updates.
 
-**The 25% gate is a temporary floor, not the target.** Measured coverage is 30%
-(`InventoryAppFileIO` and `PdfTableParser` at 100%, everything else at 0%), so 25 leaves a
-little headroom for in-progress refactors. Ratchet it upward as `InventoryAppController`,
-`spreadsheetDriver`, `InventoryEntry`, and `TurnoverEntry` gain tests; 80–90% is the goal,
-matching the sibling.
+**The 35% gate is a temporary floor, not the target.** Measured coverage is 41%
+(`InventoryAppFileIO`, `PdfTableParser`, `InventoryEntry` and `TurnoverEntry` at 100%,
+everything else at 0%), so 35 leaves a little headroom for in-progress refactors. Ratchet
+it upward as `InventoryAppController` and `spreadsheetDriver` gain tests; 80–90% is the
+goal, matching the sibling.
 
 This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
 uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
@@ -150,7 +150,12 @@ spreadsheet writer**.
   extended, so a row wrapped across a page boundary can be folded back into the row it
   continues. `align_to_columns()` assigns each numeric value to the column whose header
   right edge it lines up with, so a column the report leaves blank stays blank instead of
-  shifting every later value one column left.
+  shifting every later value one column left. `to_number()` then converts each numeric
+  cell into the number it holds — dropping the thousands separators, `int` for a cell with
+  no decimal point and `float` for one with, `None` for a blank — so the rows the entry
+  classes are built from carry numbers rather than digit-strings, and the spreadsheet gets
+  numeric cells Excel will sort and sum. A cell that is not a number (the numeric pattern
+  also matches a stray `-`) is handed back unconverted rather than failing the report.
 - **`InventoryAppFileIO`** (`source/InventoryAppFileIO.py`) — home of all file I/O. Reads
   inventory and turnover PDFs via `pypdf` (`read_pdf()`), returning one string of page
   text per page, lists the inventory
@@ -173,16 +178,23 @@ spreadsheet writer**.
   directories (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`,
   `RESULTS_FILE`), resolved against the executable's CWD (mirrors the sibling invoice
   tool's `constants.py`).
-- **`InventoryEntry`** (`source/InventoryEntry.py`) — plain data holder for one
-  inventory row (part, description, uom, onHand, allocated, available, etc.).
-  `populateInventoryEntry(list)` maps a split PDF row onto its fields (stripping
-  whitespace/commas); `to_formatted_string()` returns a formatted-string dump that the
-  controller writes to the results file. Tracks `rowWrittenTo` so turnover data can be
-  matched back to the same spreadsheet row.
-- **`TurnoverEntry`** (`source/TurnoverEntry.py`) — plain data holder for one turnover
-  "Totals:" row (partDescription, unitsSold, avgQOH, avgTODays, TORate), with a parallel
-  `populateTurnoverEntry()` / `to_formatted_string()` (the latter returns a formatted
-  string dump).
+- **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
+  row (`part`, `description`, `uom`, `on_hand`, `allocated`, `available`, etc.). Every
+  field is annotated and defaulted, so it both default-constructs and takes a parsed row
+  positionally — the controller builds one with `InventoryEntry(*row)`, which is why the
+  field order must match the parser's column order and `row_written_to` must stay last.
+  Beyond the generated constructor its only method is `to_formatted_string()`, a
+  formatted-string dump the controller writes to the results file. Tracks
+  `row_written_to` so turnover data can be matched back to the same spreadsheet row.
+- **`TurnoverEntry`** (`source/TurnoverEntry.py`) — the same shape for one turnover
+  "Totals:" row (`part_description`, `units_sold`, `avg_qoh`, `avg_to_days`, `to_rate`).
+  The three averages default to `None` because the report leaves them blank where a part's
+  turnover is undefined.
+- Both entry classes mirror `Invoice` in the sibling `FishbowlInvoiceTool`: a bare
+  `@dataclass` (never `frozen` or `slots` — `spreadsheetDriver` assigns `row_written_to`),
+  the field block wrapped in `# fmt:off` / `# fmt:on` with a trailing comment per field,
+  and exactly two things in the class body. There is deliberately no `__post_init__` and no
+  `populate*` method: converting the report's text into fields is `PdfTableParser`'s job.
 - **`spreadsheetDriver.py`** (`source/spreadsheetDriver.py`) — all `xlsxwriter` output.
   Module-level functions (not a class) build the workbook: `setupMainSpreadsheet` writes
   the inventory header + rows; `setupSpreadsheetTurnoverHeader` /
@@ -211,6 +223,16 @@ spreadsheet writer**.
 - `PdfTableParser.CONTINUATION_SEPARATOR` is the single knob for how the fragments of a
   part or description wrapped across several lines are rejoined. It is a space, matching
   how the report reads; set it to `""` to concatenate with nothing between.
+- **`align_to_columns()` returns strings; `to_number()` runs after it, never inside it.**
+  `parse_turnover_page` uses `if not any(values)` to spot a "Totals:" line whose part name
+  wrapped onto the line above, and that check depends on blanks being `""` while real
+  values are truthy *strings*. Convert any earlier and a legitimate all-zeros row becomes
+  `[0, 0, 0, 0]`, which is falsy, so the parser would scrape values off the wrong line.
+- **The entry classes' field names and their results-file labels are decoupled on
+  purpose.** Fields are snake_case (`on_hand`, `part_description`), but
+  `to_formatted_string()` prints the labels the report and the canonical results file use
+  (`onHand:`, `partDescription:`). Renaming a field must not change its label, or the
+  integration diff churns for no reason.
 - **The results file is a CI fixture, not a log.** It is diffed against
   `canonical_correct_results.txt`, so its *content* must not vary by platform: log bare
   filenames rather than paths, and use explicitly-keyed sorts in
@@ -239,6 +261,11 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
 - `tests/PdfTableParser_tests.py` — a pure-logic class with no collaborators, so nothing
   is mocked and the fixture just constructs the object. Follow it for parser-style tests,
   including the synthetic-fixture rule below.
+- `tests/InventoryEntry_tests.py` / `tests/TurnoverEntry_tests.py` — a dataclass, so there
+  is no fixture at all: each test constructs the object it needs. Cover the defaults, a
+  subset of keyword arguments, positional construction from a `PARSED_ROW` module constant
+  shaped like the parser's output, and `to_formatted_string()` asserted against the
+  report's labels rather than the field names.
 
 ### Test one object in isolation
 

@@ -48,15 +48,15 @@ jobs:
     # Run unit tests with pytest, and generate code coverage report xml. The
     # tests/* glob is required: test files use the _tests.py suffix, which
     # pytest's default discovery does not match.
-    # --cov-fail-under=75 fails this job (and thus blocks the PR, once this check
-    # is marked required in branch protection) whenever total coverage drops below 75%.
-    # 75 is a temporary floor just under the current 79%; raise it toward 80/90% as
-    # InventoryAppController, the last untested module, gains tests.
+    # --cov-fail-under=90 fails this job (and thus blocks the PR, once this check
+    # is marked required in branch protection) whenever total coverage drops below 90%.
+    # Every measured module is currently at 100%, so 90 leaves headroom for an
+    # in-progress refactor while matching the gate the sibling invoice tool uses.
     # Note: replace --cov-report=xml with --cov-report=html to generate HTML report instead
     # which can be easier to manual use
     - name: Run tests and code coverage
       run: |
-        pytest --cov=./ --cov-report=xml --cov-fail-under=75 tests/*
+        pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*
 
     # Upload the coverage report to Codecov, which serves the README badge and
     # posts the PR coverage comment. CODECOV_TOKEN is the repo upload token.

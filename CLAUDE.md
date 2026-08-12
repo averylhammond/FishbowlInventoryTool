@@ -124,8 +124,9 @@ spreadsheet writer**.
   - `start_application()` first checks `argument_provider.integration_test_mode`: when set
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
     `run_integration_test()`. Otherwise it imports and constructs `InventoryAppDisplay`,
-    wires the file I/O controller's `report_error` callback to the display's `show_popup`,
-    and enters `mainloop()`.
+    passing `read_file_callback=self.file_io.read_text_file` so the display's View menu can
+    populate its read-only file viewer, wires the file I/O controller's `report_error`
+    callback to the display's `show_popup`, and enters `mainloop()`.
   - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to
     the display. It runs `process_inventory()` with status routed to the display's output
     box, keeping the display's callback contract to two arguments.
@@ -149,23 +150,50 @@ spreadsheet writer**.
     description can wrap from the bottom of one page onto the top of the next.
 - **`source/gui/`** — the GUI subpackage, the only place tkinter appears.
   - **`InventoryAppDisplay`** (`source/gui/InventoryAppDisplay.py`) — a `tk.Tk` subclass
-    that takes every dependency as a constructor argument (`process_callback`, `title`,
-    `window_resolution`, and the defaulted `theme`/`font_family`/`font_size`) and never
-    imports the controller. It owns the file picker, the two checkbox grids, the
-    Process/Exit buttons and the `ScrolledText` output box, and exposes `show_popup()`,
-    `write_output()`, `clear_output()` and `get_selected_columns()`. `write_output()` calls
+    that takes every dependency as a constructor argument (`process_callback`,
+    `read_file_callback`, `title`, `window_resolution`, and the defaulted
+    `theme`/`font_family`/`font_size`) and never imports the controller. It owns the file
+    picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText` output box,
+    and a menu bar (File/View/Preferences/Help), and exposes `show_popup()`, `write_output()`,
+    `clear_output()` and `get_selected_columns()`. `write_output()` calls
     `update_idletasks()` because processing runs on the GUI thread, so without it a status
     line would not paint until the work it announces had already finished.
-  - **`ThemedSubwindow`** / **`MessageWindow`** — ported verbatim from the sibling: a
-    `tk.Toplevel` base that snapshots the active theme/font and centers over its parent,
-    and the themed OK-button popup `show_popup()` builds.
+    - The **menu bar** is built inline in `build_widgets()` (no separate `MenuBar` class,
+      matching the sibling): **File** (Open/Clear/Exit — Exit calls `self.destroy`, not
+      `self.quit`, to match the Exit button's own convention); **View** (Results Log opens
+      `RESULTS_FILE` in a read-only `FileEditorWindow` via `_open_readonly_file_viewer()`,
+      or a "File Not Found" popup if it doesn't exist yet; Inventories/Turnover Reports open
+      a browse-only `filedialog.askopenfilename` rooted at `INVENTORY_DIR`/`TURNOVER_DIR`,
+      reusing the same dialog mechanism as the top-level Browse button rather than shelling
+      out to the OS's file explorer); **Preferences** (Theme/Font/Font Size submenus built by
+      looping `ALL_THEMES`/`FONT_FAMILIES`/`FONT_SIZES`, each `command` a
+      `lambda x=option: self.apply_x(x)` to avoid a late-binding closure bug); **Help**
+      (About opens `AboutWindow` with `VERSION` from `constants.py`).
+    - **`apply_theme()`** / **`apply_font_family()`** / **`apply_font_size()`** /
+      **`_apply_font()`** apply a Preferences choice live by explicitly reconfiguring every
+      widget the display owns, including every checkbutton in `column_checkbuttons` (the
+      sibling has no checkbox grid, so this loop has no sibling analog). These do **not**
+      persist the choice or refresh tooltips — settings persistence
+      (`SettingsRepository`) and `Tooltip` are tracked separately and not yet built; when
+      they land, slot the persistence call and a `_refresh_tooltips()` call into these same
+      four methods rather than restructuring them.
+  - **`ThemedSubwindow`** / **`MessageWindow`** / **`AboutWindow`** / **`FileEditorWindow`**
+    — ported verbatim from the sibling: `ThemedSubwindow` is a `tk.Toplevel` base that
+    snapshots the active theme/font and centers over its parent; `MessageWindow` is the
+    themed OK-button popup `show_popup()` builds; `AboutWindow` shows the app name (hardcoded
+    as "Fishbowl Inventory Tool", since the sibling has no reusable app-name constant either)
+    and `VERSION`; `FileEditorWindow` shows a file's text in a monospace box, with an
+    `editable` flag toggling a Save button — this app only ever opens it with
+    `editable=False` (there are no editable config files here), but the class itself needed
+    no adaptation.
   - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
     sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
     consistent; they are omitted from coverage for the same reason.
-  - **Deliberately absent**, each a follow-up: menu bar, `SettingsRepository` settings
-    persistence, runtime theme/font switching, `Tooltip`, and the sibling's other
-    subwindows. Only `DARK` ships today, but the theme is a constructor argument rather
-    than a hardcoded value, so adding a picker later needs no surgery on the display.
+  - **Deliberately absent**, each a follow-up: `SettingsRepository` settings persistence
+    (theme/font/column selections reset to defaults on restart until this lands) and
+    `Tooltip`. Only `DARK` ships as the default today, but `ALL_THEMES` is already offered
+    in the Preferences menu, and the theme is a constructor argument rather than a
+    hardcoded value, so persistence needs no surgery on the display.
 - **`columns.py`** (`source/columns.py`) — the single source of truth for the (column key,
   GUI label, section) triple: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
   `TURNOVER_COLUMNS`, `ALL_COLUMNS`, `COLUMN_KEYS` and `all_columns_selected()`. The tuple
@@ -186,15 +214,21 @@ spreadsheet writer**.
   also matches a stray `-`) is handed back unconverted rather than failing the report.
 - **`InventoryAppFileIO`** (`source/InventoryAppFileIO.py`) — home of all file I/O. Reads
   inventory and turnover PDFs via `pypdf` (`read_pdf()`), returning one string of page
-  text per page, lists the inventory
+  text per page; `read_text_file()` reads a plain text file's full contents (used by the
+  display's View menu to populate its read-only file viewer), lists the inventory
   availability PDFs (`list_inventory_files()`, used by headless mode) and the turnover
   report PDFs (`list_turnover_files()`) as full `Path`s ready to read, and owns the
   output spreadsheet lifecycle — opening (`create_workbook()`) and saving
   (`save_workbook()`) the `xlsxwriter` workbook. It also owns the results log at
-  `logs/results.txt` — `reset_results_file()` clears it on startup and
-  `write_to_results_file()` appends a line; the inventory/turnover processing output
+  `logs/results.txt` — `reset_results_file()` **deletes** it on startup (rather than
+  truncating it to empty) so a fresh app launch has no results file at all until
+  something is actually processed, and `write_to_results_file()` (opening in append mode,
+  which recreates the file) writes each line; the inventory/turnover processing output
   that the app once printed to the terminal via `logging` now flows through the latter
-  (the `logging` dependency has been removed). Errors are **not** written there — they go
+  (the `logging` dependency has been removed). The delete-not-truncate distinction is
+  load-bearing: `InventoryAppDisplay.handle_results_log()` uses the file's *existence* to
+  decide whether to open the viewer or show a "File Not Found" popup, and an empty-but-present
+  file would open a blank viewer instead. Errors are **not** written there — they go
   only to the GUI output line via `report_error`. Directory and file paths come from
   `source/constants.py`. Every method wraps its I/O in `try/except`, returns a safe empty
   value (`[]`/`None`/`False`) on failure, and surfaces the error through an injected
@@ -202,10 +236,10 @@ spreadsheet writer**.
   it to the GUI), so missing/unreadable files never crash the app. The two results-file
   helpers swallow their own write failures silently. The in-memory cell writing still
   lives in `spreadsheetDriver.py`, which receives the already-open workbook.
-- **`constants.py`** (`source/constants.py`) — relative `Path` constants for the input
-  directories (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`,
-  `RESULTS_FILE`), resolved against the executable's CWD (mirrors the sibling invoice
-  tool's `constants.py`).
+- **`constants.py`** (`source/constants.py`) — `VERSION`, the current application version
+  surfaced via Help -> About, plus relative `Path` constants for the input directories
+  (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`),
+  resolved against the executable's CWD (mirrors the sibling invoice tool's `constants.py`).
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
   row (`part`, `description`, `uom`, `on_hand`, `allocated`, `available`, etc.). Every
   field is annotated and defaulted, so it both default-constructs and takes a parsed row
@@ -344,6 +378,15 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     without a default root window, so the real classes raise "Too early to create variable";
     and a `MagicMock` would defeat the assertions that `get_selected_columns()` returns real
     booleans, which is the property the spreadsheet writers depend on.
+  - The menu bar's Preferences submenus are built from a `command=lambda x=option:
+    self.apply_x(x)` per loop iteration (see the architecture section above); tests invoke
+    each captured `command` directly (`made_call.kwargs["command"]()`) and assert the
+    resulting state, which is what actually exercises the default-argument capture rather
+    than just asserting the menu was built.
+- `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` — themed subwindows,
+  following `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
+  neutralizing `tk.Toplevel.__init__` and `title`/`configure`/`_center_over_parent`, with
+  every widget class patched at its point of use.
 - `tests/InventoryAppController_tests.py` — the orchestrator, with `ArgumentProvider`,
   `InventoryAppFileIO` and `PdfTableParser` patched at `source.InventoryAppController.<name>`
   as usual. **The display is the one exception to the patch-at-the-point-of-use rule:**

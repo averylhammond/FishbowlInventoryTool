@@ -1,16 +1,25 @@
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, scrolledtext
 from typing import Callable
 
 from source.columns import ALL_COLUMNS, INVENTORY_COLUMNS, TURNOVER_COLUMNS, Column
-from source.constants import INVENTORY_DIR
+from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
+from source.gui.AboutWindow import AboutWindow
+from source.gui.FileEditorWindow import FileEditorWindow
 from source.gui.MessageWindow import MessageWindow
 from source.gui.color_theme import (
+    ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
     RED,  # Used for the EXIT button
     Theme,
 )
-from source.gui.font_settings import DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE
+from source.gui.font_settings import (
+    DEFAULT_FONT_FAMILY,
+    DEFAULT_FONT_SIZE,
+    FONT_FAMILIES,
+    FONT_SIZES,
+)
 
 # Number of checkboxes placed per row in each of the two column-selection grids
 INVENTORY_CHECKBOXES_PER_ROW = 4
@@ -28,6 +37,7 @@ class InventoryAppDisplay(tk.Tk):
     def __init__(
         self,
         process_callback: Callable[[str, dict], bool],
+        read_file_callback: Callable[[Path], str],
         title: str,
         window_resolution: str,
         theme: Theme = DARK,
@@ -41,6 +51,9 @@ class InventoryAppDisplay(tk.Tk):
             process_callback (Callable[[str, dict], bool]): Callback that processes
                 the selected inventory PDF, taking the chosen file path and the
                 column-selection dict
+            read_file_callback (Callable[[Path], str]): Callback that reads a text
+                file's contents, used to populate the read-only file viewer (e.g.
+                View -> Results Log)
             title (str): Title of the application window
             window_resolution (str): Resolution of the application window (e.g. "700x700")
             theme (Theme): The color theme to style the application with
@@ -62,6 +75,9 @@ class InventoryAppDisplay(tk.Tk):
         # Callback function to process the selected inventory file
         self.process_callback = process_callback
 
+        # Callback function to read a text file's contents for the file viewer
+        self.read_file_callback = read_file_callback
+
         # Styling applied to every widget as it is created
         self.current_theme = theme
         self.current_font_family = font_family
@@ -80,6 +96,11 @@ class InventoryAppDisplay(tk.Tk):
 
         # Tkinter Widgets
         # fmt:off
+        self.menu_bar:                 tk.Menu                   | None = None
+        self.file_menu:                tk.Menu                   | None = None
+        self.view_menu:                tk.Menu                   | None = None
+        self.preferences_menu:         tk.Menu                   | None = None
+        self.help_menu:                tk.Menu                   | None = None
         self.title_label:              tk.Label                  | None = None
         self.file_frame:               tk.Frame                  | None = None
         self.file_entry:               tk.Entry                  | None = None
@@ -113,6 +134,75 @@ class InventoryAppDisplay(tk.Tk):
         """
 
         self.configure(bg=self.current_theme.bg_main)
+
+        self.menu_bar = tk.Menu(self)
+
+        # File dropdown
+        #  -> Open option to choose an inventory availability PDF
+        #  -> Clear option to clear the output box and reset the selected file
+        #  -> Exit option to close the application
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(label="Open", command=self.handle_browse_button)
+        self.file_menu.add_command(label="Clear", command=self.handle_clear)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.destroy)
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+
+        # View dropdown
+        #  -> Results Log option to view the results log file
+        #  -> Inventories option to browse the inventory availability PDFs
+        #  -> Turnover Reports option to browse the turnover report PDFs
+        self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.view_menu.add_command(
+            label="Results Log", command=self.handle_results_log
+        )
+        self.view_menu.add_command(
+            label="Inventories", command=self.handle_open_inventories
+        )
+        self.view_menu.add_command(
+            label="Turnover Reports", command=self.handle_open_turnover_reports
+        )
+        self.menu_bar.add_cascade(label="View", menu=self.view_menu)
+
+        # Preferences dropdown
+        #  -> Theme option to select from available color themes
+        #  -> Font option to select the font family used throughout the application
+        #  -> Font Size option to adjust the text size throughout the application
+        self.preferences_menu = tk.Menu(self.menu_bar, tearoff=0)
+
+        theme_menu = tk.Menu(self.preferences_menu, tearoff=0)
+        for theme_option in ALL_THEMES:
+            theme_menu.add_command(
+                label=theme_option.name,
+                command=lambda t=theme_option: self.apply_theme(t),
+            )
+        self.preferences_menu.add_cascade(label="Theme", menu=theme_menu)
+
+        font_menu = tk.Menu(self.preferences_menu, tearoff=0)
+        for family in FONT_FAMILIES:
+            font_menu.add_command(
+                label=family,
+                command=lambda f=family: self.apply_font_family(f),
+            )
+        self.preferences_menu.add_cascade(label="Font", menu=font_menu)
+
+        font_size_menu = tk.Menu(self.preferences_menu, tearoff=0)
+        for size in FONT_SIZES:
+            font_size_menu.add_command(
+                label=str(size),
+                command=lambda s=size: self.apply_font_size(s),
+            )
+        self.preferences_menu.add_cascade(label="Font Size", menu=font_size_menu)
+
+        self.menu_bar.add_cascade(label="Preferences", menu=self.preferences_menu)
+
+        # Help dropdown
+        #  -> About option to show the current application version
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.help_menu.add_command(label="About", command=self.handle_about)
+        self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
+
+        self.config(menu=self.menu_bar)
 
         self.title_label = tk.Label(
             self,
@@ -328,6 +418,18 @@ class InventoryAppDisplay(tk.Tk):
             self.selected_file.set(file_path)
 
     ###########################################################################
+    ###                InventoryAppDisplay -> handle_clear()                ###
+    ###########################################################################
+    def handle_clear(self):
+        """
+        On "Clear" menu press, resets the selected file path and empties the
+        output box
+        """
+
+        self.selected_file.set("")
+        self.clear_output()
+
+    ###########################################################################
     ###           InventoryAppDisplay -> get_selected_columns()              ###
     ###########################################################################
     def get_selected_columns(self) -> dict:
@@ -425,3 +527,207 @@ class InventoryAppDisplay(tk.Tk):
             font_family=self.current_font_family,
             font_size=self.current_font_size,
         )
+
+    ###########################################################################
+    ###         InventoryAppDisplay -> _open_readonly_file_viewer()         ###
+    ###########################################################################
+    def _open_readonly_file_viewer(
+        self, file_path: Path, title: str, missing_message: str
+    ):
+        """
+        Opens a native, read-only window showing the given text file if it
+        exists. Shows an error popup with the provided message if the file is
+        not present.
+
+        Args:
+            file_path (Path): The text file to open for viewing
+            title (str): The title to display on the viewer window
+            missing_message (str): The popup message shown when the file does
+                not exist
+        """
+
+        if file_path.exists():
+            FileEditorWindow(
+                parent=self,
+                title=title,
+                file_path=file_path,
+                initial_text=self.read_file_callback(file_path),
+                theme=self.current_theme,
+                font_family=self.current_font_family,
+                font_size=self.current_font_size,
+                editable=False,
+            )
+        else:
+            self.show_popup(title="File Not Found", message=missing_message)
+
+    ###########################################################################
+    ###            InventoryAppDisplay -> handle_results_log()              ###
+    ###########################################################################
+    def handle_results_log(self):
+        """
+        On "Results Log" menu press, opens the results log file in a native
+        read-only viewer window if it exists. Shows an error popup if the file
+        has not been created yet.
+        """
+
+        self._open_readonly_file_viewer(
+            RESULTS_FILE,
+            "Results Log",
+            f"Log not found at: {RESULTS_FILE}. Process an inventory to generate the log.",
+        )
+
+    ###########################################################################
+    ###           InventoryAppDisplay -> handle_open_inventories()          ###
+    ###########################################################################
+    def handle_open_inventories(self):
+        """
+        On "Inventories" menu press, opens a file dialog rooted at the
+        inventory availability directory so the user can browse its contents
+        """
+
+        filedialog.askopenfilename(
+            initialdir=str(INVENTORY_DIR),
+            title="Inventories",
+            filetypes=[("PDF files", "*.pdf")],
+        )
+
+    ###########################################################################
+    ###        InventoryAppDisplay -> handle_open_turnover_reports()        ###
+    ###########################################################################
+    def handle_open_turnover_reports(self):
+        """
+        On "Turnover Reports" menu press, opens a file dialog rooted at the
+        turnover reports directory so the user can browse its contents
+        """
+
+        filedialog.askopenfilename(
+            initialdir=str(TURNOVER_DIR),
+            title="Turnover Reports",
+            filetypes=[("PDF files", "*.pdf")],
+        )
+
+    ###########################################################################
+    ###                InventoryAppDisplay -> handle_about()                ###
+    ###########################################################################
+    def handle_about(self):
+        """
+        On "About" menu press, opens the About window showing the current
+        application version, themed to match the rest of the application
+        """
+
+        AboutWindow(
+            parent=self,
+            title="About",
+            version=VERSION,
+            theme=self.current_theme,
+            font_family=self.current_font_family,
+            font_size=self.current_font_size,
+        )
+
+    ###########################################################################
+    ###                 InventoryAppDisplay -> apply_theme()                ###
+    ###########################################################################
+    def apply_theme(self, theme: Theme):
+        """
+        Applies a color theme to every widget in the application
+
+        Args:
+            theme (Theme): The theme to apply
+        """
+
+        self.current_theme = theme
+
+        self.configure(bg=theme.bg_main)
+        self.title_label.configure(bg=theme.bg_main, fg=theme.label_fg)
+        self.file_frame.configure(bg=theme.bg_main)
+        self.file_entry.configure(
+            bg=theme.bg_entry, fg=theme.bg_main, insertbackground=theme.fg_text
+        )
+        self.browse_button.configure(
+            bg=theme.button_bg,
+            fg=theme.button_fg,
+            activebackground=theme.accent,
+            activeforeground=theme.fg_text,
+        )
+        self.inventory_label.configure(bg=theme.bg_main, fg=theme.label_fg)
+        self.inventory_frame.configure(bg=theme.bg_main)
+        self.turnover_label.configure(bg=theme.bg_main, fg=theme.label_fg)
+        self.turnover_frame.configure(bg=theme.bg_main)
+
+        for checkbutton in self.column_checkbuttons.values():
+            checkbutton.configure(
+                bg=theme.bg_main,
+                fg=theme.fg_text,
+                activebackground=theme.bg_main,
+                activeforeground=theme.accent,
+                selectcolor=theme.bg_entry,
+            )
+
+        self.button_frame.configure(bg=theme.bg_main)
+        self.process_inventory_button.configure(
+            bg=theme.button_bg,
+            fg=theme.button_fg,
+            activebackground=theme.accent,
+            activeforeground=theme.fg_text,
+        )
+        self.exit_button.configure(
+            bg=theme.bg_entry,
+            fg=theme.fg_text,
+            activeforeground=theme.fg_text,
+        )
+        self.output_label.configure(bg=theme.bg_main, fg=theme.label_fg)
+        self.output_box.configure(
+            bg=theme.bg_entry, fg=theme.fg_text, insertbackground=theme.fg_text
+        )
+
+    ###########################################################################
+    ###              InventoryAppDisplay -> apply_font_family()             ###
+    ###########################################################################
+    def apply_font_family(self, family: str):
+        """
+        Applies a font family to all text on screen
+
+        Args:
+            family (str): The font family to apply
+        """
+
+        self.current_font_family = family
+        self._apply_font()
+
+    ###########################################################################
+    ###               InventoryAppDisplay -> apply_font_size()              ###
+    ###########################################################################
+    def apply_font_size(self, size: int):
+        """
+        Applies a font size to all text on screen
+
+        Args:
+            size (int): The font size to apply
+        """
+
+        self.current_font_size = size
+        self._apply_font()
+
+    ###########################################################################
+    ###                 InventoryAppDisplay -> _apply_font()                ###
+    ###########################################################################
+    def _apply_font(self):
+        """
+        Applies the current font family and size to every widget in the
+        application
+        """
+
+        font = (self.current_font_family, self.current_font_size, "bold")
+        self.title_label.configure(font=font)
+        self.browse_button.configure(font=font)
+        self.inventory_label.configure(font=font)
+        self.turnover_label.configure(font=font)
+        self.process_inventory_button.configure(font=font)
+        self.exit_button.configure(font=font)
+        self.output_label.configure(font=font)
+        self.output_box.configure(font=font)
+
+        # Checkbuttons use a non-bold font, matching _build_checkbutton()
+        checkbutton_font = (self.current_font_family, self.current_font_size)
+        for checkbutton in self.column_checkbuttons.values():
+            checkbutton.configure(font=checkbutton_font)

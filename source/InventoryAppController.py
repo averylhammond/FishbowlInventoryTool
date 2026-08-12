@@ -266,6 +266,7 @@ class InventoryAppController:
         # Create the GUI, giving it the callback that processes a chosen inventory
         self.display = InventoryAppDisplay(
             process_callback=self.handle_process_inventory,
+            read_file_callback=self.file_io.read_text_file,
             title="Automated Inventory Processor",
             window_resolution="700x700",
         )

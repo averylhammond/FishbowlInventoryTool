@@ -33,20 +33,23 @@ class InventoryAppFileIO:
     ###########################################################################
     def reset_results_file(self) -> None:
         """
-        Clears the results file so each run starts with a clean log, creating the
-        logs directory if it does not yet exist
+        Deletes the results file if it exists, so each run starts with no log
+        until something is actually processed. Deleting rather than truncating to
+        empty is load-bearing: the View -> Results Log menu treats the file's
+        existence as "has this been generated", and write_to_results_file() (in
+        append mode) recreates the file as soon as there is something to log.
         """
 
         try:
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            RESULTS_FILE.write_text("", encoding="utf-8")
+            if RESULTS_FILE.is_file():
+                RESULTS_FILE.unlink()
 
-        except OSError:
+        except OSError as error:
             self.report_error(
                 "File Error",
-                f"Could not write to the results file: {RESULTS_FILE}",
+                f"Could not reset the results file at {RESULTS_FILE}: {error}",
             )
-            pass
 
     ###########################################################################
     ###           InventoryAppFileIO -> write_to_results_file()             ###
@@ -72,6 +75,32 @@ class InventoryAppFileIO:
                 "File Error",
                 f"Could not write to the results file: {RESULTS_FILE}",
             )
+
+    ###########################################################################
+    ###                InventoryAppFileIO -> read_text_file()               ###
+    ###########################################################################
+    def read_text_file(self, file_path: Path) -> str:
+        """
+        Reads the full contents of a text file into a single string
+
+        Args:
+            file_path (Path): The file path of the text file to read in
+
+        Returns:
+            str: The full contents of the file, or an empty string if the file
+                could not be read
+        """
+
+        try:
+            with open(file=file_path, mode="r") as f:
+                return f.read()
+
+        except OSError as error:
+            self.report_error(
+                "File Error",
+                f"Could not read the file at {file_path}: {error}",
+            )
+            return ""
 
     ###########################################################################
     ###                  InventoryAppFileIO -> read_pdf()                   ###

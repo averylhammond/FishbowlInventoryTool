@@ -4,10 +4,15 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 from source.columns import ALL_COLUMNS, COLUMN_KEYS
-from source.constants import INVENTORY_DIR
+from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
-from source.gui.color_theme import DARK, FOREST
-from source.gui.font_settings import DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE
+from source.gui.color_theme import ALL_THEMES, DARK, FOREST
+from source.gui.font_settings import (
+    DEFAULT_FONT_FAMILY,
+    DEFAULT_FONT_SIZE,
+    FONT_FAMILIES,
+    FONT_SIZES,
+)
 
 
 ###############################################################################
@@ -102,10 +107,11 @@ def display(request):
 
     Returns:
         types.SimpleNamespace: Holds the constructed display (`display`), the
-            mocked Tk methods (`title`, `geometry`, `resizable`, `configure`),
-            the patched widget classes whose calls are asserted (`button_cls`,
-            `checkbutton_cls`, `message_window_cls`), and the callback passed at
-            construction (`process_callback`)
+            mocked Tk methods (`title`, `geometry`, `resizable`, `configure`,
+            `config`), the patched widget classes whose calls are asserted
+            (`button_cls`, `checkbutton_cls`, `message_window_cls`,
+            `about_window_cls`, `file_editor_window_cls`), and the callbacks
+            passed at construction (`process_callback`, `read_file_callback`)
     """
 
     # Constructor overrides supplied indirectly by a test, or none when not
@@ -118,12 +124,14 @@ def display(request):
         patch.object(InventoryAppDisplay, "geometry") as mock_geometry,
         patch.object(InventoryAppDisplay, "resizable") as mock_resizable,
         patch.object(InventoryAppDisplay, "configure") as mock_configure,
+        patch.object(InventoryAppDisplay, "config") as mock_config,
         patch(
             "source.gui.InventoryAppDisplay.tk.StringVar", side_effect=_FakeStringVar
         ),
         patch(
             "source.gui.InventoryAppDisplay.tk.BooleanVar", side_effect=_FakeBooleanVar
         ),
+        patch("source.gui.InventoryAppDisplay.tk.Menu", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Frame", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Entry", side_effect=_distinct_widget),
@@ -139,13 +147,19 @@ def display(request):
             side_effect=_distinct_widget,
         ),
         patch("source.gui.InventoryAppDisplay.MessageWindow") as mock_message_window_cls,
+        patch("source.gui.InventoryAppDisplay.AboutWindow") as mock_about_window_cls,
+        patch(
+            "source.gui.InventoryAppDisplay.FileEditorWindow"
+        ) as mock_file_editor_window_cls,
     ):
 
-        # The callback the controller would normally supply; a mock is sufficient
+        # The callbacks the controller would normally supply; mocks are sufficient
         process_callback = MagicMock()
+        read_file_callback = MagicMock()
 
         arguments = {
             "process_callback": process_callback,
+            "read_file_callback": read_file_callback,
             "title": "Automated Inventory Processor",
             "window_resolution": "700x700",
         }
@@ -159,10 +173,14 @@ def display(request):
             geometry=mock_geometry,
             resizable=mock_resizable,
             configure=mock_configure,
+            config=mock_config,
             button_cls=mock_button_cls,
             checkbutton_cls=mock_checkbutton_cls,
             message_window_cls=mock_message_window_cls,
+            about_window_cls=mock_about_window_cls,
+            file_editor_window_cls=mock_file_editor_window_cls,
             process_callback=process_callback,
+            read_file_callback=read_file_callback,
         )
 
 
@@ -195,6 +213,19 @@ def test_init_stores_the_process_callback(display):
     """
 
     assert display.display.process_callback is display.process_callback
+
+
+def test_init_stores_the_read_file_callback(display):
+    """
+    Tests that the controller's file-reading callback is stored, since the
+    read-only file viewer is populated straight from it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    assert display.display.read_file_callback is display.read_file_callback
 
 
 def test_init_defaults_to_the_dark_theme_and_default_font(display):
@@ -423,6 +454,174 @@ def test_build_widgets_styles_the_buttons_with_the_theme_and_font(display):
     assert exit_kwargs["activebackground"] != DARK.accent
 
 
+def test_build_widgets_creates_and_attaches_the_menu_bar(display):
+    """
+    Tests that build_widgets constructs every menu cascade and registers the
+    assembled menu bar on the window exactly once
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    assert display.display.menu_bar is not None
+    assert display.display.file_menu is not None
+    assert display.display.view_menu is not None
+    assert display.display.preferences_menu is not None
+    assert display.display.help_menu is not None
+
+    display.config.assert_called_once_with(menu=display.display.menu_bar)
+
+
+def test_build_widgets_wires_the_file_menu(display):
+    """
+    Tests that the File menu offers Open, Clear, and Exit (with a separator
+    before Exit), each wired to its handler
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    calls = display.display.file_menu.add_command.call_args_list
+    assert calls[0].kwargs == {
+        "label": "Open",
+        "command": display.display.handle_browse_button,
+    }
+    assert calls[1].kwargs == {
+        "label": "Clear",
+        "command": display.display.handle_clear,
+    }
+    assert calls[2].kwargs == {
+        "label": "Exit",
+        "command": display.display.destroy,
+    }
+    display.display.file_menu.add_separator.assert_called_once()
+
+
+def test_build_widgets_wires_the_view_menu(display):
+    """
+    Tests that the View menu offers Results Log, Inventories, and Turnover
+    Reports, each wired to its handler
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    calls = display.display.view_menu.add_command.call_args_list
+    assert calls[0].kwargs == {
+        "label": "Results Log",
+        "command": display.display.handle_results_log,
+    }
+    assert calls[1].kwargs == {
+        "label": "Inventories",
+        "command": display.display.handle_open_inventories,
+    }
+    assert calls[2].kwargs == {
+        "label": "Turnover Reports",
+        "command": display.display.handle_open_turnover_reports,
+    }
+
+
+def test_build_widgets_wires_the_help_menu(display):
+    """
+    Tests that the Help menu offers About, wired to its handler
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    calls = display.display.help_menu.add_command.call_args_list
+    assert calls[0].kwargs == {
+        "label": "About",
+        "command": display.display.handle_about,
+    }
+
+
+def test_build_widgets_theme_submenu_offers_every_theme_and_applies_it(display):
+    """
+    Tests that the Preferences -> Theme submenu offers every available theme, in
+    order, and that choosing one applies it. Each command is built with a
+    default-argument-capturing lambda to avoid a late-binding closure bug, so
+    invoking every command in turn and checking the result after each call is
+    what actually exercises that captured value.
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    cascade_call = next(
+        c
+        for c in display.display.preferences_menu.add_cascade.call_args_list
+        if c.kwargs["label"] == "Theme"
+    )
+    theme_menu = cascade_call.kwargs["menu"]
+    theme_commands = theme_menu.add_command.call_args_list
+
+    assert [c.kwargs["label"] for c in theme_commands] == [
+        theme.name for theme in ALL_THEMES
+    ]
+
+    for theme_option, made_call in zip(ALL_THEMES, theme_commands):
+        made_call.kwargs["command"]()
+        assert display.display.current_theme is theme_option
+
+
+def test_build_widgets_font_submenu_offers_every_family_and_applies_it(display):
+    """
+    Tests that the Preferences -> Font submenu offers every available font
+    family, in order, and that choosing one applies it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    cascade_call = next(
+        c
+        for c in display.display.preferences_menu.add_cascade.call_args_list
+        if c.kwargs["label"] == "Font"
+    )
+    font_menu = cascade_call.kwargs["menu"]
+    font_commands = font_menu.add_command.call_args_list
+
+    assert [c.kwargs["label"] for c in font_commands] == FONT_FAMILIES
+
+    for family, made_call in zip(FONT_FAMILIES, font_commands):
+        made_call.kwargs["command"]()
+        assert display.display.current_font_family == family
+
+
+def test_build_widgets_font_size_submenu_offers_every_size_and_applies_it(display):
+    """
+    Tests that the Preferences -> Font Size submenu offers every available font
+    size, in order, and that choosing one applies it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    cascade_call = next(
+        c
+        for c in display.display.preferences_menu.add_cascade.call_args_list
+        if c.kwargs["label"] == "Font Size"
+    )
+    font_size_menu = cascade_call.kwargs["menu"]
+    font_size_commands = font_size_menu.add_command.call_args_list
+
+    assert [c.kwargs["label"] for c in font_size_commands] == [
+        str(size) for size in FONT_SIZES
+    ]
+
+    for size, made_call in zip(FONT_SIZES, font_size_commands):
+        made_call.kwargs["command"]()
+        assert display.display.current_font_size == size
+
+
 ###############################################################################
 ###           Tests InventoryAppDisplay -> handle_browse_button()           ###
 ###############################################################################
@@ -648,3 +847,224 @@ def test_show_popup_opens_a_themed_message_window(display):
         font_family=DEFAULT_FONT_FAMILY,
         font_size=DEFAULT_FONT_SIZE,
     )
+
+
+###############################################################################
+###                Tests InventoryAppDisplay -> handle_clear()              ###
+###############################################################################
+def test_handle_clear_resets_the_selected_file_and_output(display):
+    """
+    Tests that "Clear" resets the selected file path and empties the output box
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.selected_file.set("C:/Inventory/Already Chosen.pdf")
+
+    display.display.handle_clear()
+
+    assert display.display.selected_file.get() == ""
+    display.display.output_box.delete.assert_called_once_with(1.0, tk.END)
+
+
+###############################################################################
+###             Tests InventoryAppDisplay -> handle_results_log()           ###
+###############################################################################
+def test_handle_results_log_opens_a_read_only_viewer_when_present(display):
+    """
+    Tests that "Results Log" opens a read-only viewer window populated from the
+    read callback when the results file exists
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch("source.gui.InventoryAppDisplay.RESULTS_FILE") as mock_results_file:
+        mock_results_file.exists.return_value = True
+
+        display.display.handle_results_log()
+
+        display.read_file_callback.assert_called_once_with(mock_results_file)
+        window_kwargs = display.file_editor_window_cls.call_args.kwargs
+        assert window_kwargs["file_path"] is mock_results_file
+        assert window_kwargs["editable"] is False
+        assert window_kwargs["initial_text"] is display.read_file_callback.return_value
+
+
+def test_handle_results_log_shows_an_error_when_missing(display):
+    """
+    Tests that "Results Log" shows a popup and opens no viewer when the results
+    file has not been created yet
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch("source.gui.InventoryAppDisplay.RESULTS_FILE") as mock_results_file:
+        mock_results_file.exists.return_value = False
+
+        display.display.handle_results_log()
+
+        display.message_window_cls.assert_called_once()
+        display.file_editor_window_cls.assert_not_called()
+
+
+###############################################################################
+###     Tests InventoryAppDisplay -> handle_open_inventories()/(turnover)   ###
+###############################################################################
+def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(display):
+    """
+    Tests that "Inventories" opens a browse-only file dialog rooted at the
+    inventory availability directory, filtered to PDFs
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch(
+        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
+    ) as mock_dialog:
+        display.display.handle_open_inventories()
+
+    dialog_kwargs = mock_dialog.call_args.kwargs
+    assert dialog_kwargs["initialdir"] == str(INVENTORY_DIR)
+    assert dialog_kwargs["filetypes"] == [("PDF files", "*.pdf")]
+
+
+def test_handle_open_turnover_reports_opens_a_dialog_rooted_at_the_turnover_dir(
+    display,
+):
+    """
+    Tests that "Turnover Reports" opens a browse-only file dialog rooted at the
+    turnover reports directory, filtered to PDFs
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch(
+        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
+    ) as mock_dialog:
+        display.display.handle_open_turnover_reports()
+
+    dialog_kwargs = mock_dialog.call_args.kwargs
+    assert dialog_kwargs["initialdir"] == str(TURNOVER_DIR)
+    assert dialog_kwargs["filetypes"] == [("PDF files", "*.pdf")]
+
+
+###############################################################################
+###                Tests InventoryAppDisplay -> handle_about()              ###
+###############################################################################
+def test_handle_about_opens_the_about_window(display):
+    """
+    Tests that "About" opens the About window showing the current application
+    version, styled with the active theme/font
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.handle_about()
+
+    display.about_window_cls.assert_called_once_with(
+        parent=display.display,
+        title="About",
+        version=VERSION,
+        theme=display.display.current_theme,
+        font_family=display.display.current_font_family,
+        font_size=display.display.current_font_size,
+    )
+
+
+###############################################################################
+###                Tests InventoryAppDisplay -> apply_theme()               ###
+###############################################################################
+def test_apply_theme_updates_state_and_restyles_every_widget(display):
+    """
+    Tests that apply_theme stores the new theme and reconfigures the window and
+    every tracked widget, including every column checkbutton, with that theme's
+    colors
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_theme(FOREST)
+
+    assert display.display.current_theme is FOREST
+
+    display.configure.assert_any_call(bg=FOREST.bg_main)
+    display.display.output_box.configure.assert_called_once_with(
+        bg=FOREST.bg_entry, fg=FOREST.fg_text, insertbackground=FOREST.fg_text
+    )
+
+    for checkbutton in display.display.column_checkbuttons.values():
+        checkbutton.configure.assert_called_once_with(
+            bg=FOREST.bg_main,
+            fg=FOREST.fg_text,
+            activebackground=FOREST.bg_main,
+            activeforeground=FOREST.accent,
+            selectcolor=FOREST.bg_entry,
+        )
+
+
+###############################################################################
+###             Tests InventoryAppDisplay -> apply_font_family()            ###
+###############################################################################
+def test_apply_font_family_updates_state_and_restyles_every_widget(display):
+    """
+    Tests that apply_font_family stores the chosen family and applies the new
+    font (family, size, weight) to the tracked widgets, including the column
+    checkbuttons at their own non-bold weight
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_font_family("Arial")
+
+    assert display.display.current_font_family == "Arial"
+    display.display.title_label.configure.assert_called_once_with(
+        font=("Arial", DEFAULT_FONT_SIZE, "bold")
+    )
+
+    for checkbutton in display.display.column_checkbuttons.values():
+        checkbutton.configure.assert_called_once_with(
+            font=("Arial", DEFAULT_FONT_SIZE)
+        )
+
+
+###############################################################################
+###              Tests InventoryAppDisplay -> apply_font_size()             ###
+###############################################################################
+def test_apply_font_size_updates_state_and_restyles_every_widget(display):
+    """
+    Tests that apply_font_size stores the chosen size and applies the new font
+    (family, size, weight) to the tracked widgets, including the column
+    checkbuttons at their own non-bold weight
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_font_size(20)
+
+    assert display.display.current_font_size == 20
+    display.display.output_box.configure.assert_called_once_with(
+        font=(DEFAULT_FONT_FAMILY, 20, "bold")
+    )
+
+    for checkbutton in display.display.column_checkbuttons.values():
+        checkbutton.configure.assert_called_once_with(
+            font=(DEFAULT_FONT_FAMILY, 20)
+        )

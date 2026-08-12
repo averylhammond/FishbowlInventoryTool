@@ -57,40 +57,70 @@ def test_init_stores_the_injected_report_error(file_io):
 ###           Tests InventoryAppFileIO -> reset_results_file()              ###
 ###############################################################################
 @patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_reset_results_file_clears_the_file(mock_results_file, file_io):
+def test_reset_results_file_deletes_an_existing_file(mock_results_file, file_io):
     """
-    Tests that reset_results_file() ensures the logs directory exists and truncates
-    the results file so each run starts with a clean log.
+    Tests that reset_results_file() ensures the logs directory exists and deletes
+    the results file when one is present, so each run starts with no log until
+    something is actually processed.
 
     Args:
         mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # The results file is reset before any processing happens
+    # A results file from a previous run is present
+    mock_results_file.is_file.return_value = True
+
     file_io.reset_results_file()
 
-    # The logs directory is ensured and the file is truncated to empty
+    # The logs directory is ensured and the existing file is deleted
     mock_results_file.parent.mkdir.assert_called_once_with(
         parents=True, exist_ok=True
     )
-    mock_results_file.write_text.assert_called_once_with("", encoding="utf-8")
+    mock_results_file.unlink.assert_called_once_with()
+    file_io.report_error.assert_not_called()
+
+
+@patch("source.InventoryAppFileIO.RESULTS_FILE")
+def test_reset_results_file_does_nothing_when_no_file_exists(
+    mock_results_file, file_io
+):
+    """
+    Tests that reset_results_file() does not attempt to delete a results file
+    that is not present, while still ensuring the logs directory exists.
+
+    Args:
+        mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
+        file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
+    """
+
+    # No results file exists yet (e.g. a fresh checkout)
+    mock_results_file.is_file.return_value = False
+
+    file_io.reset_results_file()
+
+    # The directory is ensured but nothing is deleted
+    mock_results_file.parent.mkdir.assert_called_once_with(
+        parents=True, exist_ok=True
+    )
+    mock_results_file.unlink.assert_not_called()
     file_io.report_error.assert_not_called()
 
 
 @patch("source.InventoryAppFileIO.RESULTS_FILE")
 def test_reset_results_file_reports_on_error(mock_results_file, file_io):
     """
-    Tests that reset_results_file() swallows a write failure and surfaces it to the
-    user instead of crashing the app.
+    Tests that reset_results_file() swallows a deletion failure and surfaces it to
+    the user instead of crashing the app.
 
     Args:
         mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # Truncating the results file fails
-    mock_results_file.write_text.side_effect = OSError("permission denied")
+    # Deleting the existing results file fails
+    mock_results_file.is_file.return_value = True
+    mock_results_file.unlink.side_effect = OSError("permission denied")
 
     # No exception is raised, and the failure is reported to the user
     file_io.reset_results_file()
@@ -144,6 +174,43 @@ def test_write_to_results_file_reports_on_error(
 
     # No exception is raised, and the failure is reported to the user
     file_io.write_to_results_file("some processing output")
+    file_io.report_error.assert_called_once()
+
+
+###############################################################################
+###             Tests InventoryAppFileIO -> read_text_file()                ###
+###############################################################################
+@patch("builtins.open", new_callable=mock_open, read_data="log contents")
+def test_read_text_file_returns_contents(mock_file, file_io):
+    """
+    Tests that read_text_file() returns the full contents of the given text file.
+
+    Args:
+        mock_file (unittest.mock.MagicMock): Mocks the built-in open()
+        file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
+    """
+
+    # The file's full contents are returned
+    assert file_io.read_text_file(Path("logs/results.txt")) == "log contents"
+    mock_file.assert_called_once_with(file=Path("logs/results.txt"), mode="r")
+    file_io.report_error.assert_not_called()
+
+
+@patch("builtins.open", side_effect=OSError("file not found"))
+def test_read_text_file_reports_and_returns_empty_string_on_error(
+    _mock_file, file_io
+):
+    """
+    Tests that read_text_file() returns an empty string and surfaces the failure
+    when the text file cannot be read.
+
+    Args:
+        _mock_file (unittest.mock.MagicMock): Mocks the built-in open() to raise
+        file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
+    """
+
+    # An empty string is returned and the failure is reported to the user
+    assert file_io.read_text_file(Path("logs/missing.txt")) == ""
     file_io.report_error.assert_called_once()
 
 

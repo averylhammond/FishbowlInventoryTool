@@ -113,6 +113,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
 
     mock_display_cls.assert_called_once_with(
         process_callback=controller.controller.handle_process_inventory,
+        read_file_callback=controller.file_io.read_text_file,
         title="Automated Inventory Processor",
         window_resolution="700x700",
     )

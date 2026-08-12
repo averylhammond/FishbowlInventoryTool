@@ -17,6 +17,11 @@ FONT_FAMILIES = [
     "Tahoma",
 ]
 
+# Fixed-width font used where character alignment matters (e.g. the file editor),
+# so columns in a viewed file line up the same way they do in a plain-text editor
+# regardless of the application's display font
+MONOSPACE_FONT_FAMILY = "Courier New"
+
 # Default font size applied on startup
 DEFAULT_FONT_SIZE = 12
 

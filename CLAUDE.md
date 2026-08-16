@@ -108,19 +108,23 @@ uses `@v4` and no cache — a deliberate mirror of the sibling's file rather tha
 
 ## Architecture
 
-The application flow is: **entry point → controller → GUI + file I/O + entry data classes +
-spreadsheet writer**.
+The application flow is: **entry point → controller → processor + GUI + file I/O + entry
+data classes + spreadsheet writer**.
 
 - **`main.py`** — thin entry point. Constructs an `InventoryAppController` and calls
   `start_application()`. Contains no application logic.
-- **`InventoryAppController`** (`source/InventoryAppController.py`) — the orchestrator.
-  It wires the components together and owns the parsing flow, delegating all file I/O to
-  `InventoryAppFileIO` and everything visual to `InventoryAppDisplay`. Responsibilities:
-  - `__init__` constructs the `InventoryAppFileIO` collaborator, constructs the shared
-    `ArgumentProvider` (from the `fishbowl-common` package) to detect headless mode, sets
-    `self.display = None`, and clears the results file (`reset_results_file()`) so each run
-    starts with a fresh diagnostics log. It deliberately does **not** build the GUI; see
-    `start_application()` below.
+- **`InventoryAppController`** (`source/InventoryAppController.py`) — the wiring. It owns no
+  parsing or spreadsheet logic itself, delegating the whole processing pipeline to
+  `InventoryProcessor`, all file I/O to `InventoryAppFileIO` and everything visual to
+  `InventoryAppDisplay`. Responsibilities:
+  - `__init__` constructs the `InventoryAppFileIO` collaborator, constructs the
+    `InventoryProcessor` and hands it that same file I/O instance (not a fresh one — the
+    headless path reassigns `file_io.report_error`, which only reaches the object doing the
+    reads if the two share one instance), constructs the shared `ArgumentProvider` (from the
+    `fishbowl-common` package) to detect headless mode, sets `self.display = None`, and
+    clears the results file (`reset_results_file()`) so each run starts with a fresh
+    diagnostics log. It deliberately does **not** build the GUI; see `start_application()`
+    below.
   - `start_application()` first checks `argument_provider.integration_test_mode`: when set
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
     `run_integration_test()`. Otherwise it imports and constructs `InventoryAppDisplay`,
@@ -128,8 +132,18 @@ spreadsheet writer**.
     populate its read-only file viewer, wires the file I/O controller's `report_error`
     callback to the display's `show_popup`, and enters `mainloop()`.
   - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to
-    the display. It runs `process_inventory()` with status routed to the display's output
-    box, keeping the display's callback contract to two arguments.
+    the display. It runs `self.processor.process_inventory()` with status routed to the
+    display's output box, keeping the display's callback contract to two arguments.
+  - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout,
+    takes an all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and
+    calls `self.processor.process_inventory()` for every PDF from
+    `InventoryAppFileIO.list_inventory_files()`. Lets a CI workflow generate
+    `logs/results.txt` with no GUI interaction.
+- **`InventoryProcessor`** (`source/InventoryProcessor.py`) — the whole inventory-processing
+  pipeline, mirroring `InvoiceProcessor` in the sibling `FishbowlInvoiceTool`. It takes the
+  `InventoryAppFileIO` controller as its only constructor argument and builds its own
+  `PdfTableParser`; it has no reference to the controller, the display or the argument
+  provider, and user-facing status reaches the caller only through an injected callback.
   - `process_inventory(inventory_pdf_path, checkbox_dict, report_status)` — the shared
     per-file processing routine used by both the GUI and headless paths. It parses the
     inventory PDF (bailing gracefully if it can't be read), derives the output filename
@@ -138,11 +152,6 @@ spreadsheet writer**.
     turnover PDF appending turnover columns and saves. Status strings go to the injected
     `report_status` callback (the GUI output line, or `print`/stdout in headless mode) —
     never to the results file — so the results log stays deterministic for CI diffing.
-  - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout,
-    takes an all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and
-    calls `process_inventory()` for every PDF from
-    `InventoryAppFileIO.list_inventory_files()`. Lets a CI workflow generate
-    `logs/results.txt` with no GUI interaction.
   - PDF parsing helpers: `process_inventory_file` and `process_turnover_file` source page
     text from `InventoryAppFileIO.read_pdf()`, delegate column parsing to
     `PdfTableParser`, and map the resulting rows onto `InventoryEntry` / `TurnoverEntry`
@@ -243,10 +252,10 @@ spreadsheet writer**.
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
   row (`part`, `description`, `uom`, `on_hand`, `allocated`, `available`, etc.). Every
   field is annotated and defaulted, so it both default-constructs and takes a parsed row
-  positionally — the controller builds one with `InventoryEntry(*row)`, which is why the
+  positionally — the processor builds one with `InventoryEntry(*row)`, which is why the
   field order must match the parser's column order and `row_written_to` must stay last.
   Beyond the generated constructor its only method is `to_formatted_string()`, a
-  formatted-string dump the controller writes to the results file. Tracks
+  formatted-string dump the processor writes to the results file. Tracks
   `row_written_to` so turnover data can be matched back to the same spreadsheet row.
 - **`TurnoverEntry`** (`source/TurnoverEntry.py`) — the same shape for one turnover
   "Totals:" row (`part_description`, `units_sold`, `avg_qoh`, `avg_to_days`, `to_rate`).
@@ -387,14 +396,26 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   following `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
   neutralizing `tk.Toplevel.__init__` and `title`/`configure`/`_center_over_parent`, with
   every widget class patched at its point of use.
-- `tests/InventoryAppController_tests.py` — the orchestrator, with `ArgumentProvider`,
-  `InventoryAppFileIO` and `PdfTableParser` patched at `source.InventoryAppController.<name>`
-  as usual. **The display is the one exception to the patch-at-the-point-of-use rule:**
-  `start_application()` imports it inside the function, so the name never exists at module
-  scope and the target is its definition site,
+- `tests/InventoryAppController_tests.py` — the wiring, with `ArgumentProvider`,
+  `InventoryAppFileIO` and `InventoryProcessor` patched at
+  `source.InventoryAppController.<name>` as usual. Because the processor is mocked there,
+  the GUI and headless paths are asserted against `processor.process_inventory` directly
+  rather than by patching a method onto the controller. **The display is the one exception
+  to the patch-at-the-point-of-use rule:** `start_application()` imports it inside the
+  function, so the name never exists at module scope and the target is its definition site,
   `patch("source.gui.InventoryAppDisplay.InventoryAppDisplay")`. A function-local
   `from X import Y` resolves `Y` as an attribute of module `X` at call time, which is why
   patching there works.
+- `tests/InventoryProcessor_tests.py` — a class whose collaborator is injected rather than
+  constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to
+  the constructor while the `PdfTableParser` the processor builds itself is patched at
+  `source.InventoryProcessor.PdfTableParser`. The `spec=` is safe only because the processor
+  never touches `report_error`, which is an instance attribute a spec'd mock would reject.
+  The spreadsheet writers reach the module through `from source.spreadsheetDriver import *`,
+  which makes `source.InventoryProcessor.setupMainSpreadsheet` (etc.) the point of use —
+  never `source.spreadsheetDriver.<name>`. `process_inventory()` is tested with its own
+  parsing helpers replaced via `patch.object` on the instance, so each test exercises one
+  method.
 
 ### Test one object in isolation
 

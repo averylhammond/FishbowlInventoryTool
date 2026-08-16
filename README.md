@@ -1,88 +1,136 @@
-Unit Test Status: [![Unit Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml)
+# FishbowlInventoryTool
 
-Code Coverage Status: [![codecov](https://codecov.io/gh/averylhammond/FishbowlInventoryTool/branch/main/graph/badge.svg)](https://codecov.io/gh/averylhammond/FishbowlInventoryTool)
+[![Unit Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/unit-tests.yml)
+[![Integration Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml)
+[![Code Coverage](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/code-coverage.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/code-coverage.yml)
+[![codecov](https://codecov.io/gh/averylhammond/FishbowlInventoryTool/branch/main/graph/badge.svg)](https://codecov.io/gh/averylhammond/FishbowlInventoryTool)
 
-Integration Test Status: [![Integration Tests](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml/badge.svg?branch=main)](https://github.com/averylhammond/FishbowlInventoryTool/actions/workflows/integration-tests.yml)
+A Python desktop app (tkinter) that parses Fishbowl-generated **Inventory Availability**
+and **Turnover Report** PDFs and produces a formatted Excel (`.xlsx`) report. Pick an
+inventory availability PDF and check which inventory and turnover columns to include;
+the app parses that PDF plus every turnover report found in `TurnoverReports/`, matches
+turnover rows to inventory rows by part, and writes a single styled worksheet named
+after the date in the inventory PDF's filename.
 
-**************************************
-INSTRUCTIONS TO SET UP FOR DEVELOPMENT
-**************************************
+## Setup
 
-1) Clone this repo into a project folder.
+**1. Clone the repo** into a project folder.
 
-2) In order to test with example resources (inventory availability and turnover report PDFs, located here
-   <https://github.com/averylhammond/automated-inventory-testing>), the automated-inventory-testing repo
-   has been added as a submodule to this project.
+**2. Initialize the test-data submodule.** Sample inventory availability and turnover
+report PDFs live in
+[automated-inventory-testing](https://github.com/averylhammond/automated-inventory-testing),
+which is wired in as a submodule:
 
-   Run git submodule update --init to clone and initialize the repo
-    - NOTE: This submodule is private because it contains private company data. Never commit
-            data sourced from it back into this repo.
-    - The resulting folder structure is shown below:
-     <PRE>- project_root/
-          └── FishbowlInventoryTool/
-              └── scripts/copy_resources.sh
-              └── automated-inventory-testing/
-                  └── resources/</PRE>
+```bash
+git submodule update --init
+```
 
-3) Run ./FishbowlInventoryTool/scripts/copy_resources.sh to copy the necessary resource files. This will
-   allow you to run the application using sample inventory availability and turnover report PDFs. After
-   running the script, your folder structure should have the following additions:
-     <PRE>-FishbowlInventoryTool/
-          ├── InventoryAvailability/
-          │   └── Inventory Availability 01222024.pdf
-          └── TurnoverReports/
-              └── Q3-2023.pdf
-              └── Q1-2024.pdf
-              └── etc</PRE>
+> **Note:** this submodule is private because it contains private company data. Never
+> commit data sourced from it back into this repo.
 
-4) Open a Python virtual environment
-    - python -m venv venv
+The resulting folder structure:
 
-5) Activate virtual environment
-    - Linux
-        - source venv/bin/activate
-    - Windows
-        - source venv/Scripts/activate
+```
+project_root/
+└── FishbowlInventoryTool/
+    ├── scripts/copy_resources.sh
+    └── automated-inventory-testing/
+        └── resources/
+```
 
-6) Install dependencies
-    - pip install -r requirements/release.txt
-        - Or pip install -r requirements/dev.txt to also pull in pytest and pytest-cov,
-          which are needed to run the unit tests
+**3. Stage the sample resources** so the app has PDFs to run against:
 
-    - NOTE: If on Linux, you need to install tkinter separately since it's not
-            included in the standard library. Then activate the virtual environment
-            again.
+```bash
+./scripts/copy_resources.sh
+```
 
-        - For Debian based distros:
-            - sudo apt-get install python3-tk for deb based distros
-        - For Fedora users:
-            - sudo dnf install python3-tkinter
-        - For Arch based distros:
-            - sudo pacman -S python3-tk
+This adds:
 
-7) Run application
-    - python main.py
+```
+FishbowlInventoryTool/
+├── InventoryAvailability/
+│   └── Inventory Availability 01222024.pdf
+└── TurnoverReports/
+    ├── Q3-2023.pdf
+    ├── Q1-2024.pdf
+    └── ...
+```
 
-8) Run the integration test locally
-    - python main.py --integration-test
-        - Runs headless, processing every PDF in InventoryAvailability/ with all columns
-          included, and writes logs/results.txt
-    - diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt
-        - This is the same comparison CI performs on every pull request to main. When the
-          parser changes output intentionally, regenerate canonical_correct_results.txt in
-          the automated-inventory-testing repo and bump the submodule pointer.
+**4. Create and activate a virtual environment** (Python 3.11):
 
-9) Run the unit tests locally
-    - pytest tests/*
-        - This is the same command CI runs on every pull request to main. The glob is
-          required because test files use the _tests.py suffix, which pytest's default
-          discovery does not match.
-        - Requires the dev dependencies from step 6
+```bash
+python -m venv venv
+source venv/Scripts/activate   # Windows; use venv/bin/activate on Linux/Mac
+```
 
-10) Check code coverage locally
-    - pytest --cov=./ --cov-report=term-missing tests/*
-        - Prints a per-file coverage table with the line numbers that are not covered
-    - CI runs the same tests as pytest --cov=./ --cov-report=xml --cov-fail-under=25 tests/*
-      on every pull request to main and on every push to main, and fails the check if total
-      coverage falls below 25%. That threshold is a temporary floor and will be raised as
-      more of the application gets unit tests.
+**5. Install dependencies:**
+
+```bash
+pip install -r requirements/dev.txt      # release.txt plus pytest and pytest-cov
+pip install -r requirements/release.txt  # runtime dependencies only
+```
+
+> **Note:** on Linux, `tkinter` is not part of the standard library install and must be
+> installed separately, then the virtual environment reactivated:
+>
+> - Debian-based: `sudo apt-get install python3-tk`
+> - Fedora: `sudo dnf install python3-tkinter`
+> - Arch-based: `sudo pacman -S python3-tk`
+
+## Usage
+
+```bash
+python main.py                    # run the GUI
+python main.py --integration-test # run headless, writing logs/results.txt
+```
+
+Headless mode processes every PDF in `InventoryAvailability/` with all columns included
+and exits without opening a window. It is what CI uses to validate output without GUI
+interaction.
+
+See [`USER_GUIDE.txt`](USER_GUIDE.txt) for end-user instructions.
+
+## Testing
+
+```bash
+pytest tests/*                                        # unit tests
+pytest --cov=./ --cov-report=term-missing tests/*     # unit tests with a coverage table
+```
+
+The `tests/*` glob is required: test files use the `_tests.py` suffix, which pytest's
+default discovery does not match.
+
+Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
+
+```bash
+python main.py --integration-test
+diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt
+```
+
+When the parser changes output intentionally, regenerate
+`canonical_correct_results.txt` in the `automated-inventory-testing` repo and bump the
+submodule pointer.
+
+## Continuous integration
+
+All three workflows run on pull requests to `main` and on manual dispatch; the coverage
+workflow additionally runs on pushes to `main` so Codecov records a baseline for PR
+diffs.
+
+| Workflow | What it checks |
+| --- | --- |
+| [Unit Tests](.github/workflows/unit-tests.yml) | `pytest tests/*` on `ubuntu-latest`. |
+| [Integration Tests](.github/workflows/integration-tests.yml) | Runs the app headless and fails unless `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Needs the `CUSTOMER_DATA_PAT` secret to check out the private submodule. |
+| [Code Coverage](.github/workflows/code-coverage.yml) | `pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*`, uploaded to Codecov. Needs the `CODECOV_TOKEN` secret. |
+
+Every measured module is currently at 100%, so the 90% gate is headroom for an
+in-progress refactor rather than a target to climb toward.
+
+## Related projects
+
+- [FishbowlInvoiceTool](https://github.com/averylhammond/FishbowlInvoiceTool) — the
+  sibling desktop app, which parses Fishbowl invoice PDFs and computes cost breakdowns.
+  This tool is being incrementally brought up to its architecture and engineering
+  standards.
+- [fishbowl-common](https://github.com/averylhammond/fishbowl-common) — the shared
+  infrastructure package both apps depend on, providing `ArgumentProvider`.

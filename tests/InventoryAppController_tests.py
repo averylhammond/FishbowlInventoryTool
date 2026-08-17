@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch, call, MagicMock
 
 from source.columns import all_columns_selected
-from source.constants import GITHUB_REPO, VERSION
+from source.constants import GITHUB_REPO, SETTINGS_DB_PATH, VERSION
 from source.InventoryAppController import InventoryAppController
 
 
@@ -93,13 +93,28 @@ def test_init_does_not_build_the_gui(controller):
     assert controller.controller.display is None
 
 
+def test_init_does_not_open_the_settings_database(controller):
+    """
+    Tests that constructing the controller opens no settings database. Headless
+    mode must touch no database and leave no data directory behind, so the
+    repository is not built until the GUI branch of start_application() is reached.
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    assert controller.controller.settings_repository is None
+
+
 ###############################################################################
 ###           Tests InventoryAppController -> start_application()           ###
 ###############################################################################
 def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
     """
     Tests that a normal run creates the display with the application's title and
-    resolution, hands it the processing callback, and enters the tkinter main loop
+    resolution, hands it the processing and settings callbacks along with the
+    settings to restore, and enters the tkinter main loop
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -108,18 +123,46 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
 
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
+        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch.object(controller.controller, "_start_update_check"),
     ):
+        mock_settings_cls.return_value.get_all_settings.return_value = {
+            "theme": "Ocean"
+        }
         controller.controller.start_application()
 
     mock_display_cls.assert_called_once_with(
         process_callback=controller.controller.handle_process_inventory,
         read_file_callback=controller.file_io.read_text_file,
         check_for_updates_callback=controller.controller.handle_check_for_updates,
+        save_settings_callback=controller.controller.handle_save_setting,
         title="Automated Inventory Processor",
         window_resolution="700x700",
+        settings={"theme": "Ocean"},
     )
     mock_display_cls.return_value.mainloop.assert_called_once_with()
+
+
+def test_start_application_loads_the_persisted_settings(controller):
+    """
+    Tests that a normal run opens the settings database at the application's
+    database path and reads every persisted setting from it, so the GUI can be
+    built with the user's last choices already applied
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    with (
+        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
+        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
+        patch.object(controller.controller, "_start_update_check"),
+    ):
+        controller.controller.start_application()
+
+    mock_settings_cls.assert_called_once_with(db_path=SETTINGS_DB_PATH)
+    mock_settings_cls.return_value.get_all_settings.assert_called_once_with()
 
 
 def test_start_application_wires_the_gui_popup_into_file_io(controller):
@@ -134,12 +177,36 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
 
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
+        patch("source.InventoryAppController.SettingsRepository"),
         patch.object(controller.controller, "_start_update_check"),
     ):
         controller.controller.start_application()
 
     assert (
         controller.file_io.report_error is mock_display_cls.return_value.show_popup
+    )
+
+
+def test_start_application_wires_the_gui_popup_into_the_settings_repository(controller):
+    """
+    Tests that database failures surface to the user through the GUI's popup,
+    which is what keeps the settings repository free of any GUI dependency
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    with (
+        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
+        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
+        patch.object(controller.controller, "_start_update_check"),
+    ):
+        controller.controller.start_application()
+
+    assert (
+        mock_settings_cls.return_value.report_error
+        is mock_display_cls.return_value.show_popup
     )
 
 
@@ -156,6 +223,7 @@ def test_start_application_starts_a_background_update_check(controller):
 
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
+        patch("source.InventoryAppController.SettingsRepository"),
         patch.object(controller.controller, "_start_update_check") as mock_check,
     ):
         controller.controller.start_application()
@@ -166,9 +234,9 @@ def test_start_application_starts_a_background_update_check(controller):
 def test_start_application_in_integration_test_mode_never_builds_the_gui(controller):
     """
     Tests that headless mode processes the inventories directly, creates no
-    window, and checks for no updates. The integration test job runs with no
-    display, so building the GUI there would fail the run outright, and it must
-    perform no network I/O.
+    window, opens no settings database, and checks for no updates. The integration
+    test job runs with no display, so building the GUI there would fail the run
+    outright, and it must perform no network or database I/O.
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -181,6 +249,7 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
         patch(
             "source.gui.InventoryAppDisplay.InventoryAppDisplay"
         ) as mock_display_cls,
+        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch.object(controller.controller, "run_integration_test") as mock_headless,
         patch.object(controller.controller, "_start_update_check") as mock_check,
     ):
@@ -188,8 +257,10 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
 
     mock_headless.assert_called_once_with()
     mock_display_cls.assert_not_called()
+    mock_settings_cls.assert_not_called()
     mock_check.assert_not_called()
     assert controller.controller.display is None
+    assert controller.controller.settings_repository is None
 
 
 ###############################################################################
@@ -273,6 +344,28 @@ def test_handle_process_inventory_routes_status_to_the_output_box(controller):
         controller.controller.display.write_output,
     )
     assert result is True
+
+
+###############################################################################
+###          Tests InventoryAppController -> handle_save_setting()          ###
+###############################################################################
+def test_handle_save_setting_delegates_to_the_settings_repository(controller):
+    """
+    Tests that the GUI's settings callback persists the changed setting through
+    the settings repository, so the display never touches the database itself
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    controller.controller.settings_repository = MagicMock()
+
+    controller.controller.handle_save_setting("theme", "Forest")
+
+    controller.controller.settings_repository.save_setting.assert_called_once_with(
+        key="theme", value="Forest"
+    )
 
 
 ###############################################################################

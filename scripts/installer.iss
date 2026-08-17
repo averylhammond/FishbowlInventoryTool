@@ -7,9 +7,10 @@
 ; files (exe + user guide) while PRESERVING any inventory availability and
 ; turnover report PDFs the customer has dropped into the input folders.
 ;
-; The app (see source/constants.py) reads/writes logs/, InventoryAvailability/
-; and TurnoverReports/ RELATIVE TO ITS OWN EXE, so it is installed per-user into
-; a writable location ({localappdata}\Programs) rather than Program Files.
+; The app (see source/constants.py) reads/writes logs/, data/,
+; InventoryAvailability/ and TurnoverReports/ RELATIVE TO ITS OWN EXE, so it is
+; installed per-user into a writable location ({localappdata}\Programs) rather
+; than Program Files.
 ;
 ; Unlike the sibling FishbowlInvoiceTool's installer, no files ship inside the
 ; input folders -- the release payload creates them empty -- so they appear in
@@ -81,8 +82,12 @@ Source: "{#SourceRoot}\USER_GUIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 ; Guarantee the app's writable folders exist, and keep the ones holding the
-; customer's own PDFs on uninstall.
+; customer's own PDFs on uninstall. data/ holds the per-machine settings
+; database, which is deliberately NOT kept: it is this install's own state, not
+; the customer's data, and an upgrade preserves it anyway since nothing here
+; installs into that folder.
 Name: "{app}\logs"
+Name: "{app}\data"
 Name: "{app}\InventoryAvailability"; Flags: uninsneveruninstall
 Name: "{app}\TurnoverReports"; Flags: uninsneveruninstall
 

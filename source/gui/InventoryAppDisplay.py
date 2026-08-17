@@ -1,10 +1,21 @@
+import re
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, scrolledtext
 from typing import Callable
 
 from source.columns import ALL_COLUMNS, INVENTORY_COLUMNS, TURNOVER_COLUMNS, Column
-from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
+from source.constants import (
+    INVENTORY_DIR,
+    RESULTS_FILE,
+    SETTING_KEY_COLUMN_PREFIX,
+    SETTING_KEY_FONT_FAMILY,
+    SETTING_KEY_FONT_SIZE,
+    SETTING_KEY_GEOMETRY,
+    SETTING_KEY_THEME,
+    TURNOVER_DIR,
+    VERSION,
+)
 from source.gui.AboutWindow import AboutWindow
 from source.gui.FileEditorWindow import FileEditorWindow
 from source.gui.MessageWindow import MessageWindow
@@ -13,6 +24,7 @@ from source.gui.color_theme import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
     RED,  # Used for the EXIT button
+    THEME_BY_NAME,  # Resolves a persisted theme name back to its Theme
     Theme,
 )
 from source.gui.font_settings import (
@@ -25,6 +37,11 @@ from source.gui.font_settings import (
 # Number of checkboxes placed per row in each of the two column-selection grids
 INVENTORY_CHECKBOXES_PER_ROW = 4
 TURNOVER_CHECKBOXES_PER_ROW = 3
+
+# A tkinter geometry string: a width and height, optionally followed by an x and y
+# screen offset (e.g. "700x700" or "780x820+320+180"). Used to reject a corrupt
+# persisted geometry before it is handed to geometry(), which would raise on it.
+GEOMETRY_PATTERN = re.compile(r"^\d+x\d+([+-]\d+[+-]\d+)?$")
 
 
 # Inventory App Display class to own the GUI for selecting an inventory
@@ -40,11 +57,13 @@ class InventoryAppDisplay(tk.Tk):
         process_callback: Callable[[str, dict], bool],
         read_file_callback: Callable[[Path], str],
         check_for_updates_callback: Callable[[], None],
+        save_settings_callback: Callable[[str, str], None],
         title: str,
         window_resolution: str,
         theme: Theme = DARK,
         font_family: str = DEFAULT_FONT_FAMILY,
         font_size: int = DEFAULT_FONT_SIZE,
+        settings: dict | None = None,
     ):
         """
         Initializes the InventoryAppDisplay object
@@ -59,20 +78,36 @@ class InventoryAppDisplay(tk.Tk):
             check_for_updates_callback (Callable[[], None]): Callback that triggers
                 an on-demand update check, invoked when the user selects
                 "Check for Updates" from the Help menu
+            save_settings_callback (Callable[[str, str], None]): Callback that
+                persists a single user setting (key, value), invoked when the user
+                changes a preference, toggles a column, or exits the application
             title (str): Title of the application window
             window_resolution (str): Resolution of the application window (e.g. "700x700")
-            theme (Theme): The color theme to style the application with
-            font_family (str): The font family to display the text with
-            font_size (int): The font size to display the text with
+            theme (Theme): The color theme to style the application with, used when
+                no theme has been persisted yet
+            font_family (str): The font family to display the text with, used when
+                no font family has been persisted yet
+            font_size (int): The font size to display the text with, used when no
+                font size has been persisted yet
+            settings (dict | None): Previously persisted settings, restoring the
+                user's last theme, font, window geometry and column choices. Any
+                setting that is missing or unusable falls back to the corresponding
+                argument above.
         """
 
         super().__init__()
 
+        # The settings persisted by the last run, or none on a first launch
+        settings = settings or {}
+
         # Title applied to the application window
         self.title(title)
 
-        # Resolution of the application window
-        self.geometry(window_resolution)
+        # Resolution of the application window, restored to the size and position
+        # the user last left it at
+        self.geometry(
+            self._parse_geometry(settings.get(SETTING_KEY_GEOMETRY), window_resolution)
+        )
 
         # Allow user to resize window in x and y direction
         self.resizable(True, True)
@@ -86,20 +121,28 @@ class InventoryAppDisplay(tk.Tk):
         # Callback to trigger an on-demand update check from the Help menu
         self.check_for_updates_callback = check_for_updates_callback
 
-        # Styling applied to every widget as it is created
-        self.current_theme = theme
-        self.current_font_family = font_family
-        self.current_font_size = font_size
+        # Callback to persist a single changed user setting
+        self.save_settings_callback = save_settings_callback
+
+        # Styling applied to every widget as it is created, restored to the user's
+        # last choices. Resolved before build_widgets() below so every widget is
+        # created already themed, rather than being restyled after the fact.
+        self.current_theme = THEME_BY_NAME.get(settings.get(SETTING_KEY_THEME), theme)
+        self.current_font_family = settings.get(SETTING_KEY_FONT_FAMILY, font_family)
+        self.current_font_size = self._parse_font_size(
+            settings.get(SETTING_KEY_FONT_SIZE), font_size
+        )
 
         # Holds the last selected inventory availability filepath
         self.selected_file = tk.StringVar()
 
         # One checkbox state per column, keyed by the key the spreadsheet writers
         # look up. Built from ALL_COLUMNS so the GUI cannot offer a column the
-        # spreadsheet does not know about, or miss one that it does. A column
-        # marked always starts checked and is never given a checkbox to uncheck.
+        # spreadsheet does not know about, or miss one that it does. Each starts
+        # at whatever the user last selected it as.
         self.column_vars = {
-            column.key: tk.BooleanVar(value=column.always) for column in ALL_COLUMNS
+            column.key: tk.BooleanVar(value=self._restore_column(column, settings))
+            for column in ALL_COLUMNS
         }
 
         # Tkinter Widgets
@@ -132,6 +175,83 @@ class InventoryAppDisplay(tk.Tk):
         self.build_widgets()
 
     ###########################################################################
+    ###              InventoryAppDisplay -> _parse_geometry()               ###
+    ###########################################################################
+    def _parse_geometry(self, value, default: str) -> str:
+        """
+        Converts a persisted window geometry into one safe to hand to geometry(),
+        falling back to the default when it is missing or malformed
+
+        Args:
+            value: The raw geometry loaded from the settings (a string, or None
+                when no geometry has been persisted yet)
+            default (str): The geometry to use instead when value is unusable
+
+        Returns:
+            str: The restored geometry, or default if value is missing or does not
+                look like a tkinter geometry string
+        """
+
+        if value and GEOMETRY_PATTERN.match(value):
+            return value
+        return default
+
+    ###########################################################################
+    ###             InventoryAppDisplay -> _parse_font_size()               ###
+    ###########################################################################
+    def _parse_font_size(self, value, default: int) -> int:
+        """
+        Converts a persisted font size into an int, falling back to the default
+        when it is missing or not a whole number
+
+        Args:
+            value: The raw font size loaded from the settings (a string, or None
+                when no font size has been persisted yet)
+            default (int): The font size to use instead when value is unusable
+
+        Returns:
+            int: The restored font size, or default if value is missing or
+                non-numeric
+        """
+
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    ###########################################################################
+    ###             InventoryAppDisplay -> _restore_column()                ###
+    ###########################################################################
+    def _restore_column(self, column: Column, settings: dict) -> bool:
+        """
+        Decides whether a column's checkbox starts checked, restoring the state the
+        user last left it in
+
+        Args:
+            column (Column): The column whose checkbox state is being restored
+            settings (dict): The persisted settings to read that state from
+
+        Returns:
+            bool: True if the column starts included in the report. A column marked
+                always is always included, and a column with nothing persisted for
+                it (a first launch, or one newly added to source/columns.py) falls
+                back to its own default.
+        """
+
+        # A column that is always included has no checkbox, so nothing the settings
+        # hold could uncheck it
+        if column.always:
+            return True
+
+        # Settings are stored as text, so the persisted flag is compared rather
+        # than converted: bool("False") is True, which would check every box. A
+        # column with nothing persisted for it falls back to its own default.
+        stored = settings.get(
+            SETTING_KEY_COLUMN_PREFIX + column.key, str(column.always)
+        )
+        return stored == str(True)
+
+    ###########################################################################
     ###               InventoryAppDisplay -> build_widgets()                ###
     ###########################################################################
     def build_widgets(self):
@@ -143,6 +263,10 @@ class InventoryAppDisplay(tk.Tk):
 
         self.configure(bg=self.current_theme.bg_main)
 
+        # Route the window's own close box through handle_exit too, since it is the
+        # one way out of the application that reaches no widget of ours
+        self.protocol("WM_DELETE_WINDOW", self.handle_exit)
+
         self.menu_bar = tk.Menu(self)
 
         # File dropdown
@@ -153,7 +277,7 @@ class InventoryAppDisplay(tk.Tk):
         self.file_menu.add_command(label="Open", command=self.handle_browse_button)
         self.file_menu.add_command(label="Clear", command=self.handle_clear)
         self.file_menu.add_separator()
-        self.file_menu.add_command(label="Exit", command=self.destroy)
+        self.file_menu.add_command(label="Exit", command=self.handle_exit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         # View dropdown
@@ -303,13 +427,13 @@ class InventoryAppDisplay(tk.Tk):
         )
         self.process_inventory_button.grid(row=0, column=0, padx=10)
 
-        # destroy() rather than quit() so the button and the window's close box
+        # handle_exit() rather than quit() so the button and the window's close box
         # behave identically: quit() would only end the main loop, leaving the
         # window and the interpreter's Tk state alive behind it
         self.exit_button = tk.Button(
             self.button_frame,
             text="Exit",
-            command=self.destroy,
+            command=self.handle_exit,
             bg=self.current_theme.bg_entry,
             fg=self.current_theme.fg_text,
             activebackground=RED,
@@ -391,10 +515,13 @@ class InventoryAppDisplay(tk.Tk):
         # selectcolor and highlightthickness are load bearing on a dark theme:
         # without them Tk paints the box interior white and draws a light focus
         # ring around the label, both of which read as artifacts against bg_main
+        # The key is captured as a default argument so every checkbutton persists
+        # its own column rather than whichever one the loop finished on
         return tk.Checkbutton(
             parent,
             text=column.label,
             variable=self.column_vars[column.key],
+            command=lambda key=column.key: self.handle_column_toggled(key),
             onvalue=True,
             offvalue=False,
             anchor="w",
@@ -440,6 +567,40 @@ class InventoryAppDisplay(tk.Tk):
 
         self.selected_file.set("")
         self.clear_output()
+
+    ###########################################################################
+    ###          InventoryAppDisplay -> handle_column_toggled()              ###
+    ###########################################################################
+    def handle_column_toggled(self, key: str):
+        """
+        On a column checkbox press, persists that column's new state so the same
+        columns are checked on the next launch
+
+        Args:
+            key (str): The key of the column whose checkbox was toggled
+        """
+
+        # Tk runs this after updating the variable, so this reads the new state.
+        # Settings are stored as text, so the flag is converted on the way out.
+        self.save_settings_callback(
+            SETTING_KEY_COLUMN_PREFIX + key, str(bool(self.column_vars[key].get()))
+        )
+
+    ###########################################################################
+    ###                InventoryAppDisplay -> handle_exit()                 ###
+    ###########################################################################
+    def handle_exit(self):
+        """
+        On any request to close the application, persists the window's current size
+        and position so it reopens where the user left it, then closes the window.
+
+        Every way out of the application routes through here (the Exit button, the
+        File menu, the window's close box, and the update window), so the geometry
+        is saved no matter which one the user takes.
+        """
+
+        self.save_settings_callback(SETTING_KEY_GEOMETRY, self.winfo_geometry())
+        self.destroy()
 
     ###########################################################################
     ###           InventoryAppDisplay -> get_selected_columns()              ###
@@ -667,9 +828,9 @@ class InventoryAppDisplay(tk.Tk):
             title="Update Available",
             latest_version=result.latest_version,
             release_url=result.release_url,
-            # self is the root tk.Tk, so destroy() exits the whole app, releasing
-            # the executable's file lock so the installer can replace it
-            close_app_callback=self.destroy,
+            # self is the root tk.Tk, so this exits the whole app, releasing the
+            # executable's file lock so the installer can replace it
+            close_app_callback=self.handle_exit,
             theme=self.current_theme,
             font_family=self.current_font_family,
             font_size=self.current_font_size,
@@ -731,6 +892,10 @@ class InventoryAppDisplay(tk.Tk):
             bg=theme.bg_entry, fg=theme.fg_text, insertbackground=theme.fg_text
         )
 
+        # Persist the choice so it is restored on the next launch. The theme's name
+        # is stored rather than the theme itself, since settings hold only text.
+        self.save_settings_callback(SETTING_KEY_THEME, theme.name)
+
     ###########################################################################
     ###              InventoryAppDisplay -> apply_font_family()             ###
     ###########################################################################
@@ -745,6 +910,9 @@ class InventoryAppDisplay(tk.Tk):
         self.current_font_family = family
         self._apply_font()
 
+        # Persist the choice so it is restored on the next launch
+        self.save_settings_callback(SETTING_KEY_FONT_FAMILY, family)
+
     ###########################################################################
     ###               InventoryAppDisplay -> apply_font_size()              ###
     ###########################################################################
@@ -758,6 +926,10 @@ class InventoryAppDisplay(tk.Tk):
 
         self.current_font_size = size
         self._apply_font()
+
+        # Persist the choice so it is restored on the next launch. Settings are
+        # stored as text, so the size is converted on the way out.
+        self.save_settings_callback(SETTING_KEY_FONT_SIZE, str(size))
 
     ###########################################################################
     ###                 InventoryAppDisplay -> _apply_font()                ###

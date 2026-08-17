@@ -1,12 +1,12 @@
 import tkinter as tk
 import pytest
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import DEFAULT, patch, MagicMock
 
 from source.columns import ALL_COLUMNS, COLUMN_KEYS
 from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
-from source.gui.color_theme import ALL_THEMES, DARK, FOREST
+from source.gui.color_theme import ALL_THEMES, DARK, FOREST, LIGHT
 from source.gui.font_settings import (
     DEFAULT_FONT_FAMILY,
     DEFAULT_FONT_SIZE,
@@ -93,26 +93,28 @@ def button_call(display, text: str):
 def display(request):
     """
     Builds an InventoryAppDisplay in complete isolation from tkinter: the real
-    Tk.__init__ is neutralized, the inherited Tk methods the constructor calls
-    (title/geometry/resizable/configure) are mocked, the tkinter variables are
-    replaced with stubs holding real values, and every widget class is replaced
-    so no real window or widgets are created. The patches stay active for the
-    duration of each test, since the display's methods keep calling into the
-    mocked widgets after construction.
+    Tk.__init__ is neutralized, the inherited Tk methods the display calls
+    (title/geometry/resizable/configure/protocol/destroy/winfo_geometry) are
+    mocked, the tkinter variables are replaced with stubs holding real values, and
+    every widget class is replaced so no real window or widgets are created. The
+    patches stay active for the duration of each test, since the display's methods
+    keep calling into the mocked widgets after construction.
 
     Constructor arguments can be customized per test by parametrizing the fixture
     indirectly (e.g. @pytest.mark.parametrize("display", [{"theme": FOREST}],
     indirect=True)); when not parametrized, the display is built with the same
-    arguments the controller supplies.
+    arguments the controller supplies. Persisted settings are supplied the same
+    way, as a {"settings": {...}} override.
 
     Returns:
         types.SimpleNamespace: Holds the constructed display (`display`), the
             mocked Tk methods (`title`, `geometry`, `resizable`, `configure`,
-            `config`), the patched widget classes whose calls are asserted
-            (`button_cls`, `checkbutton_cls`, `message_window_cls`,
+            `config`, `protocol`, `destroy`), the patched widget classes whose calls
+            are asserted (`button_cls`, `checkbutton_cls`, `message_window_cls`,
             `about_window_cls`, `file_editor_window_cls`, `update_window_cls`), and
             the callbacks passed at construction (`process_callback`,
-            `read_file_callback`, `check_for_updates_callback`)
+            `read_file_callback`, `check_for_updates_callback`,
+            `save_settings_callback`)
     """
 
     # Constructor overrides supplied indirectly by a test, or none when not
@@ -121,11 +123,19 @@ def display(request):
 
     with (
         patch.object(tk.Tk, "__init__", return_value=None),
-        patch.object(InventoryAppDisplay, "title") as mock_title,
-        patch.object(InventoryAppDisplay, "geometry") as mock_geometry,
-        patch.object(InventoryAppDisplay, "resizable") as mock_resizable,
-        patch.object(InventoryAppDisplay, "configure") as mock_configure,
-        patch.object(InventoryAppDisplay, "config") as mock_config,
+        # Patched together rather than one context manager each: Python allows only
+        # twenty statically nested blocks, and this with statement is at the limit
+        patch.multiple(
+            InventoryAppDisplay,
+            title=DEFAULT,
+            geometry=DEFAULT,
+            resizable=DEFAULT,
+            configure=DEFAULT,
+            config=DEFAULT,
+            protocol=DEFAULT,
+            destroy=DEFAULT,
+            winfo_geometry=DEFAULT,
+        ) as tk_methods,
         patch(
             "source.gui.InventoryAppDisplay.tk.StringVar", side_effect=_FakeStringVar
         ),
@@ -155,15 +165,20 @@ def display(request):
         patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
     ):
 
+        # The geometry handle_exit() persists, in the format Tk reports it in
+        tk_methods["winfo_geometry"].return_value = "780x820+320+180"
+
         # The callbacks the controller would normally supply; mocks are sufficient
         process_callback = MagicMock()
         read_file_callback = MagicMock()
         check_for_updates_callback = MagicMock()
+        save_settings_callback = MagicMock()
 
         arguments = {
             "process_callback": process_callback,
             "read_file_callback": read_file_callback,
             "check_for_updates_callback": check_for_updates_callback,
+            "save_settings_callback": save_settings_callback,
             "title": "Automated Inventory Processor",
             "window_resolution": "700x700",
         }
@@ -173,11 +188,13 @@ def display(request):
 
         yield SimpleNamespace(
             display=built_display,
-            title=mock_title,
-            geometry=mock_geometry,
-            resizable=mock_resizable,
-            configure=mock_configure,
-            config=mock_config,
+            title=tk_methods["title"],
+            geometry=tk_methods["geometry"],
+            resizable=tk_methods["resizable"],
+            configure=tk_methods["configure"],
+            config=tk_methods["config"],
+            protocol=tk_methods["protocol"],
+            destroy=tk_methods["destroy"],
             button_cls=mock_button_cls,
             checkbutton_cls=mock_checkbutton_cls,
             message_window_cls=mock_message_window_cls,
@@ -187,6 +204,7 @@ def display(request):
             process_callback=process_callback,
             read_file_callback=read_file_callback,
             check_for_updates_callback=check_for_updates_callback,
+            save_settings_callback=save_settings_callback,
         )
 
 
@@ -315,6 +333,162 @@ def test_init_starts_with_only_the_always_included_column_checked(display):
 
 
 ###############################################################################
+###          Tests InventoryAppDisplay -> __init__() Settings Restore       ###
+###############################################################################
+@pytest.mark.parametrize(
+    "display",
+    [
+        {
+            "settings": {
+                "theme": "Light",
+                "font_family": "Arial",
+                "font_size": "18",
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_init_restores_the_persisted_theme_and_font(display):
+    """
+    Tests that the theme, font family and font size the user last chose are
+    restored, with the stored theme name resolved back to its Theme and the
+    stored font size converted from text back to an int
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with the
+            persisted theme and font settings
+    """
+
+    assert display.display.current_theme is LIGHT
+    assert display.display.current_font_family == "Arial"
+    assert display.display.current_font_size == 18
+
+
+@pytest.mark.parametrize(
+    "display",
+    [{"theme": FOREST, "font_size": 14, "settings": {"theme": "Nonexistent"}}],
+    indirect=True,
+)
+def test_init_falls_back_when_the_persisted_theme_is_unknown(display):
+    """
+    Tests that a persisted theme name matching no known theme falls back to the
+    injected theme, so a settings database written by a version that had a theme
+    this one does not cannot leave the GUI unstyled
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with an
+            unrecognized persisted theme name
+    """
+
+    assert display.display.current_theme is FOREST
+
+
+@pytest.mark.parametrize(
+    "display",
+    [{"font_size": 14, "settings": {"font_size": "not-a-number"}}],
+    indirect=True,
+)
+def test_init_falls_back_when_the_persisted_font_size_is_not_a_number(display):
+    """
+    Tests that a corrupt font size falls back to the injected size rather than
+    reaching tkinter, which would raise on it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with a
+            non-numeric persisted font size
+    """
+
+    assert display.display.current_font_size == 14
+
+
+@pytest.mark.parametrize(
+    "display",
+    [{"settings": {"window_geometry": "900x850+120+60"}}],
+    indirect=True,
+)
+def test_init_restores_the_persisted_window_geometry(display):
+    """
+    Tests that the window reopens at the size and position the user last left it
+    at, rather than at the resolution the controller supplies
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with a
+            persisted window geometry
+    """
+
+    display.geometry.assert_called_once_with("900x850+120+60")
+
+
+@pytest.mark.parametrize(
+    "display",
+    [{"settings": {"window_geometry": "not-a-geometry"}}],
+    indirect=True,
+)
+def test_init_falls_back_when_the_persisted_geometry_is_malformed(display):
+    """
+    Tests that a corrupt geometry falls back to the injected resolution, since
+    handing it straight to geometry() would raise and never build the window
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with a
+            malformed persisted window geometry
+    """
+
+    display.geometry.assert_called_once_with("700x700")
+
+
+@pytest.mark.parametrize(
+    "display",
+    [
+        {
+            "settings": {
+                "column_OnHand": "True",
+                "column_Allocated": "False",
+                "column_tTO Rate": "True",
+            }
+        }
+    ],
+    indirect=True,
+)
+def test_init_restores_the_persisted_column_selections(display):
+    """
+    Tests that each column's checkbox starts in the state the user last left it
+    in, and that a column with nothing persisted for it still starts unchecked
+
+    Note the "False" assertions are the point: settings are stored as text and
+    bool("False") is True, so a converted round-trip would check every box.
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with persisted
+            column selections
+    """
+
+    assert display.display.column_vars["OnHand"].get() is True
+    assert display.display.column_vars["tTO Rate"].get() is True
+    assert display.display.column_vars["Allocated"].get() is False
+
+    # Nothing was persisted for this column, so it keeps its own default
+    assert display.display.column_vars["Committed"].get() is False
+
+
+@pytest.mark.parametrize(
+    "display", [{"settings": {"column_Part": "False"}}], indirect=True
+)
+def test_init_keeps_an_always_included_column_checked(display):
+    """
+    Tests that a column marked always stays checked even when the settings hold a
+    stale unchecked state for it, since it has no checkbox the user could have
+    unchecked it with
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with a
+            persisted unchecked state for an always-included column
+    """
+
+    assert display.display.column_vars["Part"].get() is True
+
+
+###############################################################################
 ###              Tests InventoryAppDisplay -> build_widgets()               ###
 ###############################################################################
 def test_build_widgets_creates_a_checkbutton_for_every_selectable_column(display):
@@ -437,17 +611,20 @@ def test_build_widgets_wires_the_process_button_to_its_handler(display):
     )
 
 
-def test_build_widgets_wires_the_exit_button_to_destroy(display):
+def test_build_widgets_wires_the_exit_button_to_handle_exit(display):
     """
-    Tests that the exit button destroys the window rather than only ending the
-    main loop, so it behaves the same as the window's close box
+    Tests that the exit button closes the application through handle_exit, so it
+    saves the window geometry and behaves the same as the window's close box
+    rather than only ending the main loop
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
             fully mocked out
     """
 
-    assert button_call(display, "Exit").kwargs["command"] == display.display.destroy
+    assert button_call(display, "Exit").kwargs["command"] == (
+        display.display.handle_exit
+    )
 
 
 def test_build_widgets_styles_the_buttons_with_the_theme_and_font(display):
@@ -515,7 +692,7 @@ def test_build_widgets_wires_the_file_menu(display):
     }
     assert calls[2].kwargs == {
         "label": "Exit",
-        "command": display.display.destroy,
+        "command": display.display.handle_exit,
     }
     display.display.file_menu.add_separator.assert_called_once()
 
@@ -1033,7 +1210,7 @@ def test_handle_check_for_updates_invokes_the_callback(display):
 def test_show_update_available_opens_the_update_window(display):
     """
     Tests that a newer release opens the update window showing that version, with
-    the app's own destroy method as the close callback so the exiting app releases
+    the app's own exit handler as the close callback so the exiting app releases
     the executable's file lock for the installer
 
     Args:
@@ -1054,7 +1231,7 @@ def test_show_update_available_opens_the_update_window(display):
         title="Update Available",
         latest_version="9.9.9",
         release_url="https://example.com/release",
-        close_app_callback=display.display.destroy,
+        close_app_callback=display.display.handle_exit,
         theme=display.display.current_theme,
         font_family=display.display.current_font_family,
         font_size=display.display.current_font_size,
@@ -1094,6 +1271,21 @@ def test_apply_theme_updates_state_and_restyles_every_widget(display):
         )
 
 
+def test_apply_theme_persists_the_choice(display):
+    """
+    Tests that choosing a theme persists its name, so the application reopens on
+    the theme the user last picked
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_theme(FOREST)
+
+    display.save_settings_callback.assert_called_once_with("theme", FOREST.name)
+
+
 ###############################################################################
 ###             Tests InventoryAppDisplay -> apply_font_family()            ###
 ###############################################################################
@@ -1121,6 +1313,21 @@ def test_apply_font_family_updates_state_and_restyles_every_widget(display):
         )
 
 
+def test_apply_font_family_persists_the_choice(display):
+    """
+    Tests that choosing a font family persists it, so the application reopens on
+    the font the user last picked
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_font_family("Arial")
+
+    display.save_settings_callback.assert_called_once_with("font_family", "Arial")
+
+
 ###############################################################################
 ###              Tests InventoryAppDisplay -> apply_font_size()             ###
 ###############################################################################
@@ -1146,3 +1353,119 @@ def test_apply_font_size_updates_state_and_restyles_every_widget(display):
         checkbutton.configure.assert_called_once_with(
             font=(DEFAULT_FONT_FAMILY, 20)
         )
+
+
+def test_apply_font_size_persists_the_choice_as_text(display):
+    """
+    Tests that choosing a font size persists it as a string, since the settings
+    database stores only text
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.apply_font_size(20)
+
+    display.save_settings_callback.assert_called_once_with("font_size", "20")
+
+
+###############################################################################
+###          Tests InventoryAppDisplay -> handle_column_toggled()           ###
+###############################################################################
+def test_handle_column_toggled_persists_a_checked_column(display):
+    """
+    Tests that checking a column persists it as included, so the same columns are
+    checked on the next launch
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.column_vars["OnHand"].set(True)
+
+    display.display.handle_column_toggled("OnHand")
+
+    display.save_settings_callback.assert_called_once_with("column_OnHand", "True")
+
+
+def test_handle_column_toggled_persists_an_unchecked_column(display):
+    """
+    Tests that unchecking a column persists it as excluded rather than dropping
+    the setting, so the choice survives a restart
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.column_vars["tTO Rate"].set(False)
+
+    display.display.handle_column_toggled("tTO Rate")
+
+    display.save_settings_callback.assert_called_once_with("column_tTO Rate", "False")
+
+
+def test_build_widgets_wires_each_checkbutton_to_persist_its_own_column(display):
+    """
+    Tests that every checkbutton's command persists the column it belongs to
+    rather than whichever column the build loop finished on, which is what the
+    default-argument capture in the lambda protects against
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    for made_call in display.checkbutton_cls.call_args_list:
+        display.save_settings_callback.reset_mock()
+
+        made_call.kwargs["command"]()
+
+        # The variable this checkbutton was bound to is the one that got persisted
+        variable = made_call.kwargs["variable"]
+        key = next(
+            column_key
+            for column_key, column_var in display.display.column_vars.items()
+            if column_var is variable
+        )
+        display.save_settings_callback.assert_called_once_with(
+            "column_" + key, str(variable.get())
+        )
+
+
+###############################################################################
+###                Tests InventoryAppDisplay -> handle_exit()               ###
+###############################################################################
+def test_handle_exit_persists_the_geometry_then_closes_the_window(display):
+    """
+    Tests that closing the application saves the window's current size and
+    position before destroying the window, so it reopens where the user left it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.handle_exit()
+
+    display.save_settings_callback.assert_called_once_with(
+        "window_geometry", "780x820+320+180"
+    )
+    display.destroy.assert_called_once_with()
+
+
+def test_build_widgets_routes_the_window_close_box_through_handle_exit(display):
+    """
+    Tests that the window's own close box exits through handle_exit too, since it
+    is the one way out of the application that reaches none of the app's widgets
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.protocol.assert_called_once_with(
+        "WM_DELETE_WINDOW", display.display.handle_exit
+    )

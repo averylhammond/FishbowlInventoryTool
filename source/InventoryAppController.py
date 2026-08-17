@@ -1,8 +1,8 @@
 import threading
 
-from fishbowl_common import ArgumentProvider, UpdateChecker
+from fishbowl_common import ArgumentProvider, SettingsRepository, UpdateChecker
 from source.columns import all_columns_selected
-from source.constants import GITHUB_REPO, VERSION
+from source.constants import GITHUB_REPO, SETTINGS_DB_PATH, VERSION
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryProcessor import InventoryProcessor
 
@@ -35,6 +35,10 @@ class InventoryAppController:
         # headless run never builds a window it has no display for
         self.display = None
 
+        # The persisted settings store, constructed alongside the GUI in
+        # start_application() so that a headless run touches no database
+        self.settings_repository = None
+
         # Start each run with a clean results file
         self.file_io.reset_results_file()
 
@@ -60,6 +64,21 @@ class InventoryAppController:
         return self.processor.process_inventory(
             inventory_pdf_path, checkbox_dict, self.display.write_output
         )
+
+    ###########################################################################
+    ###           InventoryAppController -> handle_save_setting()           ###
+    ###########################################################################
+    def handle_save_setting(self, key: str, value: str):
+        """
+        Persists a single user setting so it is restored on the next launch. Wired
+        into the display as its settings callback.
+
+        Args:
+            key (str): The setting's identifier (e.g. "theme", "font_family")
+            value (str): The setting's value to store
+        """
+
+        self.settings_repository.save_setting(key=key, value=value)
 
     ###########################################################################
     ###           InventoryAppController -> run_integration_test()          ###
@@ -106,18 +125,30 @@ class InventoryAppController:
         # runs on a machine with no display attached.
         from source.gui.InventoryAppDisplay import InventoryAppDisplay
 
+        # Load the settings the user last chose so the GUI can start out of the box
+        # the way they left it. Built here rather than in __init__ for the same
+        # reason the GUI is: integration test mode must touch no database and leave
+        # no data directory behind.
+        self.settings_repository = SettingsRepository(db_path=SETTINGS_DB_PATH)
+        saved_settings = self.settings_repository.get_all_settings()
+
         # Create the GUI, giving it the callback that processes a chosen inventory
+        # and the settings to restore the user's last theme, font and column choices
         self.display = InventoryAppDisplay(
             process_callback=self.handle_process_inventory,
             read_file_callback=self.file_io.read_text_file,
             check_for_updates_callback=self.handle_check_for_updates,
+            save_settings_callback=self.handle_save_setting,
             title="Automated Inventory Processor",
             window_resolution="700x700",
+            settings=saved_settings,
         )
 
-        # Wire the GUI's popup into the file I/O controller so file failures reach
-        # the user without coupling file I/O to the GUI
+        # Wire the GUI's popup into the file I/O controller and the settings
+        # repository so file and database failures reach the user without coupling
+        # either of them to the GUI
         self.file_io.report_error = self.display.show_popup
+        self.settings_repository.report_error = self.display.show_popup
 
         # Kick off a background check for a newer release before entering the GUI
         # loop. Confined to this branch so integration-test mode performs no

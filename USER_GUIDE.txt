@@ -14,4 +14,12 @@ inventory availability was generated. At this time, the spreadsheet will not be
 spaced correctly, but excel allows you to double click on the column boundries to
 automatically space columns correctly.
 
+Keeping the tool up to date:
+
+The tool checks for a newer version each time it starts, and you can check at any time with
+Help -> Check for Updates. When a newer version is available, choose 'Exit and Update'. That
+opens the download page in your web browser and then closes the tool a few seconds later --
+it has to close so the installer can replace it. Download the installer from that page and
+run it; your inventory availability and turnover report files are left untouched.
+
 For help or support, please contact yours truly.

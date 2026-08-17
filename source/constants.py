@@ -4,6 +4,10 @@ from pathlib import Path
 # consistent with application releases and surfaced to the user via Help -> About.
 VERSION = "2.0.0"
 
+# GitHub repository ("owner/name") this app releases from. Passed to the shared
+# UpdateChecker so it knows which repo's releases to compare VERSION against.
+GITHUB_REPO = "averylhammond/FishbowlInventoryTool"
+
 # Base directories. The specific file paths below are composed from these.
 INVENTORY_DIR = Path("InventoryAvailability")
 TURNOVER_DIR = Path("TurnoverReports")

@@ -110,8 +110,9 @@ def display(request):
             mocked Tk methods (`title`, `geometry`, `resizable`, `configure`,
             `config`), the patched widget classes whose calls are asserted
             (`button_cls`, `checkbutton_cls`, `message_window_cls`,
-            `about_window_cls`, `file_editor_window_cls`), and the callbacks
-            passed at construction (`process_callback`, `read_file_callback`)
+            `about_window_cls`, `file_editor_window_cls`, `update_window_cls`), and
+            the callbacks passed at construction (`process_callback`,
+            `read_file_callback`, `check_for_updates_callback`)
     """
 
     # Constructor overrides supplied indirectly by a test, or none when not
@@ -151,15 +152,18 @@ def display(request):
         patch(
             "source.gui.InventoryAppDisplay.FileEditorWindow"
         ) as mock_file_editor_window_cls,
+        patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
     ):
 
         # The callbacks the controller would normally supply; mocks are sufficient
         process_callback = MagicMock()
         read_file_callback = MagicMock()
+        check_for_updates_callback = MagicMock()
 
         arguments = {
             "process_callback": process_callback,
             "read_file_callback": read_file_callback,
+            "check_for_updates_callback": check_for_updates_callback,
             "title": "Automated Inventory Processor",
             "window_resolution": "700x700",
         }
@@ -179,8 +183,10 @@ def display(request):
             message_window_cls=mock_message_window_cls,
             about_window_cls=mock_about_window_cls,
             file_editor_window_cls=mock_file_editor_window_cls,
+            update_window_cls=mock_update_window_cls,
             process_callback=process_callback,
             read_file_callback=read_file_callback,
+            check_for_updates_callback=check_for_updates_callback,
         )
 
 
@@ -226,6 +232,21 @@ def test_init_stores_the_read_file_callback(display):
     """
 
     assert display.display.read_file_callback is display.read_file_callback
+
+
+def test_init_stores_the_check_for_updates_callback(display):
+    """
+    Tests that the controller's update-check callback is stored, since the Help
+    menu's "Check for Updates" item is wired straight to it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    assert (
+        display.display.check_for_updates_callback is display.check_for_updates_callback
+    )
 
 
 def test_init_defaults_to_the_dark_theme_and_default_font(display):
@@ -526,7 +547,8 @@ def test_build_widgets_wires_the_view_menu(display):
 
 def test_build_widgets_wires_the_help_menu(display):
     """
-    Tests that the Help menu offers About, wired to its handler
+    Tests that the Help menu offers About and Check for Updates, each wired to its
+    handler
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -537,6 +559,10 @@ def test_build_widgets_wires_the_help_menu(display):
     assert calls[0].kwargs == {
         "label": "About",
         "command": display.display.handle_about,
+    }
+    assert calls[1].kwargs == {
+        "label": "Check for Updates",
+        "command": display.display.handle_check_for_updates,
     }
 
 
@@ -977,6 +1003,58 @@ def test_handle_about_opens_the_about_window(display):
         parent=display.display,
         title="About",
         version=VERSION,
+        theme=display.display.current_theme,
+        font_family=display.display.current_font_family,
+        font_size=display.display.current_font_size,
+    )
+
+
+###############################################################################
+###         Tests InventoryAppDisplay -> handle_check_for_updates()         ###
+###############################################################################
+def test_handle_check_for_updates_invokes_the_callback(display):
+    """
+    Tests that "Check for Updates" asks the controller to run an on-demand update
+    check, rather than reaching for the network itself
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.handle_check_for_updates()
+
+    display.check_for_updates_callback.assert_called_once_with()
+
+
+###############################################################################
+###           Tests InventoryAppDisplay -> show_update_available()          ###
+###############################################################################
+def test_show_update_available_opens_the_update_window(display):
+    """
+    Tests that a newer release opens the update window showing that version, with
+    the app's own destroy method as the close callback so the exiting app releases
+    the executable's file lock for the installer
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    result = SimpleNamespace(
+        update_available=True,
+        latest_version="9.9.9",
+        release_url="https://example.com/release",
+    )
+
+    display.display.show_update_available(result)
+
+    display.update_window_cls.assert_called_once_with(
+        parent=display.display,
+        title="Update Available",
+        latest_version="9.9.9",
+        release_url="https://example.com/release",
+        close_app_callback=display.display.destroy,
         theme=display.display.current_theme,
         font_family=display.display.current_font_family,
         font_size=display.display.current_font_size,

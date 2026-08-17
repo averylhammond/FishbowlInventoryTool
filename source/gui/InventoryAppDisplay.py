@@ -8,6 +8,7 @@ from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
 from source.gui.AboutWindow import AboutWindow
 from source.gui.FileEditorWindow import FileEditorWindow
 from source.gui.MessageWindow import MessageWindow
+from source.gui.UpdateWindow import UpdateWindow
 from source.gui.color_theme import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
@@ -38,6 +39,7 @@ class InventoryAppDisplay(tk.Tk):
         self,
         process_callback: Callable[[str, dict], bool],
         read_file_callback: Callable[[Path], str],
+        check_for_updates_callback: Callable[[], None],
         title: str,
         window_resolution: str,
         theme: Theme = DARK,
@@ -54,6 +56,9 @@ class InventoryAppDisplay(tk.Tk):
             read_file_callback (Callable[[Path], str]): Callback that reads a text
                 file's contents, used to populate the read-only file viewer (e.g.
                 View -> Results Log)
+            check_for_updates_callback (Callable[[], None]): Callback that triggers
+                an on-demand update check, invoked when the user selects
+                "Check for Updates" from the Help menu
             title (str): Title of the application window
             window_resolution (str): Resolution of the application window (e.g. "700x700")
             theme (Theme): The color theme to style the application with
@@ -77,6 +82,9 @@ class InventoryAppDisplay(tk.Tk):
 
         # Callback function to read a text file's contents for the file viewer
         self.read_file_callback = read_file_callback
+
+        # Callback to trigger an on-demand update check from the Help menu
+        self.check_for_updates_callback = check_for_updates_callback
 
         # Styling applied to every widget as it is created
         self.current_theme = theme
@@ -198,8 +206,12 @@ class InventoryAppDisplay(tk.Tk):
 
         # Help dropdown
         #  -> About option to show the current application version
+        #  -> Check for Updates option to manually check for a newer release
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="About", command=self.handle_about)
+        self.help_menu.add_command(
+            label="Check for Updates", command=self.handle_check_for_updates
+        )
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         self.config(menu=self.menu_bar)
@@ -619,6 +631,45 @@ class InventoryAppDisplay(tk.Tk):
             parent=self,
             title="About",
             version=VERSION,
+            theme=self.current_theme,
+            font_family=self.current_font_family,
+            font_size=self.current_font_size,
+        )
+
+    ###########################################################################
+    ###          InventoryAppDisplay -> handle_check_for_updates()          ###
+    ###########################################################################
+    def handle_check_for_updates(self):
+        """
+        On "Check for Updates" menu press, asks the controller to run an on-demand
+        update check. The controller surfaces the outcome back through
+        show_update_available() / show_popup().
+        """
+
+        self.check_for_updates_callback()
+
+    ###########################################################################
+    ###            InventoryAppDisplay -> show_update_available()           ###
+    ###########################################################################
+    def show_update_available(self, result):
+        """
+        Notifies the user that a newer release is available by opening a themed
+        popup showing the available version, with an "Exit and Update" button that
+        opens the release page and closes the app, and a Close button.
+
+        Args:
+            result (UpdateCheckResult): The outcome of the update check, exposing
+                the newer release's `latest_version` and `release_url`
+        """
+
+        UpdateWindow(
+            parent=self,
+            title="Update Available",
+            latest_version=result.latest_version,
+            release_url=result.release_url,
+            # self is the root tk.Tk, so destroy() exits the whole app, releasing
+            # the executable's file lock so the installer can replace it
+            close_app_callback=self.destroy,
             theme=self.current_theme,
             font_family=self.current_font_family,
             font_size=self.current_font_size,

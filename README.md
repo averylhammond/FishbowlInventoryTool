@@ -88,6 +88,12 @@ Headless mode processes every PDF in `InventoryAvailability/` with all columns i
 and exits without opening a window. It is what CI uses to validate output without GUI
 interaction.
 
+The GUI checks GitHub for a newer release on launch, and on demand via **Help → Check for
+Updates**. When one exists, an *Update Available* window offers "Exit and Update", which
+opens the release page in your browser and closes the app so the downloaded installer can
+replace the running executable. The check runs on a background thread and fails silently
+when offline; headless mode performs no network I/O at all.
+
 See [`USER_GUIDE.txt`](USER_GUIDE.txt) for end-user instructions.
 
 ## Testing
@@ -157,6 +163,10 @@ git push origin v1.0.0
 That runs the [Release workflow](.github/workflows/release.yml), which verifies the tag
 matches `VERSION`, runs the unit and integration tests, packages the zip and installer,
 and publishes them as a GitHub Release.
+
+Published releases are what the in-app update check compares against, and the installer's
+stable `AppId` is what lets a customer's download upgrade an existing install in place
+rather than landing beside it.
 
 ## Related projects
 

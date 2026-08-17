@@ -113,18 +113,50 @@ submodule pointer.
 
 ## Continuous integration
 
-All three workflows run on pull requests to `main` and on manual dispatch; the coverage
-workflow additionally runs on pushes to `main` so Codecov records a baseline for PR
-diffs.
+The first three workflows run on pull requests to `main` and on manual dispatch; the
+coverage workflow additionally runs on pushes to `main` so Codecov records a baseline for
+PR diffs. The release workflow runs only on pushed `v*` tags.
 
 | Workflow | What it checks |
 | --- | --- |
 | [Unit Tests](.github/workflows/unit-tests.yml) | `pytest tests/*` on `ubuntu-latest`. |
 | [Integration Tests](.github/workflows/integration-tests.yml) | Runs the app headless and fails unless `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Needs the `CUSTOMER_DATA_PAT` secret to check out the private submodule. |
 | [Code Coverage](.github/workflows/code-coverage.yml) | `pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*`, uploaded to Codecov. Needs the `CODECOV_TOKEN` secret. |
+| [Release](.github/workflows/release.yml) | On a `v*` tag: verifies the tag matches `VERSION`, runs both test suites on `windows-latest`, packages the release, and publishes it. |
 
 Every measured module is currently at 100%, so the 90% gate is headroom for an
 in-progress refactor rather than a target to climb toward.
+
+## Releases
+
+Package a release build locally:
+
+```bash
+./scripts/package_release.sh
+```
+
+This builds the executable with PyInstaller into `release/FishbowlInventoryTool/` and zips
+it. The release ships the executable and the user guide alongside **empty**
+`InventoryAvailability/` and `TurnoverReports/` folders for the customer to fill; no sample
+data is bundled, so packaging does not need the private submodule. On Windows with
+[Inno Setup](https://jrsoftware.org/isinfo.php) installed it additionally builds
+`release/FishbowlInventoryTool_Setup.exe` from `scripts/installer.iss`; that step is
+skipped on Linux or when Inno Setup is absent.
+
+> **Note:** the script runs a `git clean` on your working tree before building, so commit
+> or stash anything you care about first.
+
+To cut a release, bump `VERSION` in `source/constants.py`, merge to `main`, then push a
+matching tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+That runs the [Release workflow](.github/workflows/release.yml), which verifies the tag
+matches `VERSION`, runs the unit and integration tests, packages the zip and installer,
+and publishes them as a GitHub Release.
 
 ## Related projects
 

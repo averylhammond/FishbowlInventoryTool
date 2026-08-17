@@ -35,8 +35,11 @@ focused, single-responsibility classes.
 - Install deps: `pip install -r requirements/dev.txt` for development (pulls in
   `release.txt` plus `pytest`/`pytest-cov`); `requirements/release.txt` alone is what the
   shipped app needs. `release.txt` pulls `fishbowl-common` (import name
-  `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider`; see
-  the sibling `FishbowlInvoiceTool` for the shared-package story.
+  `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider` and
+  `UpdateChecker`; see the sibling `FishbowlInvoiceTool` for the shared-package story. Both
+  classes are application-agnostic and take every app-specific value by constructor
+  injection, which is why `UpdateChecker` is handed `VERSION` and `GITHUB_REPO` rather than
+  importing them.
 
 ## Common Commands
 
@@ -191,8 +194,29 @@ data classes + spreadsheet writer**.
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
     `run_integration_test()`. Otherwise it imports and constructs `InventoryAppDisplay`,
     passing `read_file_callback=self.file_io.read_text_file` so the display's View menu can
-    populate its read-only file viewer, wires the file I/O controller's `report_error`
-    callback to the display's `show_popup`, and enters `mainloop()`.
+    populate its read-only file viewer and `check_for_updates_callback=self.handle_check_for_updates`
+    for its Help menu, wires the file I/O controller's `report_error` callback to the
+    display's `show_popup`, starts the background update check, and enters `mainloop()`.
+  - **The update check** — four methods porting the sibling's feature 1:1, built on
+    `UpdateChecker` from `fishbowl-common` (which only fetches release metadata; all
+    threading and UI are the app's job):
+    - `_start_update_check(manual=False)` spawns a `daemon=True` thread running
+      `_run_update_check`, so the GUI never blocks on the GitHub API and a stalled request
+      cannot delay shutdown.
+    - `_run_update_check(manual)` constructs `UpdateChecker(current_version=VERSION,
+      repo=GITHUB_REPO)`, calls `check_for_update()`, then hands the result back with
+      `display.after(0, self._handle_update_result, result, manual)` — tkinter is only ever
+      touched from the GUI thread.
+    - `_handle_update_result(result, manual=False)` opens the update window whenever a
+      strictly newer release exists. The "No Updates Available" / "Update Check Failed"
+      popups fire **only** when `manual` is set, so the startup check never interrupts a
+      launch just because the user is offline.
+    - `handle_check_for_updates()` is the display's Help-menu callback, calling
+      `_start_update_check(manual=True)`.
+
+    `_start_update_check()` is called **only** in `start_application()`'s GUI branch, after
+    the `integration_test_mode` early return. Keep it there: a headless CI run must perform
+    no network I/O, and `tests/InventoryAppController_tests.py` asserts it is not called.
   - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to
     the display. It runs `self.processor.process_inventory()` with status routed to the
     display's output box, keeping the display's callback contract to two arguments.
@@ -222,11 +246,11 @@ data classes + spreadsheet writer**.
 - **`source/gui/`** — the GUI subpackage, the only place tkinter appears.
   - **`InventoryAppDisplay`** (`source/gui/InventoryAppDisplay.py`) — a `tk.Tk` subclass
     that takes every dependency as a constructor argument (`process_callback`,
-    `read_file_callback`, `title`, `window_resolution`, and the defaulted
-    `theme`/`font_family`/`font_size`) and never imports the controller. It owns the file
-    picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText` output box,
-    and a menu bar (File/View/Preferences/Help), and exposes `show_popup()`, `write_output()`,
-    `clear_output()` and `get_selected_columns()`. `write_output()` calls
+    `read_file_callback`, `check_for_updates_callback`, `title`, `window_resolution`, and the
+    defaulted `theme`/`font_family`/`font_size`) and never imports the controller. It owns the
+    file picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText` output box,
+    and a menu bar (File/View/Preferences/Help), and exposes `show_popup()`,
+    `show_update_available()`, `write_output()`, `clear_output()` and `get_selected_columns()`. `write_output()` calls
     `update_idletasks()` because processing runs on the GUI thread, so without it a status
     line would not paint until the work it announces had already finished.
     - The **menu bar** is built inline in `build_widgets()` (no separate `MenuBar` class,
@@ -239,7 +263,9 @@ data classes + spreadsheet writer**.
       out to the OS's file explorer); **Preferences** (Theme/Font/Font Size submenus built by
       looping `ALL_THEMES`/`FONT_FAMILIES`/`FONT_SIZES`, each `command` a
       `lambda x=option: self.apply_x(x)` to avoid a late-binding closure bug); **Help**
-      (About opens `AboutWindow` with `VERSION` from `constants.py`).
+      (About opens `AboutWindow` with `VERSION` from `constants.py`; Check for Updates just
+      calls `check_for_updates_callback` — the display never touches the network itself, and
+      the controller reports the outcome back through `show_update_available()`/`show_popup()`).
     - **`apply_theme()`** / **`apply_font_family()`** / **`apply_font_size()`** /
       **`_apply_font()`** apply a Preferences choice live by explicitly reconfiguring every
       widget the display owns, including every checkbutton in `column_checkbuttons` (the
@@ -248,15 +274,23 @@ data classes + spreadsheet writer**.
       (`SettingsRepository`) and `Tooltip` are tracked separately and not yet built; when
       they land, slot the persistence call and a `_refresh_tooltips()` call into these same
       four methods rather than restructuring them.
-  - **`ThemedSubwindow`** / **`MessageWindow`** / **`AboutWindow`** / **`FileEditorWindow`**
-    — ported verbatim from the sibling: `ThemedSubwindow` is a `tk.Toplevel` base that
+  - **`ThemedSubwindow`** / **`MessageWindow`** / **`AboutWindow`** / **`FileEditorWindow`** /
+    **`UpdateWindow`** — ported verbatim from the sibling: `ThemedSubwindow` is a `tk.Toplevel` base that
     snapshots the active theme/font and centers over its parent; `MessageWindow` is the
     themed OK-button popup `show_popup()` builds; `AboutWindow` shows the app name (hardcoded
     as "Fishbowl Inventory Tool", since the sibling has no reusable app-name constant either)
     and `VERSION`; `FileEditorWindow` shows a file's text in a monospace box, with an
     `editable` flag toggling a Save button — this app only ever opens it with
     `editable=False` (there are no editable config files here), but the class itself needed
-    no adaptation.
+    no adaptation. `UpdateWindow` announces a newer release: its "Exit and Update" button
+    `webbrowser.open()`s the release page, then closes the **whole application** after
+    `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` (the display's own `destroy`).
+    The app must exit because Windows file-locks the running executable, so an installer that
+    finds it open hangs trying to close it; the delay lets the browser surface first, and a
+    `_closing` flag keeps repeat clicks from stacking timers. Unlike the sibling's copy this
+    one has **no `integration_test_mode` guard** on `show_update_available()` — this display
+    holds no argument provider and is never constructed headless, the same reason
+    `show_popup()` has no guard either.
   - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
     sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
     consistent; they are omitted from coverage for the same reason.
@@ -308,7 +342,9 @@ data classes + spreadsheet writer**.
   helpers swallow their own write failures silently. The in-memory cell writing still
   lives in `spreadsheetDriver.py`, which receives the already-open workbook.
 - **`constants.py`** (`source/constants.py`) — `VERSION`, the current application version
-  surfaced via Help -> About, plus relative `Path` constants for the input directories
+  surfaced via Help -> About and compared against the latest release by the update check;
+  `GITHUB_REPO`, the `"owner/name"` string naming the repo whose releases that check reads;
+  plus relative `Path` constants for the input directories
   (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`),
   resolved against the executable's CWD (mirrors the sibling invoice tool's `constants.py`).
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
@@ -454,10 +490,14 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     each captured `command` directly (`made_call.kwargs["command"]()`) and assert the
     resulting state, which is what actually exercises the default-argument capture rather
     than just asserting the menu was built.
-- `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` — themed subwindows,
-  following `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
+- `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` /
+  `tests/UpdateWindow_tests.py` — themed subwindows, following
+  `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
   neutralizing `tk.Toplevel.__init__` and `title`/`configure`/`_center_over_parent`, with
-  every widget class patched at its point of use.
+  every widget class patched at its point of use. `UpdateWindow_tests.py` additionally
+  assigns `window.after = MagicMock()` before exercising `_open_release_page()`, since a
+  window built this way has no Tcl interpreter to schedule against, and patches
+  `source.gui.UpdateWindow.webbrowser.open` so no browser is launched.
 - `tests/InventoryAppController_tests.py` — the wiring, with `ArgumentProvider`,
   `InventoryAppFileIO` and `InventoryProcessor` patched at
   `source.InventoryAppController.<name>` as usual. Because the processor is mocked there,
@@ -467,7 +507,10 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   function, so the name never exists at module scope and the target is its definition site,
   `patch("source.gui.InventoryAppDisplay.InventoryAppDisplay")`. A function-local
   `from X import Y` resolves `Y` as an attribute of module `X` at call time, which is why
-  patching there works.
+  patching there works. The update-check tests patch `source.InventoryAppController.threading.Thread`
+  and `source.InventoryAppController.UpdateChecker` so no thread is spawned and no request is
+  made; every test reaching `start_application()` also patches `_start_update_check` on the
+  instance, or a real daemon thread would call GitHub during the run.
 - `tests/InventoryProcessor_tests.py` — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to
   the constructor while the `PdfTableParser` the processor builds itself is patched at

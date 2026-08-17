@@ -54,11 +54,16 @@ focused, single-responsibility classes.
 - Run a single test:
   `pytest tests/InventoryAppFileIO_tests.py::test_read_pdf_extracts_each_page_in_layout_mode`
 - Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/*`
+- Package a release executable: `./scripts/package_release.sh` (no arguments). Builds via
+  PyInstaller into `release/FishbowlInventoryTool/` and zips it. On Windows with Inno Setup
+  installed, it additionally builds `release/FishbowlInventoryTool_Setup.exe` (via
+  `scripts/installer.iss`); this step is skipped on Linux or when Inno Setup is absent.
 
 ### CI
 
-Three workflows, all of which run on pull requests to `main` and on manual dispatch. The
-code-coverage one additionally runs on pushes to `main`.
+Four workflows. Three of them — integration tests, unit tests and code coverage — run on
+pull requests to `main` and on manual dispatch; the code-coverage one additionally runs on
+pushes to `main`. The fourth, the release workflow, runs only on pushed `v*` tags.
 
 `.github/workflows/integration-tests.yml`. On `ubuntu-latest` it installs `requirements/release.txt`,
 stages the test PDFs with `scripts/copy_resources.sh`, runs the app headless, and fails
@@ -72,8 +77,10 @@ submodule pointer.
 
 The job runs on Linux while the app ships as a Windows executable, which is only safe
 because the results file is platform-independent by construction (see the results-file
-convention below). Nothing enforces that continuously — if a Windows-specific regression
-ever slips through, add a `windows-latest` leg to a `strategy.matrix`.
+convention below). The release workflow re-runs the same integration test on
+`windows-latest`, so a Windows-specific regression is caught at release time — but not on
+every PR. If one ever slips through to a release, add a `windows-latest` leg to a
+`strategy.matrix` here.
 
 `.github/workflows/unit-tests.yml` runs the unit tests. On `ubuntu-latest` it installs
 `requirements/dev.txt` (`release.txt` plus `pytest`/`pytest-cov`) and runs `pytest tests/*`.
@@ -105,6 +112,61 @@ measurement (see `.coveragerc`) because they are inert data with no behavior to 
 This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
 uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
 `.coveragerc` scopes what is measured (see the unit-testing section).
+
+`.github/workflows/release.yml` publishes a release when a `v*` tag is pushed. On
+`windows-latest` (see the release-packaging section below for why the platform is not
+negotiable) it verifies the tag matches `VERSION` in `source/constants.py` — stripping the
+`v` and failing with `::error::` on a mismatch, so a release can never ship an About box
+that disagrees with the tag — then runs the unit tests and the integration test, installs
+Inno Setup via Chocolatey, runs `scripts/package_release.sh`, and uploads
+`release/FishbowlInventoryTool.zip` and `release/FishbowlInventoryTool_Setup.exe` to a
+GitHub Release with `gh release create --generate-notes`. It checks out the submodule (for
+`canonical_correct_results.txt`) and so needs `CUSTOMER_DATA_PAT`; the packaging itself
+needs nothing from the submodule. Cutting a release is therefore: bump `VERSION`, merge,
+then push a matching `vX.Y.Z` tag.
+
+## Release Packaging
+
+`scripts/package_release.sh` takes **no arguments** and produces everything a release
+needs. It mirrors the sibling `FishbowlInvoiceTool`'s script — fresh venv, `pip install`
+of `requirements/release.txt` plus PyInstaller (deliberately unpinned and deliberately not
+in `requirements/`), then
+`python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc main.py`, then a
+zip built with `shutil.make_archive` rather than `tar` so the artifact is a real
+DEFLATE `.zip`. `-OO` strips docstrings and `__debug__`-gated code from the shipped
+executable. Three divergences from the sibling, each load-bearing:
+
+- **The release ships no sample data.** The sibling stages `Configs/` (and optionally
+  `Invoices/`) out of its testing submodule; this app has no config files, so the payload
+  is just the executable and `USER_GUIDE.txt` alongside **empty** `InventoryAvailability/`
+  and `TurnoverReports/` folders. That is why the script takes no arguments and never
+  touches `automated-inventory-testing` — packaging must not require access to a private
+  repo.
+- **The payload's input folders are created with `mkdir`, never copied from the repo
+  root.** A release CI run stages real customer PDFs into the repo's
+  `InventoryAvailability/` and `TurnoverReports/` to run the integration test *before*
+  packaging, so a `cp` here would publish private data in the release zip. Do not
+  "helpfully" copy them across.
+- **`git clean -fdx`, not the sibling's `-fdxf`.** A single `-f` makes git skip nested
+  repositories, leaving the submodule checkout intact; the sibling's second `-f` deletes it
+  and then has to re-init it. Nothing here is packaged from the submodule, so there is
+  nothing to re-init. This clean (and the venv deactivate above it) is guarded behind
+  `IS_CI="${CI:-false}"` — in CI the tree is already clean and the clean would delete the
+  staged test data.
+
+`scripts/installer.iss` builds the optional double-click installer with Inno Setup, whose
+`ISCC.exe` is Windows-only; the script probes `$ISCC`, then the default install path, then
+`iscc` on `PATH`, and skips with a message when none is found — the zip is the guaranteed
+artifact. The version reaches it as `//DAppVersion=` (a **double** slash, or Git Bash
+path-mangles the argument) read from `source/constants.py`, keeping that the single source
+of truth. The install is per-user (`PrivilegesRequired=lowest`, `{autopf}` resolving to
+`%LOCALAPPDATA%\Programs`) because `constants.py` uses paths relative to the executable's
+CWD — a Program Files install would leave the app unable to write its own `logs/` and
+`.xlsx` output. `InventoryAvailability/` and `TurnoverReports/` are `[Dirs]` entries
+flagged `uninsneveruninstall` so a customer's PDFs survive upgrades and uninstalls; they
+have no `[Files]` entries at all, since nothing ships inside them. The `AppId` GUID is what
+lets Inno upgrade an existing install in place — never change it, and never share it with
+the sibling's.
 
 ## Architecture
 

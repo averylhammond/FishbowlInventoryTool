@@ -2,7 +2,7 @@ from pathlib import Path
 
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
-VERSION = "1.0"
+VERSION = "1.0.0"
 
 # Base directories. The specific file paths below are composed from these.
 INVENTORY_DIR = Path("InventoryAvailability")

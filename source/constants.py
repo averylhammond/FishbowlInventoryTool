@@ -15,3 +15,21 @@ TURNOVER_DIR = Path("TurnoverReports")
 # Logs directory containing the results file with application output
 LOGS_DIR = Path("logs")
 RESULTS_FILE = LOGS_DIR / "results.txt"
+
+# Data directory holding the database of persisted user settings
+DATA_DIR = Path("data")
+SETTINGS_DB_PATH = DATA_DIR / "settings.db"
+
+# Keys under which user settings are persisted in the settings database. Shared
+# between the display (which reads/writes them) and any other consumer so the
+# two never drift apart. Every value is stored as text, so a non-string setting
+# is converted on the way out and parsed on the way back in.
+SETTING_KEY_THEME = "theme"
+SETTING_KEY_FONT_FAMILY = "font_family"
+SETTING_KEY_FONT_SIZE = "font_size"
+SETTING_KEY_GEOMETRY = "window_geometry"
+
+# Prefix each column's checkbox state is persisted under, e.g. "column_OnHand".
+# The column key itself completes the setting key, so a column added to
+# source/columns.py needs no new constant here.
+SETTING_KEY_COLUMN_PREFIX = "column_"

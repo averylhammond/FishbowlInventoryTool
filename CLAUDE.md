@@ -35,11 +35,13 @@ focused, single-responsibility classes.
 - Install deps: `pip install -r requirements/dev.txt` for development (pulls in
   `release.txt` plus `pytest`/`pytest-cov`); `requirements/release.txt` alone is what the
   shipped app needs. `release.txt` pulls `fishbowl-common` (import name
-  `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider` and
-  `UpdateChecker`; see the sibling `FishbowlInvoiceTool` for the shared-package story. Both
+  `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider`,
+  `SettingsRepository` and `UpdateChecker`; see the sibling `FishbowlInvoiceTool` for the
+  shared-package story. All three
   classes are application-agnostic and take every app-specific value by constructor
-  injection, which is why `UpdateChecker` is handed `VERSION` and `GITHUB_REPO` rather than
-  importing them.
+  injection, which is why `UpdateChecker` is handed `VERSION` and `GITHUB_REPO`, and
+  `SettingsRepository` its `db_path`, rather than importing them. `SettingsRepository` is
+  covered by its own tests in that package, so this repo tests only the wiring around it.
 
 ## Common Commands
 
@@ -164,10 +166,14 @@ artifact. The version reaches it as `//DAppVersion=` (a **double** slash, or Git
 path-mangles the argument) read from `source/constants.py`, keeping that the single source
 of truth. The install is per-user (`PrivilegesRequired=lowest`, `{autopf}` resolving to
 `%LOCALAPPDATA%\Programs`) because `constants.py` uses paths relative to the executable's
-CWD — a Program Files install would leave the app unable to write its own `logs/` and
-`.xlsx` output. `InventoryAvailability/` and `TurnoverReports/` are `[Dirs]` entries
+CWD — a Program Files install would leave the app unable to write its own `logs/`, `data/`
+and `.xlsx` output. `InventoryAvailability/` and `TurnoverReports/` are `[Dirs]` entries
 flagged `uninsneveruninstall` so a customer's PDFs survive upgrades and uninstalls; they
-have no `[Files]` entries at all, since nothing ships inside them. The `AppId` GUID is what
+have no `[Files]` entries at all, since nothing ships inside them. `data/` (the settings
+database) is a `[Dirs]` entry too but deliberately **not** flagged `uninsneveruninstall`,
+matching the sibling: it is this install's own state rather than the customer's data. An
+upgrade preserves it regardless, because nothing in `[Files]` installs into that folder. The
+`AppId` GUID is what
 lets Inno upgrade an existing install in place — never change it, and never share it with
 the sibling's.
 
@@ -186,17 +192,32 @@ data classes + spreadsheet writer**.
     `InventoryProcessor` and hands it that same file I/O instance (not a fresh one — the
     headless path reassigns `file_io.report_error`, which only reaches the object doing the
     reads if the two share one instance), constructs the shared `ArgumentProvider` (from the
-    `fishbowl-common` package) to detect headless mode, sets `self.display = None`, and
-    clears the results file (`reset_results_file()`) so each run starts with a fresh
-    diagnostics log. It deliberately does **not** build the GUI; see `start_application()`
-    below.
+    `fishbowl-common` package) to detect headless mode, sets `self.display = None` and
+    `self.settings_repository = None`, and clears the results file (`reset_results_file()`)
+    so each run starts with a fresh diagnostics log. It deliberately builds neither the GUI
+    nor the settings repository; see `start_application()` below.
   - `start_application()` first checks `argument_provider.integration_test_mode`: when set
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
-    `run_integration_test()`. Otherwise it imports and constructs `InventoryAppDisplay`,
-    passing `read_file_callback=self.file_io.read_text_file` so the display's View menu can
-    populate its read-only file viewer and `check_for_updates_callback=self.handle_check_for_updates`
-    for its Help menu, wires the file I/O controller's `report_error` callback to the
-    display's `show_popup`, starts the background update check, and enters `mainloop()`.
+    `run_integration_test()`. Otherwise it constructs the shared `SettingsRepository` (from
+    `fishbowl-common`) at `SETTINGS_DB_PATH` and reads `get_all_settings()`, then imports and
+    constructs `InventoryAppDisplay`, passing `read_file_callback=self.file_io.read_text_file`
+    so the display's View menu can populate its read-only file viewer,
+    `check_for_updates_callback=self.handle_check_for_updates` for its Help menu,
+    `save_settings_callback=self.handle_save_setting` and `settings=` the settings just read,
+    wires both the file I/O controller's and the settings repository's `report_error`
+    callbacks to the display's `show_popup`, starts the background update check, and enters
+    `mainloop()`.
+  - **The settings repository is built here, in the GUI branch, not in `__init__`** — the one
+    deliberate divergence from the sibling, which builds its own in `__init__`. The
+    integration test must perform no database I/O and leave no `data/` directory behind, the
+    same reason the display itself is built here.
+    `tests/InventoryAppController_tests.py` guards it with
+    `mock_settings_cls.assert_not_called()`. Because `SettingsRepository.__init__` runs
+    `initialize_database()` before any display exists, an error from that first call falls to
+    the repository's no-op default reporter; only later reads and writes reach `show_popup`.
+  - `handle_save_setting(key, value)` is the display's settings callback, forwarding to
+    `settings_repository.save_setting()`. It is the display's only route to the database —
+    the display itself never imports the repository.
   - **The update check** — four methods porting the sibling's feature 1:1, built on
     `UpdateChecker` from `fishbowl-common` (which only fetches release metadata; all
     threading and UI are the app's job):
@@ -246,15 +267,27 @@ data classes + spreadsheet writer**.
 - **`source/gui/`** — the GUI subpackage, the only place tkinter appears.
   - **`InventoryAppDisplay`** (`source/gui/InventoryAppDisplay.py`) — a `tk.Tk` subclass
     that takes every dependency as a constructor argument (`process_callback`,
-    `read_file_callback`, `check_for_updates_callback`, `title`, `window_resolution`, and the
-    defaulted `theme`/`font_family`/`font_size`) and never imports the controller. It owns the
+    `read_file_callback`, `check_for_updates_callback`, `save_settings_callback`, `title`,
+    `window_resolution`, and the defaulted `theme`/`font_family`/`font_size`/`settings`) and
+    never imports the controller. It owns the
     file picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText` output box,
     and a menu bar (File/View/Preferences/Help), and exposes `show_popup()`,
     `show_update_available()`, `write_output()`, `clear_output()` and `get_selected_columns()`. `write_output()` calls
     `update_idletasks()` because processing runs on the GUI thread, so without it a status
     line would not paint until the work it announces had already finished.
+    - **Settings restore happens in `__init__`, before `build_widgets()`**, so every widget is
+      created already themed rather than restyled afterwards — and so no
+      `save_settings_callback` fires during startup. The `theme`/`font_family`/`font_size`/
+      `window_resolution` arguments are the *fallbacks* the restore resolves against, which is
+      why they stay even though the controller now passes `settings`: the defaults live in one
+      place and a missing or corrupt setting falls back to an injected value rather than a
+      hardcoded one. Four helpers do the resolving — `THEME_BY_NAME.get()` inline for the
+      theme, `_parse_font_size()` (`int()`, falling back on `TypeError`/`ValueError`),
+      `_parse_geometry()` (accepts a value only if it matches `GEOMETRY_PATTERN`, since a
+      corrupt string handed to `geometry()` would raise), and `_restore_column()` (one
+      checkbox state per column).
     - The **menu bar** is built inline in `build_widgets()` (no separate `MenuBar` class,
-      matching the sibling): **File** (Open/Clear/Exit — Exit calls `self.destroy`, not
+      matching the sibling): **File** (Open/Clear/Exit — Exit calls `self.handle_exit`, not
       `self.quit`, to match the Exit button's own convention); **View** (Results Log opens
       `RESULTS_FILE` in a read-only `FileEditorWindow` via `_open_readonly_file_viewer()`,
       or a "File Not Found" popup if it doesn't exist yet; Inventories/Turnover Reports open
@@ -269,11 +302,22 @@ data classes + spreadsheet writer**.
     - **`apply_theme()`** / **`apply_font_family()`** / **`apply_font_size()`** /
       **`_apply_font()`** apply a Preferences choice live by explicitly reconfiguring every
       widget the display owns, including every checkbutton in `column_checkbuttons` (the
-      sibling has no checkbox grid, so this loop has no sibling analog). These do **not**
-      persist the choice or refresh tooltips — settings persistence
-      (`SettingsRepository`) and `Tooltip` are tracked separately and not yet built; when
-      they land, slot the persistence call and a `_refresh_tooltips()` call into these same
-      four methods rather than restructuring them.
+      sibling has no checkbox grid, so this loop has no sibling analog). The first three
+      persist the choice as their last statement; `_apply_font()` deliberately does not,
+      since it runs for both font settings and would write two keys per change. They do not
+      yet refresh tooltips — `Tooltip` is tracked separately and not built; when it lands,
+      slot a `_refresh_tooltips()` call into these same four methods rather than
+      restructuring them.
+    - **`handle_column_toggled(key)`** persists one column's checkbox state, wired as each
+      checkbutton's `command` with the key captured as a default argument (the same
+      late-binding guard the Preferences lambdas use). Tk runs `command` after updating the
+      variable, so it reads the new state.
+    - **`handle_exit()`** is the single way out of the application: it persists
+      `winfo_geometry()` and then calls `destroy()`. The Exit button, File -> Exit, the
+      window's close box (bound via `protocol("WM_DELETE_WINDOW", ...)` in `build_widgets()`)
+      and `UpdateWindow`'s `close_app_callback` all route through it, so the geometry is saved
+      whichever way the user leaves. Geometry is saved on exit rather than on `<Configure>` so
+      a window drag does not write to the database on every frame.
   - **`ThemedSubwindow`** / **`MessageWindow`** / **`AboutWindow`** / **`FileEditorWindow`** /
     **`UpdateWindow`** — ported verbatim from the sibling: `ThemedSubwindow` is a `tk.Toplevel` base that
     snapshots the active theme/font and centers over its parent; `MessageWindow` is the
@@ -284,7 +328,7 @@ data classes + spreadsheet writer**.
     `editable=False` (there are no editable config files here), but the class itself needed
     no adaptation. `UpdateWindow` announces a newer release: its "Exit and Update" button
     `webbrowser.open()`s the release page, then closes the **whole application** after
-    `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` (the display's own `destroy`).
+    `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` (the display's `handle_exit`).
     The app must exit because Windows file-locks the running executable, so an installer that
     finds it open hangs trying to close it; the delay lets the browser surface first, and a
     `_closing` flag keeps repeat clicks from stacking timers. Unlike the sibling's copy this
@@ -294,11 +338,7 @@ data classes + spreadsheet writer**.
   - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
     sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
     consistent; they are omitted from coverage for the same reason.
-  - **Deliberately absent**, each a follow-up: `SettingsRepository` settings persistence
-    (theme/font/column selections reset to defaults on restart until this lands) and
-    `Tooltip`. Only `DARK` ships as the default today, but `ALL_THEMES` is already offered
-    in the Preferences menu, and the theme is a constructor argument rather than a
-    hardcoded value, so persistence needs no surgery on the display.
+  - **Deliberately absent**, a follow-up: `Tooltip`.
 - **`columns.py`** (`source/columns.py`) — the single source of truth for the (column key,
   GUI label, section) triple: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
   `TURNOVER_COLUMNS`, `ALL_COLUMNS`, `COLUMN_KEYS` and `all_columns_selected()`. The tuple
@@ -345,8 +385,13 @@ data classes + spreadsheet writer**.
   surfaced via Help -> About and compared against the latest release by the update check;
   `GITHUB_REPO`, the `"owner/name"` string naming the repo whose releases that check reads;
   plus relative `Path` constants for the input directories
-  (`INVENTORY_DIR`, `TURNOVER_DIR`) and the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`),
+  (`INVENTORY_DIR`, `TURNOVER_DIR`), the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`) and the
+  settings database (`DATA_DIR`, `SETTINGS_DB_PATH`),
   resolved against the executable's CWD (mirrors the sibling invoice tool's `constants.py`).
+  It also holds the keys user settings are persisted under — `SETTING_KEY_THEME`,
+  `SETTING_KEY_FONT_FAMILY`, `SETTING_KEY_FONT_SIZE`, `SETTING_KEY_GEOMETRY` and the
+  `SETTING_KEY_COLUMN_PREFIX` each column's key is appended to — shared between the display
+  that reads/writes them and any other consumer so the two never drift apart.
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
   row (`part`, `description`, `uom`, `on_hand`, `allocated`, `available`, etc.). Every
   field is annotated and defaulted, so it both default-constructs and takes a parsed row
@@ -386,6 +431,16 @@ data classes + spreadsheet writer**.
 - **`get_selected_columns()` wraps every value in `bool()`, and that is load-bearing.**
   The spreadsheet writers test `if checkboxDict["Part"] == True`, which a `tk.BooleanVar`
   fails — the column would be silently dropped from the report rather than raising.
+- **The settings table stores only text, so a persisted boolean is compared, never
+  `bool()`-ed.** `SettingsRepository.get_all_settings()` hands back raw strings and
+  `bool("False")` is `True`, so converting a stored column flag would silently check every
+  box. `_restore_column()` compares against `str(True)` instead. The same applies in
+  reverse: the font size is `str()`-ed on the way out and `int()`-ed on the way back.
+- **An absent column setting means "never persisted", not "unchecked".** `_restore_column()`
+  falls back to the column's own `always` default when the key is missing, so a column newly
+  added to `source/columns.py` behaves like a first launch rather than arriving pre-unchecked.
+  A column marked `always` is forced checked regardless of what is stored, since it has no
+  checkbox the user could have unchecked it with.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
   spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
 - **`extraction_mode="layout"` is mandatory in `read_pdf()`.** `pypdf`'s default mode
@@ -472,14 +527,21 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   holders with no I/O — but each is given a distinct value per field so a column/data
   desync fails loudly instead of matching by coincidence.
 - `tests/InventoryAppDisplay_tests.py` — a tkinter GUI class. The `display` fixture
-  neutralizes `tk.Tk.__init__`, mocks the inherited Tk methods the constructor calls
-  (`patch.object(InventoryAppDisplay, "title"/"geometry"/"resizable"/"configure")`), and
+  neutralizes `tk.Tk.__init__`, mocks the inherited Tk methods the display calls
+  (title/geometry/resizable/configure/config/protocol/destroy/winfo_geometry), and
   replaces every widget class at its point of use
   (`patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget)`), so no
   real window is created and each widget attribute is a distinct assertable mock. It
   `yield`s a `SimpleNamespace` **from inside** the `with` block so the patches stay live for
   the whole test. Per-test constructor arguments come from indirect parametrization
-  (`@pytest.mark.parametrize("display", [{"theme": FOREST}], indirect=True)`).
+  (`@pytest.mark.parametrize("display", [{"theme": FOREST}], indirect=True)`); persisted
+  settings arrive the same way, as a `{"settings": {...}}` override.
+  - **The inherited Tk methods are patched with one `patch.multiple(InventoryAppDisplay,
+    title=DEFAULT, ...)`, not one `patch.object` each, and that is required rather than
+    stylistic.** Python allows only twenty statically nested blocks and this fixture's `with`
+    statement is at that limit; a further `patch.object` raises `SyntaxError: too many
+    statically nested blocks` at collection time. The mocks come back as a dict
+    (`tk_methods["geometry"]`). Add new Tk-method patches inside that call.
   - **`tk.StringVar` and `tk.BooleanVar` are patched with the `_FakeStringVar` /
     `_FakeBooleanVar` stubs, not bare `MagicMock`s.** A tkinter variable cannot be built
     without a default root window, so the real classes raise "Too early to create variable";
@@ -489,7 +551,14 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     self.apply_x(x)` per loop iteration (see the architecture section above); tests invoke
     each captured `command` directly (`made_call.kwargs["command"]()`) and assert the
     resulting state, which is what actually exercises the default-argument capture rather
-    than just asserting the menu was built.
+    than just asserting the menu was built. The checkbutton `command`s are tested the same
+    way, each resolved back to its column through the `variable` it was built with, so a
+    late-binding regression fails rather than passing by coincidence.
+  - `save_settings_callback` is a bare `MagicMock()`; `SettingsRepository` is never imported
+    here, since the display only ever reaches it through that callback. The three Preferences
+    submenu tests invoke every `command` in a loop, so those tests absorb 4 + 10 + 14 writes
+    into the same mock — assert with `assert_any_call` there, and reserve
+    `assert_called_once_with` for the tests that exercise a single `apply_*` call.
 - `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` /
   `tests/UpdateWindow_tests.py` — themed subwindows, following
   `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
@@ -511,6 +580,12 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   and `source.InventoryAppController.UpdateChecker` so no thread is spawned and no request is
   made; every test reaching `start_application()` also patches `_start_update_check` on the
   instance, or a real daemon thread would call GitHub during the run.
+  **`SettingsRepository` is deliberately absent from the `controller` fixture** — it is built
+  in `start_application()`, so only the tests reaching that method patch it (at
+  `source.InventoryAppController.SettingsRepository`, the ordinary point of use). Every test
+  that calls `start_application()` must patch it, or it opens a real SQLite database and
+  leaves a `data/` directory in the working tree, breaking the "no new artifacts after a run"
+  rule below.
 - `tests/InventoryProcessor_tests.py` — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to
   the constructor while the `PdfTableParser` the processor builds itself is patched at
@@ -553,7 +628,7 @@ touch the real filesystem, a real PDF, or the GUI.
 - **Independent** — no ordering dependencies or shared mutable state between tests.
 - **Repeatable** — deterministic on every machine. Do not depend on the
   `automated-inventory-testing` submodule; that drives the *integration* test, not the
-  unit tests. After a run, `git status` must show no new `logs/`, `*.xlsx`, or
+  unit tests. After a run, `git status` must show no new `logs/`, `data/`, `*.xlsx`, or
   `InventoryAvailability/` artifacts.
 - **Self-validating** — each test asserts a clear pass/fail; never require reading
   `logs/results.txt` to judge the result.

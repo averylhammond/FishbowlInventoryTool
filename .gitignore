@@ -24,3 +24,6 @@ TurnoverReports/*
 
 # Ignore output files
 *.xlsx
+
+# Ignore the per-machine user settings database
+data/

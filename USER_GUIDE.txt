@@ -14,6 +14,10 @@ inventory availability was generated. At this time, the spreadsheet will not be
 spaced correctly, but excel allows you to double click on the column boundries to
 automatically space columns correctly.
 
+If you are unsure what one of the column checkboxes means, rest your mouse on it for a
+moment and a short description of that column will appear. The same works for the
+buttons.
+
 Keeping the tool up to date:
 
 The tool checks for a newer version each time it starts, and you can check at any time with

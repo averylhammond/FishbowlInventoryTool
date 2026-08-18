@@ -19,6 +19,7 @@ from source.constants import (
 from source.gui.AboutWindow import AboutWindow
 from source.gui.FileEditorWindow import FileEditorWindow
 from source.gui.MessageWindow import MessageWindow
+from source.gui.Tooltip import Tooltip
 from source.gui.UpdateWindow import UpdateWindow
 from source.gui.color_theme import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
@@ -170,6 +171,10 @@ class InventoryAppDisplay(tk.Tk):
         # The column checkbuttons, keyed by column key. Columns marked always get
         # no checkbutton, so they are absent from this mapping.
         self.column_checkbuttons = {}
+
+        # Hover tooltips attached to the buttons and the column checkboxes, kept
+        # so they can be restyled when the user changes the theme or font
+        self.tooltips: list[Tooltip] = []
 
         # Build the GUI
         self.build_widgets()
@@ -464,6 +469,56 @@ class InventoryAppDisplay(tk.Tk):
         )
         self.output_box.pack(padx=20, pady=(0, 10), fill="both", expand=True)
 
+        # Attach hover tooltips describing what each button does
+        self._attach_tooltip(
+            self.browse_button,
+            "Open a file dialog to choose an inventory availability PDF",
+        )
+        self._attach_tooltip(
+            self.process_inventory_button,
+            "Process the selected inventory and write the report spreadsheet",
+        )
+        self._attach_tooltip(self.exit_button, "Close the application")
+
+    ###########################################################################
+    ###             InventoryAppDisplay -> _attach_tooltip()                ###
+    ###########################################################################
+    def _attach_tooltip(self, widget, text: str):
+        """
+        Attaches a hover tooltip to a widget, styled with the active theme/font,
+        and tracks it so it can be restyled when the theme or font changes.
+
+        Args:
+            widget (tk.Widget): The widget that shows the tooltip when hovered
+            text (str): The informational text to display on hover
+        """
+
+        self.tooltips.append(
+            Tooltip(
+                widget=widget,
+                text=text,
+                theme=self.current_theme,
+                font_family=self.current_font_family,
+                font_size=self.current_font_size,
+            )
+        )
+
+    ###########################################################################
+    ###            InventoryAppDisplay -> _refresh_tooltips()               ###
+    ###########################################################################
+    def _refresh_tooltips(self):
+        """
+        Restyles every attached tooltip with the current theme and font so the
+        tooltips stay consistent after a theme or font change.
+        """
+
+        for tooltip in self.tooltips:
+            tooltip.update_style(
+                self.current_theme,
+                self.current_font_family,
+                self.current_font_size,
+            )
+
     ###########################################################################
     ###            InventoryAppDisplay -> _build_checkbox_grid()             ###
     ###########################################################################
@@ -491,6 +546,7 @@ class InventoryAppDisplay(tk.Tk):
             checkbutton = self._build_checkbutton(parent, column)
             checkbutton.grid(row=row, column=position, sticky="w", padx=6, pady=2)
             self.column_checkbuttons[column.key] = checkbutton
+            self._attach_tooltip(checkbutton, column.tooltip)
 
             position += 1
             if position == per_row:
@@ -892,6 +948,9 @@ class InventoryAppDisplay(tk.Tk):
             bg=theme.bg_entry, fg=theme.fg_text, insertbackground=theme.fg_text
         )
 
+        # Keep the hover tooltips consistent with the new theme
+        self._refresh_tooltips()
+
         # Persist the choice so it is restored on the next launch. The theme's name
         # is stored rather than the theme itself, since settings hold only text.
         self.save_settings_callback(SETTING_KEY_THEME, theme.name)
@@ -954,3 +1013,7 @@ class InventoryAppDisplay(tk.Tk):
         checkbutton_font = (self.current_font_family, self.current_font_size)
         for checkbutton in self.column_checkbuttons.values():
             checkbutton.configure(font=checkbutton_font)
+
+        # Keep the hover tooltips consistent with the new font. Both font settings
+        # route through here, so this covers a family change and a size change.
+        self._refresh_tooltips()

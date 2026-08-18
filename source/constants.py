@@ -9,7 +9,7 @@ APP_NAME = "Fishbowl Inventory Tool"
 VERSION = "2.1.0"
 
 # GitHub repository ("owner/name") this app releases from. Passed to the shared
-# UpdateChecker so it knows which repo's releases to compare VERSION against.
+# UpdateCoordinator so it knows which repo's releases to compare VERSION against.
 GITHUB_REPO = "averylhammond/FishbowlInventoryTool"
 
 # Base directories. The specific file paths below are composed from these.

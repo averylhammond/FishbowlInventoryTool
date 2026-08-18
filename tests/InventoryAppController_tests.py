@@ -107,6 +107,21 @@ def test_init_does_not_open_the_settings_database(controller):
     assert controller.controller.settings_repository is None
 
 
+def test_init_does_not_build_the_update_coordinator(controller):
+    """
+    Tests that constructing the controller builds no update coordinator. It
+    reports through the display, which does not exist yet, and headless mode must
+    perform no network I/O, so it is not built until the GUI branch of
+    start_application() is reached.
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    assert controller.controller.update_coordinator is None
+
+
 ###############################################################################
 ###           Tests InventoryAppController -> start_application()           ###
 ###############################################################################
@@ -124,7 +139,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch.object(controller.controller, "_start_update_check"),
+        patch("source.InventoryAppController.UpdateCoordinator"),
     ):
         mock_settings_cls.return_value.get_all_settings.return_value = {
             "theme": "Ocean"
@@ -157,7 +172,7 @@ def test_start_application_loads_the_persisted_settings(controller):
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch.object(controller.controller, "_start_update_check"),
+        patch("source.InventoryAppController.UpdateCoordinator"),
     ):
         controller.controller.start_application()
 
@@ -178,7 +193,7 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository"),
-        patch.object(controller.controller, "_start_update_check"),
+        patch("source.InventoryAppController.UpdateCoordinator"),
     ):
         controller.controller.start_application()
 
@@ -200,7 +215,7 @@ def test_start_application_wires_the_gui_popup_into_the_settings_repository(cont
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch.object(controller.controller, "_start_update_check"),
+        patch("source.InventoryAppController.UpdateCoordinator"),
     ):
         controller.controller.start_application()
 
@@ -222,13 +237,20 @@ def test_start_application_starts_a_background_update_check(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
+        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository"),
-        patch.object(controller.controller, "_start_update_check") as mock_check,
+        patch(
+            "source.InventoryAppController.UpdateCoordinator"
+        ) as mock_coordinator_cls,
     ):
         controller.controller.start_application()
 
-    mock_check.assert_called_once_with()
+    mock_coordinator_cls.assert_called_once_with(
+        current_version=VERSION,
+        repo=GITHUB_REPO,
+        display=mock_display_cls.return_value,
+    )
+    mock_coordinator_cls.return_value.start.assert_called_once_with()
 
 
 def test_start_application_in_integration_test_mode_never_builds_the_gui(controller):
@@ -251,16 +273,19 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
         ) as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch.object(controller.controller, "run_integration_test") as mock_headless,
-        patch.object(controller.controller, "_start_update_check") as mock_check,
+        patch(
+            "source.InventoryAppController.UpdateCoordinator"
+        ) as mock_coordinator_cls,
     ):
         controller.controller.start_application()
 
     mock_headless.assert_called_once_with()
     mock_display_cls.assert_not_called()
     mock_settings_cls.assert_not_called()
-    mock_check.assert_not_called()
+    mock_coordinator_cls.assert_not_called()
     assert controller.controller.display is None
     assert controller.controller.settings_repository is None
+    assert controller.controller.update_coordinator is None
 
 
 ###############################################################################
@@ -369,189 +394,20 @@ def test_handle_save_setting_delegates_to_the_settings_repository(controller):
 
 
 ###############################################################################
-###         Tests InventoryAppController -> _start_update_check()           ###
-###############################################################################
-def test_start_update_check_spawns_a_daemon_worker_thread(controller):
-    """
-    Tests that the startup check runs on a background daemon thread, so the GUI
-    never blocks on the GitHub API and a stalled request cannot delay shutdown
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    with patch("source.InventoryAppController.threading.Thread") as mock_thread_cls:
-        controller.controller._start_update_check()
-
-    mock_thread_cls.assert_called_once_with(
-        target=controller.controller._run_update_check, args=(False,), daemon=True
-    )
-    mock_thread_cls.return_value.start.assert_called_once_with()
-
-
-def test_start_update_check_passes_the_manual_flag_to_the_worker(controller):
-    """
-    Tests that a manually triggered check hands the manual flag to the worker, which
-    is what makes an up-to-date or failed check report back to the user
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    with patch("source.InventoryAppController.threading.Thread") as mock_thread_cls:
-        controller.controller._start_update_check(manual=True)
-
-    mock_thread_cls.assert_called_once_with(
-        target=controller.controller._run_update_check, args=(True,), daemon=True
-    )
-
-
-###############################################################################
-###          Tests InventoryAppController -> _run_update_check()            ###
-###############################################################################
-def test_run_update_check_schedules_the_result_on_the_gui_thread(controller):
-    """
-    Tests that the worker checks this application's own releases and hands the
-    outcome back through display.after(), so the GUI is only ever touched from the
-    tkinter main thread
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-
-    with patch("source.InventoryAppController.UpdateChecker") as mock_checker_cls:
-        mock_result = mock_checker_cls.return_value.check_for_update.return_value
-        controller.controller._run_update_check(manual=True)
-
-    mock_checker_cls.assert_called_once_with(
-        current_version=VERSION, repo=GITHUB_REPO
-    )
-    controller.controller.display.after.assert_called_once_with(
-        0, controller.controller._handle_update_result, mock_result, True
-    )
-
-
-###############################################################################
-###         Tests InventoryAppController -> _handle_update_result()         ###
-###############################################################################
-def test_handle_update_result_shows_the_update_window_when_newer(controller):
-    """
-    Tests that a strictly newer release always opens the update window, whether the
-    check was manual or the silent one run on startup
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-    result = SimpleNamespace(update_available=True)
-
-    controller.controller._handle_update_result(result)
-
-    controller.controller.display.show_update_available.assert_called_once_with(result)
-    controller.controller.display.show_popup.assert_not_called()
-
-
-def test_handle_update_result_stays_silent_when_up_to_date_on_startup(controller):
-    """
-    Tests that the startup check says nothing when the app is already current, so
-    the user is never interrupted on launch
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-
-    controller.controller._handle_update_result(SimpleNamespace(update_available=False))
-
-    controller.controller.display.show_update_available.assert_not_called()
-    controller.controller.display.show_popup.assert_not_called()
-
-
-def test_handle_update_result_stays_silent_when_the_startup_check_fails(controller):
-    """
-    Tests that a failed startup check (no result at all) is swallowed, so being
-    offline never greets the user with an error popup
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-
-    controller.controller._handle_update_result(None)
-
-    controller.controller.display.show_update_available.assert_not_called()
-    controller.controller.display.show_popup.assert_not_called()
-
-
-def test_handle_update_result_reports_up_to_date_on_a_manual_check(controller):
-    """
-    Tests that a manual check confirms the app is current, so a deliberate action
-    always produces an outcome
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-
-    controller.controller._handle_update_result(
-        SimpleNamespace(update_available=False), manual=True
-    )
-
-    controller.controller.display.show_popup.assert_called_once()
-    assert (
-        controller.controller.display.show_popup.call_args.args[0]
-        == "No Updates Available"
-    )
-
-
-def test_handle_update_result_reports_failure_on_a_manual_check(controller):
-    """
-    Tests that a manual check that could not reach GitHub tells the user so, rather
-    than appearing to do nothing
-
-    Args:
-        controller (pytest.fixture): Test fixture building the controller with all
-            of its collaborators mocked
-    """
-
-    controller.controller.display = MagicMock()
-
-    controller.controller._handle_update_result(None, manual=True)
-
-    controller.controller.display.show_popup.assert_called_once()
-    assert (
-        controller.controller.display.show_popup.call_args.args[0]
-        == "Update Check Failed"
-    )
-
-
-###############################################################################
 ###        Tests InventoryAppController -> handle_check_for_updates()       ###
 ###############################################################################
 def test_handle_check_for_updates_starts_a_manual_check(controller):
     """
-    Tests that the Help menu's callback reuses the background check pipeline and
-    flags it as manual, so the user always gets feedback
+    Tests that the Help menu's callback runs the check through the shared
+    coordinator and flags it as manual, so the user always gets feedback
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
             of its collaborators mocked
     """
 
-    with patch.object(controller.controller, "_start_update_check") as mock_check:
-        controller.controller.handle_check_for_updates()
+    controller.controller.update_coordinator = MagicMock()
 
-    mock_check.assert_called_once_with(manual=True)
+    controller.controller.handle_check_for_updates()
+
+    controller.controller.update_coordinator.start.assert_called_once_with(manual=True)

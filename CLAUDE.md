@@ -42,6 +42,11 @@ focused, single-responsibility classes.
   injection, which is why `UpdateChecker` is handed `VERSION` and `GITHUB_REPO`, and
   `SettingsRepository` its `db_path`, rather than importing them. `SettingsRepository` is
   covered by its own tests in that package, so this repo tests only the wiring around it.
+  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.0.1`), which
+  adds the package's GUI half — the themed subwindows, the tooltip and the styling data
+  this app shares with the sibling. The extra installs no additional requirements (its only
+  dependency is tkinter, which ships with CPython); it marks intent, since the top-level
+  `fishbowl_common` stays importable with no tkinter present.
 
 ## Common Commands
 
@@ -111,8 +116,8 @@ records a main-branch baseline for PR diffs; without it the badge never updates.
 **Every measured module is at 100%**, so the 90% gate is headroom for an in-progress
 refactor rather than a target to climb toward, and it matches the gate the sibling uses.
 Keep it there: a new module landing untested should fail the check, not quietly lower the
-average. `source/gui/color_theme.py` and `source/gui/font_settings.py` are omitted from
-measurement (see `.coveragerc`) because they are inert data with no behavior to test.
+average. Nothing is omitted for being untestable: the inert styling data that used to be
+excluded now lives upstream in `fishbowl_common.gui` (see `.coveragerc`).
 
 This workflow pins `actions/setup-python@v5` with pip caching while `unit-tests.yml` still
 uses `@v4` and no cache — a deliberate mirror of the sibling's file rather than an oversight.
@@ -264,7 +269,10 @@ data classes + spreadsheet writer**.
     `PdfTableParser`, and map the resulting rows onto `InventoryEntry` / `TurnoverEntry`
     objects. Every page is parsed before any entry is built, because a row's part or
     description can wrap from the bottom of one page onto the top of the next.
-- **`source/gui/`** — the GUI subpackage, the only place tkinter appears.
+- **`source/gui/`** — the GUI subpackage. It holds exactly one class: this app's own
+  `InventoryAppDisplay`. Every themed subwindow, the tooltip and the styling data it uses
+  come from `fishbowl_common.gui` (see the bullet below), so this is the only module in the
+  repo that imports tkinter directly.
   - **`InventoryAppDisplay`** (`source/gui/InventoryAppDisplay.py`) — a `tk.Tk` subclass
     that takes every dependency as a constructor argument (`process_callback`,
     `read_file_callback`, `check_for_updates_callback`, `save_settings_callback`, `title`,
@@ -297,7 +305,8 @@ data classes + spreadsheet writer**.
       out to the OS's file explorer); **Preferences** (Theme/Font/Font Size submenus built by
       looping `ALL_THEMES`/`FONT_FAMILIES`/`FONT_SIZES`, each `command` a
       `lambda x=option: self.apply_x(x)` to avoid a late-binding closure bug); **Help**
-      (About opens `AboutWindow` with `VERSION` from `constants.py`; Check for Updates just
+      (About opens `AboutWindow` with `APP_NAME` and `VERSION` from `constants.py` — the
+      shared window is application-agnostic and takes both by injection; Check for Updates just
       calls `check_for_updates_callback` — the display never touches the network itself, and
       the controller reports the outcome back through `show_update_available()`/`show_popup()`).
     - **`apply_theme()`** / **`apply_font_family()`** / **`apply_font_size()`** /
@@ -320,47 +329,51 @@ data classes + spreadsheet writer**.
       and `UpdateWindow`'s `close_app_callback` all route through it, so the geometry is saved
       whichever way the user leaves. Geometry is saved on exit rather than on `<Configure>` so
       a window drag does not write to the database on every frame.
-  - **`ThemedSubwindow`** / **`MessageWindow`** / **`AboutWindow`** / **`FileEditorWindow`** /
-    **`UpdateWindow`** — ported verbatim from the sibling: `ThemedSubwindow` is a `tk.Toplevel` base that
-    snapshots the active theme/font and centers over its parent; `MessageWindow` is the
-    themed OK-button popup `show_popup()` builds; `AboutWindow` shows the app name (hardcoded
-    as "Fishbowl Inventory Tool", since the sibling has no reusable app-name constant either)
-    and `VERSION`; `FileEditorWindow` shows a file's text in a monospace box, with an
-    `editable` flag toggling a Save button — this app only ever opens it with
-    `editable=False` (there are no editable config files here), but the class itself needed
-    no adaptation. `UpdateWindow` announces a newer release: its "Exit and Update" button
-    `webbrowser.open()`s the release page, then closes the **whole application** after
-    `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` (the display's `handle_exit`).
-    The app must exit because Windows file-locks the running executable, so an installer that
-    finds it open hangs trying to close it; the delay lets the browser surface first, and a
-    `_closing` flag keeps repeat clicks from stacking timers. Unlike the sibling's copy this
-    one has **no `integration_test_mode` guard** on `show_update_available()` — this display
-    holds no argument provider and is never constructed headless, the same reason
-    `show_popup()` has no guard either.
-  - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
-    sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
-    consistent; they are omitted from coverage for the same reason.
-  - **`Tooltip`** (`source/gui/Tooltip.py`) — ported verbatim from the sibling, and
-    application-agnostic: it takes the widget, the text and the styling by argument and
-    imports nothing but `tkinter` and `Theme`. It binds `<Enter>`/`<Leave>`/`<ButtonPress>`
-    on the target widget and shows a borderless `Toplevel` after `SHOW_DELAY_MS` (500ms),
-    so a pointer merely crossing a widget never flashes a tip. **The bindings use
-    `add="+"`, which is load-bearing here in a way it is not in the sibling:** the column
-    checkbuttons already carry their own `command`, and a binding without `add="+"` would
-    replace it, silently breaking the checkbox that persists a column's state.
-    `update_style()` re-styles a tooltip in place, hiding any tip currently shown so it is
-    rebuilt rather than left half-applied.
+  - **`fishbowl_common.gui`** — the shared GUI half of the `fishbowl-common` package, and
+    the source of every themed window this app opens: `ThemedSubwindow` (a `tk.Toplevel`
+    base that snapshots the active theme/font and centers over its parent), `MessageWindow`
+    (the themed OK-button popup `show_popup()` builds), `AboutWindow`, `FileEditorWindow`,
+    `UpdateWindow` and `Tooltip`, plus the styling data (`Theme`, `RED`, `ALL_THEMES`,
+    `THEME_BY_NAME`, `FONT_FAMILIES`, `FONT_SIZES`, …). All of it is re-exported from that
+    one name, so `InventoryAppDisplay` imports from `fishbowl_common.gui` rather than the
+    individual modules. These lived in `source/gui/` until they were consolidated upstream;
+    **do not re-add a local copy** — fix or extend them in `fishbowl-common` and bump the
+    pin. Their unit tests live upstream in `fishbowl-common/tests/gui/` and deliberately
+    have **no counterpart here**; this repo tests only its own display and the wiring
+    around the shared classes.
+    - It is a **separate import** from the top-level `fishbowl_common`, which stays
+      tkinter-free so a headless run never loads tkinter. That split is what the `[gui]`
+      extra in the `requirements/release.txt` pin marks.
+    - `AboutWindow` takes both the name and the version it displays by injection, which is
+      why `APP_NAME` lives in `source/constants.py` alongside `VERSION`.
+    - `FileEditorWindow`'s `editable` flag toggles a Save button; this app only ever opens
+      it with `editable=False`, since there are no editable config files here.
+    - `UpdateWindow` announces a newer release: its "Exit and Update" button
+      `webbrowser.open()`s the release page, then closes the **whole application** after
+      `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` — the display's
+      `handle_exit`. The app must exit because Windows file-locks the running executable, so
+      an installer that finds it open hangs trying to close it.
+    - Unlike the sibling's display, this one puts **no `integration_test_mode` guard** on
+      `show_update_available()` — it holds no argument provider and is never constructed
+      headless, the same reason `show_popup()` has no guard either.
+    - `Tooltip` binds `<Enter>`/`<Leave>`/`<ButtonPress>` on its target widget and shows a
+      borderless `Toplevel` after `SHOW_DELAY_MS` (500ms), so a pointer merely crossing a
+      widget never flashes a tip. **Those bindings use `add="+"`, which is load-bearing
+      here in a way it is not in the sibling:** the column checkbuttons already carry their
+      own `command`, and a binding without `add="+"` would replace it, silently breaking the
+      checkbox that persists a column's state. Anyone changing `Tooltip` upstream must keep
+      that flag.
 
-    The display attaches them through **`_attach_tooltip(widget, text)`**, which tracks
-    each one in `self.tooltips` — initialized in `__init__` **before** `build_widgets()`,
-    since the grid builder attaches as it goes. Two groups get tooltips: the three action
-    buttons, attached at the end of `build_widgets()` as the sibling does, and **every
-    column checkbutton**, attached in `_build_checkbox_grid()` from that column's own
-    `Column.tooltip`. The checkbox group has no sibling analog and is the reason the
-    feature is worth more here than there — the checkbox labels are Fishbowl report jargon
-    (`Not Available`, `Avg TO Days`, `TO Rate`). A column marked `always` has no
-    checkbutton, so its tooltip text is never shown; it carries one anyway so the
-    every-column-has-hover-text invariant survives an `always` flag being dropped later.
+      The display attaches its tooltips through **`_attach_tooltip(widget, text)`**, which
+      tracks each one in `self.tooltips` — initialized in `__init__` **before** `build_widgets()`,
+      since the grid builder attaches as it goes. Two groups get tooltips: the three action
+      buttons, attached at the end of `build_widgets()` as the sibling does, and **every
+      column checkbutton**, attached in `_build_checkbox_grid()` from that column's own
+      `Column.tooltip`. The checkbox group has no sibling analog and is the reason the
+      feature is worth more here than there — the checkbox labels are Fishbowl report jargon
+      (`Not Available`, `Avg TO Days`, `TO Rate`). A column marked `always` has no
+      checkbutton, so its tooltip text is never shown; it carries one anyway so the
+      every-column-has-hover-text invariant survives an `always` flag being dropped later.
 - **`columns.py`** (`source/columns.py`) — the single source of truth for the (column key,
   GUI label, section, hover text) record: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
   `TURNOVER_COLUMNS`, `ALL_COLUMNS`, `COLUMN_KEYS` and `all_columns_selected()`. The tuple
@@ -592,21 +605,11 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     submenu tests invoke every `command` in a loop, so those tests absorb 4 + 10 + 14 writes
     into the same mock — assert with `assert_any_call` there, and reserve
     `assert_called_once_with` for the tests that exercise a single `apply_*` call.
-- `tests/Tooltip_tests.py` — ported verbatim with the class. Its fixture builds the
-  Tooltip against a plain `MagicMock` widget rather than a patched tkinter one, which is
-  enough because `__init__` only binds handlers — no window exists until a hover. The mock
-  widget reports `winfo_rootx=100` / `winfo_rooty=200` / `winfo_height=30`, which is what
-  makes the `geometry("+120+235")` assertion check the positioning arithmetic rather than
-  just that `geometry()` was called; `tk.Toplevel` and `tk.Label` are patched at
-  `source.gui.Tooltip.<name>`.
-- `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` /
-  `tests/UpdateWindow_tests.py` — themed subwindows, following
-  `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper
-  neutralizing `tk.Toplevel.__init__` and `title`/`configure`/`_center_over_parent`, with
-  every widget class patched at its point of use. `UpdateWindow_tests.py` additionally
-  assigns `window.after = MagicMock()` before exercising `_open_release_page()`, since a
-  window built this way has no Tcl interpreter to schedule against, and patches
-  `source.gui.UpdateWindow.webbrowser.open` so no browser is launched.
+- **There are no tests here for the shared GUI classes.** `ThemedSubwindow`,
+  `MessageWindow`, `AboutWindow`, `FileEditorWindow`, `UpdateWindow` and `Tooltip` are
+  covered upstream in `fishbowl-common/tests/gui/`; this repo tests only its own display
+  and the wiring around them. Do not re-add a local test file for one — a gap in their
+  coverage is a change to make in that repo.
 - `tests/InventoryAppController_tests.py` — the wiring, with `ArgumentProvider`,
   `InventoryAppFileIO` and `InventoryProcessor` patched at
   `source.InventoryAppController.<name>` as usual. Because the processor is mocked there,
@@ -688,8 +691,8 @@ touch the real filesystem, a real PDF, or the GUI.
   `from source.InventoryAppFileIO import *` resolve. There is deliberately no `conftest.py`
   and no pytest config file.
 - `.coveragerc` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
-  `tests/`, the virtualenv, and the two inert GUI data modules (`source/gui/color_theme.py`,
-  `source/gui/font_settings.py`).
+  `tests/`, the virtualenv and the empty `__init__.py` files. Nothing else is omitted: the
+  inert styling data that used to be excluded now lives upstream in `fishbowl_common.gui`.
 - Group tests under the `###`-bordered banners used throughout the file, and give each test
   a docstring describing what it verifies with an `Args:` block documenting every
   mock/fixture parameter.

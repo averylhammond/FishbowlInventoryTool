@@ -5,6 +5,7 @@ from unittest.mock import DEFAULT, patch, MagicMock
 
 from source.columns import ALL_COLUMNS, COLUMN_KEYS
 from source.constants import (
+    APP_NAME,
     INVENTORY_DIR,
     OUTPUT_DIR,
     RESULTS_FILE,
@@ -12,12 +13,15 @@ from source.constants import (
     VERSION,
 )
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
-from source.gui.color_theme import ALL_THEMES, DARK, FOREST, LIGHT
-from source.gui.font_settings import (
+from fishbowl_common.gui import (
+    ALL_THEMES,
+    DARK,
     DEFAULT_FONT_FAMILY,
     DEFAULT_FONT_SIZE,
     FONT_FAMILIES,
     FONT_SIZES,
+    FOREST,
+    LIGHT,
 )
 
 
@@ -1297,8 +1301,9 @@ def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
 ###############################################################################
 def test_handle_about_opens_the_about_window(display):
     """
-    Tests that "About" opens the About window showing the current application
-    version, styled with the active theme/font
+    Tests that "About" opens the About window showing this application's name
+    and current version, styled with the active theme/font. The shared
+    AboutWindow is application-agnostic, so both are injected.
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -1310,6 +1315,7 @@ def test_handle_about_opens_the_about_window(display):
     display.about_window_cls.assert_called_once_with(
         parent=display.display,
         title="About",
+        app_name=APP_NAME,
         version=VERSION,
         theme=display.display.current_theme,
         font_family=display.display.current_font_family,

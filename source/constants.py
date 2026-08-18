@@ -1,5 +1,9 @@
 from pathlib import Path
 
+# Display name of this application. Passed to the shared AboutWindow, which is
+# application-agnostic and takes the name it shows by injection.
+APP_NAME = "Fishbowl Inventory Tool"
+
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
 VERSION = "2.1.0"

@@ -8,5 +8,3 @@ omit =
     ./source/__init__.py
     ./source/constants.py
     ./source/gui/__init__.py
-    ./source/gui/color_theme.py
-    ./source/gui/font_settings.py

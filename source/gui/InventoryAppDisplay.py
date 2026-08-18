@@ -6,6 +6,7 @@ from typing import Callable
 
 from source.columns import ALL_COLUMNS, INVENTORY_COLUMNS, TURNOVER_COLUMNS, Column
 from source.constants import (
+    APP_NAME,
     INVENTORY_DIR,
     OUTPUT_DIR,
     RESULTS_FILE,
@@ -17,23 +18,21 @@ from source.constants import (
     TURNOVER_DIR,
     VERSION,
 )
-from source.gui.AboutWindow import AboutWindow
-from source.gui.FileEditorWindow import FileEditorWindow
-from source.gui.MessageWindow import MessageWindow
-from source.gui.Tooltip import Tooltip
-from source.gui.UpdateWindow import UpdateWindow
-from source.gui.color_theme import (
+from fishbowl_common.gui import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
-    RED,  # Used for the EXIT button
-    THEME_BY_NAME,  # Resolves a persisted theme name back to its Theme
-    Theme,
-)
-from source.gui.font_settings import (
     DEFAULT_FONT_FAMILY,
     DEFAULT_FONT_SIZE,
     FONT_FAMILIES,
     FONT_SIZES,
+    RED,  # Used for the EXIT button
+    THEME_BY_NAME,  # Resolves a persisted theme name back to its Theme
+    AboutWindow,
+    FileEditorWindow,
+    MessageWindow,
+    Theme,
+    Tooltip,
+    UpdateWindow,
 )
 
 # Number of checkboxes placed per row in each of the two column-selection grids
@@ -868,6 +867,7 @@ class InventoryAppDisplay(tk.Tk):
         AboutWindow(
             parent=self,
             title="About",
+            app_name=APP_NAME,
             version=VERSION,
             theme=self.current_theme,
             font_family=self.current_font_family,

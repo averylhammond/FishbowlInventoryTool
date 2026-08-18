@@ -4,7 +4,13 @@ from types import SimpleNamespace
 from unittest.mock import DEFAULT, patch, MagicMock
 
 from source.columns import ALL_COLUMNS, COLUMN_KEYS
-from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR, VERSION
+from source.constants import (
+    INVENTORY_DIR,
+    OUTPUT_DIR,
+    RESULTS_FILE,
+    TURNOVER_DIR,
+    VERSION,
+)
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
 from source.gui.color_theme import ALL_THEMES, DARK, FOREST, LIGHT
 from source.gui.font_settings import (
@@ -722,8 +728,8 @@ def test_build_widgets_wires_the_file_menu(display):
 
 def test_build_widgets_wires_the_view_menu(display):
     """
-    Tests that the View menu offers Results Log, Inventories, and Turnover
-    Reports, each wired to its handler
+    Tests that the View menu offers Results Log, Inventories, Turnover Reports
+    and Spreadsheets, each wired to its handler
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -742,6 +748,10 @@ def test_build_widgets_wires_the_view_menu(display):
     assert calls[2].kwargs == {
         "label": "Turnover Reports",
         "command": display.display.handle_open_turnover_reports,
+    }
+    assert calls[3].kwargs == {
+        "label": "Spreadsheets",
+        "command": display.display.handle_open_spreadsheets,
     }
 
 
@@ -1216,7 +1226,7 @@ def test_handle_results_log_shows_an_error_when_missing(display):
 
 
 ###############################################################################
-###     Tests InventoryAppDisplay -> handle_open_inventories()/(turnover)   ###
+###  Tests InventoryAppDisplay -> handle_open_inventories()/(turnover/xlsx) ###
 ###############################################################################
 def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(display):
     """
@@ -1258,6 +1268,28 @@ def test_handle_open_turnover_reports_opens_a_dialog_rooted_at_the_turnover_dir(
     dialog_kwargs = mock_dialog.call_args.kwargs
     assert dialog_kwargs["initialdir"] == str(TURNOVER_DIR)
     assert dialog_kwargs["filetypes"] == [("PDF files", "*.pdf")]
+
+
+def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
+    display,
+):
+    """
+    Tests that "Spreadsheets" opens a browse-only file dialog rooted at the
+    directory the generated spreadsheets are written to, filtered to .xlsx files
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch(
+        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
+    ) as mock_dialog:
+        display.display.handle_open_spreadsheets()
+
+    dialog_kwargs = mock_dialog.call_args.kwargs
+    assert dialog_kwargs["initialdir"] == str(OUTPUT_DIR)
+    assert dialog_kwargs["filetypes"] == [("Excel files", "*.xlsx")]
 
 
 ###############################################################################

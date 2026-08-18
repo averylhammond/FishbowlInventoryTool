@@ -7,6 +7,7 @@ from typing import Callable
 from source.columns import ALL_COLUMNS, INVENTORY_COLUMNS, TURNOVER_COLUMNS, Column
 from source.constants import (
     INVENTORY_DIR,
+    OUTPUT_DIR,
     RESULTS_FILE,
     SETTING_KEY_COLUMN_PREFIX,
     SETTING_KEY_FONT_FAMILY,
@@ -289,6 +290,7 @@ class InventoryAppDisplay(tk.Tk):
         #  -> Results Log option to view the results log file
         #  -> Inventories option to browse the inventory availability PDFs
         #  -> Turnover Reports option to browse the turnover report PDFs
+        #  -> Spreadsheets option to browse the generated .xlsx reports
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.view_menu.add_command(
             label="Results Log", command=self.handle_results_log
@@ -298,6 +300,9 @@ class InventoryAppDisplay(tk.Tk):
         )
         self.view_menu.add_command(
             label="Turnover Reports", command=self.handle_open_turnover_reports
+        )
+        self.view_menu.add_command(
+            label="Spreadsheets", command=self.handle_open_spreadsheets
         )
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
@@ -833,6 +838,22 @@ class InventoryAppDisplay(tk.Tk):
             initialdir=str(TURNOVER_DIR),
             title="Turnover Reports",
             filetypes=[("PDF files", "*.pdf")],
+        )
+
+    ###########################################################################
+    ###          InventoryAppDisplay -> handle_open_spreadsheets()          ###
+    ###########################################################################
+    def handle_open_spreadsheets(self):
+        """
+        On "Spreadsheets" menu press, opens a file dialog rooted at the
+        directory the generated spreadsheets are written to so the user can
+        browse its contents
+        """
+
+        filedialog.askopenfilename(
+            initialdir=str(OUTPUT_DIR),
+            title="Spreadsheets",
+            filetypes=[("Excel files", "*.xlsx")],
         )
 
     ###########################################################################

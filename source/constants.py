@@ -12,6 +12,10 @@ GITHUB_REPO = "averylhammond/FishbowlInventoryTool"
 INVENTORY_DIR = Path("InventoryAvailability")
 TURNOVER_DIR = Path("TurnoverReports")
 
+# Directory the generated .xlsx reports are written to. The application root
+# (i.e. the executable's CWD), so a finished spreadsheet sits next to the app.
+OUTPUT_DIR = Path(".")
+
 # Logs directory containing the results file with application output
 LOGS_DIR = Path("logs")
 RESULTS_FILE = LOGS_DIR / "results.txt"

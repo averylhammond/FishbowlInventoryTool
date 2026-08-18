@@ -290,8 +290,9 @@ data classes + spreadsheet writer**.
       matching the sibling): **File** (Open/Clear/Exit — Exit calls `self.handle_exit`, not
       `self.quit`, to match the Exit button's own convention); **View** (Results Log opens
       `RESULTS_FILE` in a read-only `FileEditorWindow` via `_open_readonly_file_viewer()`,
-      or a "File Not Found" popup if it doesn't exist yet; Inventories/Turnover Reports open
-      a browse-only `filedialog.askopenfilename` rooted at `INVENTORY_DIR`/`TURNOVER_DIR`,
+      or a "File Not Found" popup if it doesn't exist yet; Inventories/Turnover Reports/
+      Spreadsheets open a browse-only `filedialog.askopenfilename` rooted at
+      `INVENTORY_DIR`/`TURNOVER_DIR`/`OUTPUT_DIR` and filtered to that folder's file type,
       reusing the same dialog mechanism as the top-level Browse button rather than shelling
       out to the OS's file explorer); **Preferences** (Theme/Font/Font Size submenus built by
       looping `ALL_THEMES`/`FONT_FAMILIES`/`FONT_SIZES`, each `command` a
@@ -384,8 +385,8 @@ data classes + spreadsheet writer**.
   display's View menu to populate its read-only file viewer), lists the inventory
   availability PDFs (`list_inventory_files()`, used by headless mode) and the turnover
   report PDFs (`list_turnover_files()`) as full `Path`s ready to read, and owns the
-  output spreadsheet lifecycle — opening (`create_workbook()`) and saving
-  (`save_workbook()`) the `xlsxwriter` workbook. It also owns the results log at
+  output spreadsheet lifecycle — opening (`create_workbook()`, which places the workbook
+  under `OUTPUT_DIR`) and saving (`save_workbook()`) the `xlsxwriter` workbook. It also owns the results log at
   `logs/results.txt` — `reset_results_file()` **deletes** it on startup (rather than
   truncating it to empty) so a fresh app launch has no results file at all until
   something is actually processed, and `write_to_results_file()` (opening in append mode,
@@ -406,8 +407,10 @@ data classes + spreadsheet writer**.
   surfaced via Help -> About and compared against the latest release by the update check;
   `GITHUB_REPO`, the `"owner/name"` string naming the repo whose releases that check reads;
   plus relative `Path` constants for the input directories
-  (`INVENTORY_DIR`, `TURNOVER_DIR`), the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`) and the
-  settings database (`DATA_DIR`, `SETTINGS_DB_PATH`),
+  (`INVENTORY_DIR`, `TURNOVER_DIR`), the generated spreadsheets (`OUTPUT_DIR`, the
+  application root — shared by `create_workbook()` and the display's View -> Spreadsheets
+  browser so the two cannot point at different folders), the diagnostics log (`LOGS_DIR`,
+  `RESULTS_FILE`) and the settings database (`DATA_DIR`, `SETTINGS_DB_PATH`),
   resolved against the executable's CWD (mirrors the sibling invoice tool's `constants.py`).
   It also holds the keys user settings are persisted under — `SETTING_KEY_THEME`,
   `SETTING_KEY_FONT_FAMILY`, `SETTING_KEY_FONT_SIZE`, `SETTING_KEY_GEOMETRY` and the

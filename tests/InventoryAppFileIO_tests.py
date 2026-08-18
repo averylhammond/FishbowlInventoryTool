@@ -506,26 +506,26 @@ def test_list_turnover_files_reports_and_returns_empty_on_error(
 ###             Tests InventoryAppFileIO -> create_workbook()               ###
 ###############################################################################
 @patch("source.InventoryAppFileIO.xlsxwriter.Workbook")
-@patch("source.InventoryAppFileIO.Path")
+@patch("source.InventoryAppFileIO.OUTPUT_DIR")
 def test_create_workbook_appends_xlsx_extension(
-    mock_path, mock_workbook, file_io
+    mock_output_dir, mock_workbook, file_io
 ):
     """
-    Tests that create_workbook() appends the .xlsx extension, ensures the output
-    directory exists, and returns the open workbook.
+    Tests that create_workbook() appends the .xlsx extension under the output
+    directory, ensures that directory exists, and returns the open workbook.
 
     Args:
-        mock_path (unittest.mock.MagicMock): Mocks the Path class
+        mock_output_dir (unittest.mock.MagicMock): Mocks the output directory Path
         mock_workbook (unittest.mock.MagicMock): Mocks xlsxwriter.Workbook
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # The output path is built from the caller's extensionless filename
-    output_path = mock_path.return_value
+    # The output path is the caller's extensionless filename under the output directory
+    output_path = mock_output_dir.__truediv__.return_value
 
     # The extension is appended, the directory is ensured, and the workbook opens
     assert file_io.create_workbook("01-01-2026") is mock_workbook.return_value
-    mock_path.assert_called_once_with("01-01-2026.xlsx")
+    mock_output_dir.__truediv__.assert_called_once_with("01-01-2026.xlsx")
     output_path.parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
     mock_workbook.assert_called_once_with(str(output_path))
     file_io.report_error.assert_not_called()

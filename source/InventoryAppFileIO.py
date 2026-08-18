@@ -3,7 +3,7 @@ import xlsxwriter
 from pathlib import Path
 from typing import Callable, Optional
 
-from source.constants import INVENTORY_DIR, RESULTS_FILE, TURNOVER_DIR
+from source.constants import INVENTORY_DIR, OUTPUT_DIR, RESULTS_FILE, TURNOVER_DIR
 
 
 # InventoryAppFileIO class to handle all file input/output operations
@@ -209,7 +209,7 @@ class InventoryAppFileIO:
                 be created (the failure is also surfaced via report_error)
         """
 
-        output_path = Path(filename + ".xlsx")
+        output_path = OUTPUT_DIR / (filename + ".xlsx")
 
         try:
             # Ensure the output directory exists before opening the workbook

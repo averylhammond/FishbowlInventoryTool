@@ -65,6 +65,25 @@ class _FakeBooleanVar:
         self._value = value
 
 
+def tooltip_texts_by_widget(display):
+    """
+    Maps each widget a tooltip was attached to onto the hover text it was given,
+    so an attachment can be asserted against the widget it belongs to
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+
+    Returns:
+        dict: A mapping of widget to the tooltip text attached to it
+    """
+
+    return {
+        made_call.kwargs["widget"]: made_call.kwargs["text"]
+        for made_call in display.tooltip_cls.call_args_list
+    }
+
+
 def button_call(display, text: str):
     """
     Finds the tk.Button construction call that created the button with the given
@@ -111,8 +130,8 @@ def display(request):
             mocked Tk methods (`title`, `geometry`, `resizable`, `configure`,
             `config`, `protocol`, `destroy`), the patched widget classes whose calls
             are asserted (`button_cls`, `checkbutton_cls`, `message_window_cls`,
-            `about_window_cls`, `file_editor_window_cls`, `update_window_cls`), and
-            the callbacks passed at construction (`process_callback`,
+            `about_window_cls`, `file_editor_window_cls`, `update_window_cls`,
+            `tooltip_cls`), and the callbacks passed at construction (`process_callback`,
             `read_file_callback`, `check_for_updates_callback`,
             `save_settings_callback`)
     """
@@ -163,6 +182,9 @@ def display(request):
             "source.gui.InventoryAppDisplay.FileEditorWindow"
         ) as mock_file_editor_window_cls,
         patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
+        patch(
+            "source.gui.InventoryAppDisplay.Tooltip", side_effect=_distinct_widget
+        ) as mock_tooltip_cls,
     ):
 
         # The geometry handle_exit() persists, in the format Tk reports it in
@@ -201,6 +223,7 @@ def display(request):
             about_window_cls=mock_about_window_cls,
             file_editor_window_cls=mock_file_editor_window_cls,
             update_window_cls=mock_update_window_cls,
+            tooltip_cls=mock_tooltip_cls,
             process_callback=process_callback,
             read_file_callback=read_file_callback,
             check_for_updates_callback=check_for_updates_callback,
@@ -825,6 +848,82 @@ def test_build_widgets_font_size_submenu_offers_every_size_and_applies_it(displa
         assert display.display.current_font_size == size
 
 
+def test_build_widgets_attaches_a_tooltip_to_every_button(display):
+    """
+    Tests that build_widgets gives each action button a non-empty hover tooltip
+    describing what it does
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    tooltip_texts = tooltip_texts_by_widget(display)
+
+    for button in (
+        display.display.browse_button,
+        display.display.process_inventory_button,
+        display.display.exit_button,
+    ):
+        assert tooltip_texts.get(button)
+
+
+def test_build_widgets_gives_each_checkbutton_its_own_columns_tooltip(display):
+    """
+    Tests that every column checkbutton is given the hover text of the column it
+    selects. Resolving each checkbutton back through column_checkbuttons is what
+    catches a tooltip attached to the wrong checkbox, which a "has some text"
+    assertion would pass right over.
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    tooltip_texts = tooltip_texts_by_widget(display)
+
+    for column in ALL_COLUMNS:
+
+        # A column that is always included has no checkbutton to hover
+        if column.always:
+            continue
+
+        checkbutton = display.display.column_checkbuttons[column.key]
+        assert tooltip_texts[checkbutton] == column.tooltip
+
+
+def test_build_widgets_tracks_every_tooltip_for_restyling(display):
+    """
+    Tests that every tooltip built is kept in the tooltips list, since that list
+    is the only handle apply_theme and _apply_font have to restyle them
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    # One per action button, plus one per column that has a checkbutton
+    selectable = [column for column in ALL_COLUMNS if not column.always]
+
+    assert len(display.display.tooltips) == 3 + len(selectable)
+
+
+def test_build_widgets_styles_the_tooltips_with_the_theme_and_font(display):
+    """
+    Tests that each tooltip is built with the display's active theme and font, so
+    a tooltip matches the rest of the application the first time it is shown
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    for made_call in display.tooltip_cls.call_args_list:
+        assert made_call.kwargs["theme"] is DARK
+        assert made_call.kwargs["font_family"] == DEFAULT_FONT_FAMILY
+        assert made_call.kwargs["font_size"] == DEFAULT_FONT_SIZE
+
+
 ###############################################################################
 ###           Tests InventoryAppDisplay -> handle_browse_button()           ###
 ###############################################################################
@@ -1270,6 +1369,12 @@ def test_apply_theme_updates_state_and_restyles_every_widget(display):
             selectcolor=FOREST.bg_entry,
         )
 
+    # The hover tooltips are restyled to the new theme
+    for tooltip in display.display.tooltips:
+        tooltip.update_style.assert_called_once_with(
+            FOREST, DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE
+        )
+
 
 def test_apply_theme_persists_the_choice(display):
     """
@@ -1353,6 +1458,10 @@ def test_apply_font_size_updates_state_and_restyles_every_widget(display):
         checkbutton.configure.assert_called_once_with(
             font=(DEFAULT_FONT_FAMILY, 20)
         )
+
+    # The hover tooltips are restyled to the new font
+    for tooltip in display.display.tooltips:
+        tooltip.update_style.assert_called_once_with(DARK, DEFAULT_FONT_FAMILY, 20)
 
 
 def test_apply_font_size_persists_the_choice_as_text(display):

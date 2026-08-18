@@ -304,10 +304,11 @@ data classes + spreadsheet writer**.
       widget the display owns, including every checkbutton in `column_checkbuttons` (the
       sibling has no checkbox grid, so this loop has no sibling analog). The first three
       persist the choice as their last statement; `_apply_font()` deliberately does not,
-      since it runs for both font settings and would write two keys per change. They do not
-      yet refresh tooltips — `Tooltip` is tracked separately and not built; when it lands,
-      slot a `_refresh_tooltips()` call into these same four methods rather than
-      restructuring them.
+      since it runs for both font settings and would write two keys per change. Two of them
+      also call **`_refresh_tooltips()`** so the hover tooltips follow the new styling:
+      `apply_theme()` and `_apply_font()`, and only those two. `apply_font_family()` and
+      `apply_font_size()` both route through `_apply_font()`, so a call there as well would
+      restyle every tooltip twice per change.
     - **`handle_column_toggled(key)`** persists one column's checkbox state, wired as each
       checkbutton's `command` with the key captured as a default argument (the same
       late-binding guard the Preferences lambdas use). Tk runs `command` after updating the
@@ -338,9 +339,29 @@ data classes + spreadsheet writer**.
   - **`color_theme.py`** / **`font_settings.py`** — inert styling data shared with the
     sibling. Keep them byte-identical to that repo's copies so the two apps stay visually
     consistent; they are omitted from coverage for the same reason.
-  - **Deliberately absent**, a follow-up: `Tooltip`.
+  - **`Tooltip`** (`source/gui/Tooltip.py`) — ported verbatim from the sibling, and
+    application-agnostic: it takes the widget, the text and the styling by argument and
+    imports nothing but `tkinter` and `Theme`. It binds `<Enter>`/`<Leave>`/`<ButtonPress>`
+    on the target widget and shows a borderless `Toplevel` after `SHOW_DELAY_MS` (500ms),
+    so a pointer merely crossing a widget never flashes a tip. **The bindings use
+    `add="+"`, which is load-bearing here in a way it is not in the sibling:** the column
+    checkbuttons already carry their own `command`, and a binding without `add="+"` would
+    replace it, silently breaking the checkbox that persists a column's state.
+    `update_style()` re-styles a tooltip in place, hiding any tip currently shown so it is
+    rebuilt rather than left half-applied.
+
+    The display attaches them through **`_attach_tooltip(widget, text)`**, which tracks
+    each one in `self.tooltips` — initialized in `__init__` **before** `build_widgets()`,
+    since the grid builder attaches as it goes. Two groups get tooltips: the three action
+    buttons, attached at the end of `build_widgets()` as the sibling does, and **every
+    column checkbutton**, attached in `_build_checkbox_grid()` from that column's own
+    `Column.tooltip`. The checkbox group has no sibling analog and is the reason the
+    feature is worth more here than there — the checkbox labels are Fishbowl report jargon
+    (`Not Available`, `Avg TO Days`, `TO Rate`). A column marked `always` has no
+    checkbutton, so its tooltip text is never shown; it carries one anyway so the
+    every-column-has-hover-text invariant survives an `always` flag being dropped later.
 - **`columns.py`** (`source/columns.py`) — the single source of truth for the (column key,
-  GUI label, section) triple: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
+  GUI label, section, hover text) record: a frozen `Column` dataclass plus `INVENTORY_COLUMNS`,
   `TURNOVER_COLUMNS`, `ALL_COLUMNS`, `COLUMN_KEYS` and `all_columns_selected()`. The tuple
   a `Column` lives in *is* its GUI section. It imports only `dataclasses`, which is what
   lets the headless path reach `all_columns_selected()` without loading tkinter.
@@ -537,11 +558,13 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   (`@pytest.mark.parametrize("display", [{"theme": FOREST}], indirect=True)`); persisted
   settings arrive the same way, as a `{"settings": {...}}` override.
   - **The inherited Tk methods are patched with one `patch.multiple(InventoryAppDisplay,
-    title=DEFAULT, ...)`, not one `patch.object` each, and that is required rather than
-    stylistic.** Python allows only twenty statically nested blocks and this fixture's `with`
-    statement is at that limit; a further `patch.object` raises `SyntaxError: too many
-    statically nested blocks` at collection time. The mocks come back as a dict
-    (`tk_methods["geometry"]`). Add new Tk-method patches inside that call.
+    title=DEFAULT, ...)`, not one `patch.object` each.** Python allows only twenty
+    statically nested blocks, and a `with` item is one; eight separate `patch.object`
+    calls would put this fixture within one item of the ceiling, where the next patch
+    anyone adds raises `SyntaxError: too many statically nested blocks` at collection
+    time. As written the block holds sixteen items, so there is room for four more —
+    verify with a trial `compile()` before assuming a new patch fits. The mocks come back
+    as a dict (`tk_methods["geometry"]`). Add new Tk-method patches inside that call.
   - **`tk.StringVar` and `tk.BooleanVar` are patched with the `_FakeStringVar` /
     `_FakeBooleanVar` stubs, not bare `MagicMock`s.** A tkinter variable cannot be built
     without a default root window, so the real classes raise "Too early to create variable";
@@ -554,11 +577,25 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     than just asserting the menu was built. The checkbutton `command`s are tested the same
     way, each resolved back to its column through the `variable` it was built with, so a
     late-binding regression fails rather than passing by coincidence.
+  - **`Tooltip` is patched at `source.gui.InventoryAppDisplay.Tooltip`** with the same
+    `_distinct_widget` side effect the widget classes use, so every attached tooltip is its
+    own assertable mock, and exposed on the fixture namespace as `tooltip_cls`. The
+    attachment tests read `call.kwargs["widget"]` / `["text"]`, so `_attach_tooltip()` must
+    keep passing those by keyword. The per-column test resolves each checkbutton back
+    through `column_checkbuttons[column.key]` before comparing text — a "every tooltip has
+    some text" assertion would pass even with every tip attached to the wrong checkbox.
   - `save_settings_callback` is a bare `MagicMock()`; `SettingsRepository` is never imported
     here, since the display only ever reaches it through that callback. The three Preferences
     submenu tests invoke every `command` in a loop, so those tests absorb 4 + 10 + 14 writes
     into the same mock — assert with `assert_any_call` there, and reserve
     `assert_called_once_with` for the tests that exercise a single `apply_*` call.
+- `tests/Tooltip_tests.py` — ported verbatim with the class. Its fixture builds the
+  Tooltip against a plain `MagicMock` widget rather than a patched tkinter one, which is
+  enough because `__init__` only binds handlers — no window exists until a hover. The mock
+  widget reports `winfo_rootx=100` / `winfo_rooty=200` / `winfo_height=30`, which is what
+  makes the `geometry("+120+235")` assertion check the positioning arithmetic rather than
+  just that `geometry()` was called; `tk.Toplevel` and `tk.Label` are patched at
+  `source.gui.Tooltip.<name>`.
 - `tests/AboutWindow_tests.py` / `tests/FileEditorWindow_tests.py` /
   `tests/UpdateWindow_tests.py` — themed subwindows, following
   `tests/MessageWindow_tests.py`'s pattern exactly: a `_build_window()` helper

@@ -88,6 +88,10 @@ Headless mode processes every PDF in `InventoryAvailability/` with all columns i
 and exits without opening a window. It is what CI uses to validate output without GUI
 interaction.
 
+Hovering a button or a column checkbox shows a short description of what it does, so the
+report's column names (`Not Available`, `Avg TO Days`, `TO Rate`) do not have to be
+memorized.
+
 The GUI checks GitHub for a newer release on launch, and on demand via **Help → Check for
 Updates**. When one exists, an *Update Available* window offers "Exit and Update", which
 opens the release page in your browser and closes the app so the downloaded installer can

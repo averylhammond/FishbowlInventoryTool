@@ -62,6 +62,17 @@ def test_every_column_has_a_label():
         assert column.label
 
 
+def test_every_column_has_a_tooltip():
+    """
+    Tests that every column carries non-empty hover text, since the display
+    attaches these straight to the checkboxes. A column added without one would
+    show an empty tooltip rather than no tooltip at all.
+    """
+
+    for column in ALL_COLUMNS:
+        assert column.tooltip
+
+
 def test_turnover_labels_drop_the_key_prefix():
     """
     Tests that the turnover columns show plain labels rather than their

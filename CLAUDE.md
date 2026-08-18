@@ -36,13 +36,15 @@ focused, single-responsibility classes.
   `release.txt` plus `pytest`/`pytest-cov`); `requirements/release.txt` alone is what the
   shipped app needs. `release.txt` pulls `fishbowl-common` (import name
   `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider`,
-  `SettingsRepository` and `UpdateChecker`; see the sibling `FishbowlInvoiceTool` for the
-  shared-package story. All three
+  `SettingsRepository`, `UpdateChecker` and `UpdateCoordinator`; see the sibling
+  `FishbowlInvoiceTool` for the shared-package story. All four
   classes are application-agnostic and take every app-specific value by constructor
-  injection, which is why `UpdateChecker` is handed `VERSION` and `GITHUB_REPO`, and
-  `SettingsRepository` its `db_path`, rather than importing them. `SettingsRepository` is
-  covered by its own tests in that package, so this repo tests only the wiring around it.
-  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.0.1`), which
+  injection, which is why `UpdateCoordinator` is handed `VERSION` and `GITHUB_REPO`, and
+  `SettingsRepository` its `db_path`, rather than importing them. `SettingsRepository` and
+  `UpdateCoordinator` are covered by their own tests in that package, so this repo tests
+  only the wiring around them — `UpdateChecker` is not imported here at all, since the
+  coordinator constructs it.
+  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.1.0`), which
   adds the package's GUI half — the themed subwindows, the tooltip and the styling data
   this app shares with the sibling. The extra installs no additional requirements (its only
   dependency is tkinter, which ships with CPython); it marks intent, since the top-level
@@ -197,10 +199,11 @@ data classes + spreadsheet writer**.
     `InventoryProcessor` and hands it that same file I/O instance (not a fresh one — the
     headless path reassigns `file_io.report_error`, which only reaches the object doing the
     reads if the two share one instance), constructs the shared `ArgumentProvider` (from the
-    `fishbowl-common` package) to detect headless mode, sets `self.display = None` and
-    `self.settings_repository = None`, and clears the results file (`reset_results_file()`)
-    so each run starts with a fresh diagnostics log. It deliberately builds neither the GUI
-    nor the settings repository; see `start_application()` below.
+    `fishbowl-common` package) to detect headless mode, sets `self.display = None`,
+    `self.settings_repository = None` and `self.update_coordinator = None`, and clears the
+    results file (`reset_results_file()`) so each run starts with a fresh diagnostics log.
+    It deliberately builds none of the GUI, the settings repository or the update
+    coordinator; see `start_application()` below.
   - `start_application()` first checks `argument_provider.integration_test_mode`: when set
     (via the `--integration-test` CLI flag) it skips the GUI entirely and calls
     `run_integration_test()`. Otherwise it constructs the shared `SettingsRepository` (from
@@ -223,26 +226,25 @@ data classes + spreadsheet writer**.
   - `handle_save_setting(key, value)` is the display's settings callback, forwarding to
     `settings_repository.save_setting()`. It is the display's only route to the database —
     the display itself never imports the repository.
-  - **The update check** — four methods porting the sibling's feature 1:1, built on
-    `UpdateChecker` from `fishbowl-common` (which only fetches release metadata; all
-    threading and UI are the app's job):
-    - `_start_update_check(manual=False)` spawns a `daemon=True` thread running
-      `_run_update_check`, so the GUI never blocks on the GitHub API and a stalled request
-      cannot delay shutdown.
-    - `_run_update_check(manual)` constructs `UpdateChecker(current_version=VERSION,
-      repo=GITHUB_REPO)`, calls `check_for_update()`, then hands the result back with
-      `display.after(0, self._handle_update_result, result, manual)` — tkinter is only ever
-      touched from the GUI thread.
-    - `_handle_update_result(result, manual=False)` opens the update window whenever a
-      strictly newer release exists. The "No Updates Available" / "Update Check Failed"
-      popups fire **only** when `manual` is set, so the startup check never interrupts a
-      launch just because the user is offline.
+  - **The update check** — `UpdateCoordinator` from `fishbowl-common` owns the whole
+    feature: the `daemon=True` worker thread, the `UpdateChecker` call, the
+    `display.after(0, ...)` hop back onto the GUI thread, and the decision to open the
+    update window versus popping "No Updates Available" / "Update Check Failed" (the latter
+    two only on a manual check, so a startup check never interrupts a launch just because
+    the user is offline). The controller's whole share of it is two things:
+    - `start_application()` constructs it with `current_version=VERSION`,
+      `repo=GITHUB_REPO`, `display=self.display` and calls `start()` for the silent startup
+      check. It is built here rather than in `__init__` because it reports through the
+      display, which does not exist until this branch.
     - `handle_check_for_updates()` is the display's Help-menu callback, calling
-      `_start_update_check(manual=True)`.
+      `update_coordinator.start(manual=True)`. The display never touches the network itself.
 
-    `_start_update_check()` is called **only** in `start_application()`'s GUI branch, after
-    the `integration_test_mode` early return. Keep it there: a headless CI run must perform
-    no network I/O, and `tests/InventoryAppController_tests.py` asserts it is not called.
+    The coordinator is constructed **only** in `start_application()`'s GUI branch, after the
+    `integration_test_mode` early return. Keep it there: a headless CI run must perform no
+    network I/O, and `tests/InventoryAppController_tests.py` asserts the class is never
+    called. The coordinator takes its display as a `typing.Protocol`, which is what lets it
+    live in the headless half of `fishbowl_common` rather than `fishbowl_common.gui`; the
+    display satisfies it through `after()`, `show_update_available()` and `show_popup()`.
   - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to
     the display. It runs `self.processor.process_inventory()` with status routed to the
     display's output box, keeping the display's callback contract to two arguments.
@@ -619,10 +621,11 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   function, so the name never exists at module scope and the target is its definition site,
   `patch("source.gui.InventoryAppDisplay.InventoryAppDisplay")`. A function-local
   `from X import Y` resolves `Y` as an attribute of module `X` at call time, which is why
-  patching there works. The update-check tests patch `source.InventoryAppController.threading.Thread`
-  and `source.InventoryAppController.UpdateChecker` so no thread is spawned and no request is
-  made; every test reaching `start_application()` also patches `_start_update_check` on the
-  instance, or a real daemon thread would call GitHub during the run.
+  patching there works. Every test reaching `start_application()` must patch
+  `source.InventoryAppController.UpdateCoordinator`, or a real daemon thread would call
+  GitHub during the run; the threading and result-handling those tests used to cover
+  directly are now `UpdateCoordinator`'s own tests upstream, and this repo asserts only that
+  the coordinator is built with this app's `VERSION`/`GITHUB_REPO`/display and started.
   **`SettingsRepository` is deliberately absent from the `controller` fixture** — it is built
   in `start_application()`, so only the tests reaching that method patch it (at
   `source.InventoryAppController.SettingsRepository`, the ordinary point of use). Every test

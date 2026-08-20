@@ -6,11 +6,18 @@ APP_NAME = "Fishbowl Inventory Tool"
 
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # GitHub repository ("owner/name") this app releases from. Passed to the shared
 # UpdateCoordinator so it knows which repo's releases to compare VERSION against.
 GITHUB_REPO = "averylhammond/FishbowlInventoryTool"
+
+# Name of the installer asset published on each GitHub release, matched against the
+# release's assets by the shared UpdateCoordinator to find the file an in-app update
+# downloads and runs. Injected rather than hardcoded upstream because each Fishbowl
+# app names its own installer; a release without a matching asset simply offers the
+# manual download instead. Must stay in step with installer.iss's OutputBaseFilename.
+INSTALLER_ASSET_PATTERN = "FishbowlInventoryTool_Setup.exe"
 
 # Base directories. The specific file paths below are composed from these.
 INVENTORY_DIR = Path("InventoryAvailability")

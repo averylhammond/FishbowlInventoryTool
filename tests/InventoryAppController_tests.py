@@ -4,7 +4,12 @@ from types import SimpleNamespace
 from unittest.mock import patch, call, MagicMock
 
 from source.columns import all_columns_selected
-from source.constants import GITHUB_REPO, SETTINGS_DB_PATH, VERSION
+from source.constants import (
+    GITHUB_REPO,
+    INSTALLER_ASSET_PATTERN,
+    SETTINGS_DB_PATH,
+    VERSION,
+)
 from source.InventoryAppController import InventoryAppController
 
 
@@ -229,7 +234,10 @@ def test_start_application_starts_a_background_update_check(controller):
     """
     Tests that a normal run kicks off the startup update check once the display
     exists, so the user learns about a newer release without the GUI blocking on
-    the network
+    the network, and that the coordinator is handed this app's installer asset
+    pattern. The shared package cannot know that name, since each Fishbowl app
+    names its own installer; it is what lets the coordinator offer an in-place
+    update rather than only a manual download
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -249,6 +257,7 @@ def test_start_application_starts_a_background_update_check(controller):
         current_version=VERSION,
         repo=GITHUB_REPO,
         display=mock_display_cls.return_value,
+        asset_pattern=INSTALLER_ASSET_PATTERN,
     )
     mock_coordinator_cls.return_value.start.assert_called_once_with()
 

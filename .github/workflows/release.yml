@@ -97,7 +97,17 @@ jobs:
       run: |
         ./scripts/package_release.sh
 
-    # Create the GitHub Release with the packaged assets and auto-generated notes
+    # Publish a checksum for each artifact so the in-app updater can verify the
+    # installer it downloads before running it. Written from inside release/ so the
+    # file names in it are bare, matching the asset names on the GitHub Release.
+    - name: Write release checksums
+      run: |
+        cd release
+        sha256sum FishbowlInventoryTool.zip FishbowlInventoryTool_Setup.exe > SHA256SUMS.txt
+        cat SHA256SUMS.txt
+
+    # Create the GitHub Release with the packaged assets, checksums and
+    # auto-generated notes
     - name: Create GitHub Release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,5 +115,6 @@ jobs:
         gh release create "$GITHUB_REF_NAME" \
           release/FishbowlInventoryTool.zip \
           release/FishbowlInventoryTool_Setup.exe \
+          release/SHA256SUMS.txt \
           --title "$GITHUB_REF_NAME" \
           --generate-notes

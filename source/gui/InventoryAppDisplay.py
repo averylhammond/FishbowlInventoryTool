@@ -889,15 +889,27 @@ class InventoryAppDisplay(tk.Tk):
     ###########################################################################
     ###            InventoryAppDisplay -> show_update_available()           ###
     ###########################################################################
-    def show_update_available(self, result):
+    def show_update_available(
+        self,
+        result,
+        start_install: (
+            Callable[[Callable[[int, int], None], Callable[[bool], None]], None] | None
+        ) = None,
+    ):
         """
         Notifies the user that a newer release is available by opening a themed
         popup showing the available version, with an "Exit and Update" button that
-        opens the release page and closes the app, and a Close button.
+        opens the release page and closes the app, and a Close button. When the
+        release can be installed in place, the window also offers an "Update and
+        Restart" button driven by start_install.
 
         Args:
             result (UpdateCheckResult): The outcome of the update check, exposing
                 the newer release's `latest_version` and `release_url`
+            start_install (Callable | None): Downloads and starts this release's
+                installer, taking a progress callback and a completion callback.
+                None when the release cannot be installed in place, which leaves
+                the window offering only the manual download
         """
 
         UpdateWindow(
@@ -911,6 +923,7 @@ class InventoryAppDisplay(tk.Tk):
             theme=self.current_theme,
             font_family=self.current_font_family,
             font_size=self.current_font_size,
+            start_install_callback=start_install,
         )
 
     ###########################################################################

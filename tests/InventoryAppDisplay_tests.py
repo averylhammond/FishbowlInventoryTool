@@ -1372,7 +1372,33 @@ def test_show_update_available_opens_the_update_window(display):
         theme=display.display.current_theme,
         font_family=display.display.current_font_family,
         font_size=display.display.current_font_size,
+        start_install_callback=None,
     )
+
+
+def test_show_update_available_forwards_the_install_callback(display):
+    """
+    Tests that the install callback the controller supplies is handed to the
+    update window, which is what makes it offer "Update and Restart" alongside
+    the manual download. The display never downloads or installs anything itself,
+    so forwarding this callback is its entire share of the feature
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    result = SimpleNamespace(
+        update_available=True,
+        latest_version="9.9.9",
+        release_url="https://example.com/release",
+    )
+    start_install = MagicMock()
+
+    display.display.show_update_available(result, start_install)
+
+    made_call = display.update_window_cls.call_args
+    assert made_call.kwargs["start_install_callback"] is start_install
 
 
 ###############################################################################

@@ -1,6 +1,11 @@
 from fishbowl_common import ArgumentProvider, SettingsRepository, UpdateCoordinator
 from source.columns import all_columns_selected
-from source.constants import GITHUB_REPO, SETTINGS_DB_PATH, VERSION
+from source.constants import (
+    GITHUB_REPO,
+    INSTALLER_ASSET_PATTERN,
+    SETTINGS_DB_PATH,
+    VERSION,
+)
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryProcessor import InventoryProcessor
 
@@ -167,9 +172,14 @@ class InventoryAppController:
         # Kick off a background check for a newer release before entering the GUI
         # loop. Built here rather than in __init__ because it reports through the
         # display, and confined to this branch so integration-test mode performs
-        # no network I/O.
+        # no network I/O. The asset pattern names this app's installer among the
+        # release's assets, which is what lets the user update in place rather
+        # than downloading it by hand.
         self.update_coordinator = UpdateCoordinator(
-            current_version=VERSION, repo=GITHUB_REPO, display=self.display
+            current_version=VERSION,
+            repo=GITHUB_REPO,
+            display=self.display,
+            asset_pattern=INSTALLER_ASSET_PATTERN,
         )
         self.update_coordinator.start()
 

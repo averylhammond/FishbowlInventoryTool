@@ -3,9 +3,10 @@ from dataclasses import dataclass
 
 # InventoryEntry class to hold all attributes of the InventoryEntry that
 # passes to the .xlsx file. The quantities arrive from PdfTableParser already
-# converted to numbers, so they reach the spreadsheet as numeric cells. Every field
-# has a default, so InventoryEntry() default-constructs while callers may also build
-# one straight from a parsed row, e.g. InventoryEntry(*row).
+# converted to numbers, so they reach the spreadsheet as numeric cells. The fields
+# below are exactly one parsed row, in the parser's column order, so a caller may
+# build one straight from a row with InventoryEntry(*row). Every field also has a
+# default, so InventoryEntry() default-constructs.
 @dataclass
 class InventoryEntry:
 
@@ -21,7 +22,6 @@ class InventoryEntry:
     on_order: int | float        = 0   # Number of parts on order but not arrived
     committed: int | float       = 0   # TODO: is this the same as allocated?
     short: int | float           = 0   # TODO: Is this like being in the negative?
-    row_written_to: int          = 0   # The row that the entry is written to through the xlsxwriter API
     # fmt:on
 
     ###########################################################################
@@ -49,6 +49,5 @@ class InventoryEntry:
             f"onOrder: {self.on_order}\n"
             f"committed: {self.committed}\n"
             f"short: {self.short}\n"
-            f"rowWrittenTo: {self.row_written_to}\n"
             "*****************************"
         )

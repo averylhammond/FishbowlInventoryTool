@@ -553,26 +553,28 @@ data classes + spreadsheet writer**.
   row (`part`, `description`, `uom`, `on_hand`, `allocated`, `available`, etc.). Every
   field is annotated and defaulted, so it both default-constructs and takes a parsed row
   positionally — the processor builds one with `InventoryEntry(*row)`, which is why the
-  field order must match the parser's column order and `row_written_to` must stay last.
-  Beyond the generated constructor its only method is `to_formatted_string()`, a
-  formatted-string dump the processor writes to the results file. Tracks
-  `row_written_to` so turnover data can be matched back to the same spreadsheet row.
+  field order must match the parser's column order. The fields *are* the parsed row and
+  nothing else: it holds no spreadsheet state, so where a row lands on the sheet cannot
+  disagree with where the writer put it. Beyond the generated constructor its only method
+  is `to_formatted_string()`, a formatted-string dump the processor writes to the results
+  file.
 - **`TurnoverEntry`** (`source/TurnoverEntry.py`) — the same shape for one turnover
   "Totals:" row (`part_description`, `units_sold`, `avg_qoh`, `avg_to_days`, `to_rate`).
   The three averages default to `None` because the report leaves them blank where a part's
   turnover is undefined.
 - Both entry classes mirror `Invoice` in the sibling `FishbowlInvoiceTool`: a bare
-  `@dataclass` (never `frozen` or `slots` — `spreadsheetDriver` assigns `row_written_to`),
-  the field block wrapped in `# fmt:off` / `# fmt:on` with a trailing comment per field,
-  and exactly two things in the class body. There is deliberately no `__post_init__` and no
-  `populate*` method: converting the report's text into fields is `PdfTableParser`'s job.
+  `@dataclass` (never `frozen` or `slots`, for parity with the sibling rather than
+  because anything mutates them — nothing does), the field block wrapped in `# fmt:off` /
+  `# fmt:on` with a trailing comment per field, and exactly two things in the class body.
+  There is deliberately no `__post_init__` and no `populate*` method: converting the
+  report's text into fields is `PdfTableParser`'s job.
 - **`spreadsheetDriver.py`** (`source/spreadsheetDriver.py`) — all `xlsxwriter` output.
   Module-level functions (not a class) build the workbook: `setupMainSpreadsheet` writes
   the inventory header + rows; `setupSpreadsheetTurnoverHeader` /
   `appendTurnoverToSpreadsheet` add a turnover report's columns and match each
-  `TurnoverEntry` to its `InventoryEntry` by part name, writing to that entry's
-  `rowWrittenTo`. `setupSpreadsheetTurnoverHeader` **returns the first free column after
-  the ones it filled**, and the caller assigns that value rather than advancing by a
+  `TurnoverEntry` to its `InventoryEntry` by part name, writing to the row that entry's
+  position gives it. `setupSpreadsheetTurnoverHeader` **returns the first free column
+  after the ones it filled**, and the caller assigns that value rather than advancing by a
   fixed amount — see the stride convention below. Helpers (`writeInventoryEntryToSpreadsheet`,
   `writeTurnoverEntryToSpreadsheet`, `formatTurnoverRow`) handle per-cell styling.
 
@@ -609,7 +611,16 @@ data classes + spreadsheet writer**.
   A column marked `always` is forced checked regardless of what is stored, since it has no
   checkbox the user could have unchecked it with.
 - Turnover rows are matched to inventory rows by `part` vs. `partDescription` with all
-  spaces removed; `InventoryEntry.rowWrittenTo` is the join key into the spreadsheet.
+  spaces removed; the matched entry's **position in the inventory list** is its row on the
+  sheet. `setupMainSpreadsheet` writes one row per entry starting at `FIRST_DATA_ROW`
+  regardless of which columns are checked, so `appendTurnoverToSpreadsheet` derives the
+  row with `enumerate(inventory, start=FIRST_DATA_ROW)` rather than reading it back off
+  the entry. **`FIRST_DATA_ROW` is the single definition of where data begins** — the
+  inventory writer, the turnover pre-fill and the turnover join all measure from it, and
+  row 0 is the header. The entry used to carry a `row_written_to` field instead, assigned
+  from inside each checked column's branch; with no inventory column checked nothing
+  assigned it and every turnover row overwrote the header (#55). Deriving the row removes
+  the failure mode rather than guarding it, so do not reintroduce a stored row.
 - **`extraction_mode="layout"` is mandatory in `read_pdf()`.** `pypdf`'s default mode
   discards the horizontal spacing the whole parser rests on, running adjacent columns
   together (`UOMOn`, `LABEL180 MINUTE DOOR LABEL`). Column offsets also drift by a

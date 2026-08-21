@@ -179,7 +179,8 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
             "source.InventoryProcessor.setupMainSpreadsheet", return_value=11
         ) as mock_setup_main,
         patch(
-            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader"
+            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader",
+            side_effect=[16, 21],
         ) as mock_turnover_header,
         patch(
             "source.InventoryProcessor.appendTurnoverToSpreadsheet"
@@ -192,16 +193,70 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
     assert result is True
     mock_setup_main.assert_called_once()
 
-    # Each turnover report takes the next column, named after its own file
-    assert [made.args[2] for made in mock_turnover_header.call_args_list] == [11, 12]
+    # Each turnover report starts where the one before it reported that it ended,
+    # and is named after its own file
+    assert [made.args[2] for made in mock_turnover_header.call_args_list] == [11, 16]
     assert [made.args[3] for made in mock_turnover_header.call_args_list] == [
         "January",
         "February",
     ]
-    assert [made.args[3] for made in mock_append.call_args_list] == [11, 12]
+    assert [made.args[3] for made in mock_append.call_args_list] == [11, 16]
 
     processor.file_io.save_workbook.assert_called_once_with(workbook)
     report_status.assert_called_with("Successfully processed Inventory Availability!")
+
+
+# A report is between one and five columns wide, depending on which turnover
+# columns the user checked, so no fixed stride can be correct for all of them.
+@pytest.mark.parametrize("width", [1, 3, 5])
+def test_process_inventory_starts_each_turnover_report_after_the_last(
+    width, processor
+):
+    """
+    Tests that each turnover report is written starting at the column the previous
+    report reported as free, so several reports sit side by side instead of the
+    later ones overwriting the earlier ones' columns
+
+    Args:
+        width (int): The number of columns each turnover report occupies
+        processor (pytest.fixture): Test fixture building the processor with its
+            file I/O controller and parser mocked
+    """
+
+    processor.file_io.list_turnover_files.return_value = [
+        Path("TurnoverReports/January.pdf"),
+        Path("TurnoverReports/February.pdf"),
+        Path("TurnoverReports/March.pdf"),
+    ]
+    processor.file_io.save_workbook.return_value = True
+
+    with (
+        patch.object(
+            processor.processor,
+            "process_inventory_file",
+            return_value=[InventoryEntry(part="PART-A")],
+        ),
+        patch.object(processor.processor, "process_turnover_file", return_value=[]),
+        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
+        patch(
+            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader",
+            # Stands in for the real writer, which fills one column per checked
+            # turnover column and reports back the first free one
+            side_effect=lambda workbook, checkboxes, col, name, rows: col + width,
+        ) as mock_turnover_header,
+        patch(
+            "source.InventoryProcessor.appendTurnoverToSpreadsheet"
+        ) as mock_append,
+    ):
+        processor.processor.process_inventory(
+            "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
+        )
+
+    # No report starts inside the columns of the one before it, and the data is
+    # appended to the same columns their headers were written to
+    expected = [11, 11 + width, 11 + 2 * width]
+    assert [made.args[2] for made in mock_turnover_header.call_args_list] == expected
+    assert [made.args[3] for made in mock_append.call_args_list] == expected
 
 
 def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor):

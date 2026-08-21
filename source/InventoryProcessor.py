@@ -165,7 +165,9 @@ class InventoryProcessor:
         for file in self.file_io.list_turnover_files():
             turnover = self.process_turnover_file(file)
 
-            setupSpreadsheetTurnoverHeader(
+            # The header writer reports back the first column past the ones this
+            # report filled, so the next report starts after it rather than over it
+            endCol = setupSpreadsheetTurnoverHeader(
                 workbook, checkbox_dict, nextCol, file.stem, len(inventory)
             )
 
@@ -173,7 +175,7 @@ class InventoryProcessor:
             appendTurnoverToSpreadsheet(
                 workbook, turnover, inventory, nextCol, checkbox_dict
             )
-            nextCol += 1
+            nextCol = endCol
 
         # Save and close the spreadsheet
         if self.file_io.save_workbook(workbook):

@@ -151,25 +151,32 @@ def workbook(worksheet):
 ###############################################################################
 ###              Tests spreadsheetDriver -> formatTurnoverRow()             ###
 ###############################################################################
+# An empty report, a single row, the row count the pre-fill was once hardcoded to,
+# and a report longer than that count - the case the hardcoded limit truncated.
+@pytest.mark.parametrize("row_count", [0, 1, 618, 622])
 def test_format_turnover_row_fills_every_data_row_with_not_available(
-    workbook, worksheet
+    row_count, workbook, worksheet
 ):
     """
     Tests that formatTurnoverRow() pre-fills the column with a placeholder in every
-    data row, so a part the turnover report never mentions reads as N/A rather than
-    as an empty cell. The header row is left alone for the column title.
+    data row of the report it was given, however long that report is, so a part the
+    turnover report never mentions reads as N/A rather than as an empty cell. The
+    header row is left alone for the column title.
 
     Args:
+        row_count (int): The number of inventory data rows the report holds
         workbook (pytest.fixture): Test fixture to create the workbook
         worksheet (pytest.fixture): Test fixture to create the worksheet
     """
 
     # A turnover column is prepared before any turnover data is written to it
-    formatTurnoverRow(workbook, 3)
+    formatTurnoverRow(workbook, 3, row_count)
 
-    # Every row below the header holds the placeholder, up to the fixed row limit
+    # Every row below the header holds the placeholder, down to the last one
     workbook.get_worksheet_by_name.assert_called_once_with("Sheet1")
-    assert written_cells(worksheet) == [(row, 3, "N/A") for row in range(1, 618)]
+    assert written_cells(worksheet) == [
+        (row, 3, "N/A") for row in range(1, row_count + 1)
+    ]
 
 
 def test_format_turnover_row_alternates_the_row_fill_colors(workbook, worksheet):
@@ -183,7 +190,7 @@ def test_format_turnover_row_alternates_the_row_fill_colors(workbook, worksheet)
     """
 
     # A turnover column is prepared
-    formatTurnoverRow(workbook, 3)
+    formatTurnoverRow(workbook, 3, 4)
 
     # The first two rows written carry the two alternating fills
     formats = written_formats(worksheet)
@@ -320,7 +327,9 @@ def test_setup_spreadsheet_turnover_header_labels_each_column_with_the_filename(
     """
 
     # A turnover report is appended after the eleven inventory columns
-    setupSpreadsheetTurnoverHeader(workbook, checkboxes(), 11, "Turnover_Jan2024")
+    setupSpreadsheetTurnoverHeader(
+        workbook, checkboxes(), 11, "Turnover_Jan2024", 300
+    )
 
     # Each column is titled with the report it holds, except the shared description
     workbook.get_worksheet_by_name.assert_called_once_with("Sheet1")
@@ -353,6 +362,7 @@ def test_setup_spreadsheet_turnover_header_skips_unchecked_columns(
         checkboxes({"tDescription": False, "tAvg QOH": False}),
         11,
         "Turnover_Jan2024",
+        300,
     )
 
     # The remaining columns stay contiguous from the first free column
@@ -378,15 +388,17 @@ def test_setup_spreadsheet_turnover_header_prefills_each_column_written(
     """
 
     # A turnover report is appended after the eleven inventory columns
-    setupSpreadsheetTurnoverHeader(workbook, checkboxes(), 11, "Turnover_Jan2024")
+    setupSpreadsheetTurnoverHeader(
+        workbook, checkboxes(), 11, "Turnover_Jan2024", 300
+    )
 
-    # Each of the five columns is pre-filled as it is titled
+    # Each of the five columns is pre-filled down the whole report as it is titled
     assert mock_format_row.call_args_list == [
-        call(workbook, 11),
-        call(workbook, 12),
-        call(workbook, 13),
-        call(workbook, 14),
-        call(workbook, 15),
+        call(workbook, 11, 300),
+        call(workbook, 12, 300),
+        call(workbook, 13, 300),
+        call(workbook, 14, 300),
+        call(workbook, 15, 300),
     ]
 
 

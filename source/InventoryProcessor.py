@@ -166,7 +166,7 @@ class InventoryProcessor:
             turnover = self.process_turnover_file(file)
 
             setupSpreadsheetTurnoverHeader(
-                workbook, checkbox_dict, nextCol, file.stem
+                workbook, checkbox_dict, nextCol, file.stem, len(inventory)
             )
 
             # Append turnover data to columns in workbook

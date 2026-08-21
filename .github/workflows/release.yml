@@ -59,6 +59,17 @@ jobs:
             exit 1
         fi
 
+    # Fail the release if the patch notes say nothing about the version being released.
+    # The app shows these notes on the first launch after an update, so a release missing
+    # its section would ship silently and only surface when a customer updated into it.
+    - name: Verify patch notes document this version
+      run: |
+        VERSION="$(python -c 'from source import constants; print(constants.VERSION)')"
+        if ! grep -qE "^## v?${VERSION}( |$)" PATCH_NOTES.md; then
+            echo "::error::PATCH_NOTES.md has no '## ${VERSION}' section."
+            exit 1
+        fi
+
     # Copy integration test data into the expected input directories
     - name: Copy integration test data
       run: |

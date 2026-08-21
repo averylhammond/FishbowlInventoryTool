@@ -141,8 +141,9 @@ def display(request):
             `config`, `protocol`, `destroy`), the patched widget classes whose calls
             are asserted (`button_cls`, `checkbutton_cls`, `message_window_cls`,
             `about_window_cls`, `file_editor_window_cls`, `update_window_cls`,
-            `tooltip_cls`), and the callbacks passed at construction (`process_callback`,
-            `read_file_callback`, `check_for_updates_callback`,
+            `patch_notes_window_cls`, `tooltip_cls`), and the callbacks passed at
+            construction (`process_callback`, `read_file_callback`,
+            `check_for_updates_callback`, `view_patch_notes_callback`,
             `save_settings_callback`)
     """
 
@@ -193,6 +194,9 @@ def display(request):
         ) as mock_file_editor_window_cls,
         patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
         patch(
+            "source.gui.InventoryAppDisplay.PatchNotesWindow"
+        ) as mock_patch_notes_window_cls,
+        patch(
             "source.gui.InventoryAppDisplay.Tooltip", side_effect=_distinct_widget
         ) as mock_tooltip_cls,
     ):
@@ -204,12 +208,14 @@ def display(request):
         process_callback = MagicMock()
         read_file_callback = MagicMock()
         check_for_updates_callback = MagicMock()
+        view_patch_notes_callback = MagicMock()
         save_settings_callback = MagicMock()
 
         arguments = {
             "process_callback": process_callback,
             "read_file_callback": read_file_callback,
             "check_for_updates_callback": check_for_updates_callback,
+            "view_patch_notes_callback": view_patch_notes_callback,
             "save_settings_callback": save_settings_callback,
             "title": "Automated Inventory Processor",
             "window_resolution": "700x700",
@@ -233,10 +239,12 @@ def display(request):
             about_window_cls=mock_about_window_cls,
             file_editor_window_cls=mock_file_editor_window_cls,
             update_window_cls=mock_update_window_cls,
+            patch_notes_window_cls=mock_patch_notes_window_cls,
             tooltip_cls=mock_tooltip_cls,
             process_callback=process_callback,
             read_file_callback=read_file_callback,
             check_for_updates_callback=check_for_updates_callback,
+            view_patch_notes_callback=view_patch_notes_callback,
             save_settings_callback=save_settings_callback,
         )
 
@@ -297,6 +305,21 @@ def test_init_stores_the_check_for_updates_callback(display):
 
     assert (
         display.display.check_for_updates_callback is display.check_for_updates_callback
+    )
+
+
+def test_init_stores_the_view_patch_notes_callback(display):
+    """
+    Tests that the controller's patch notes callback is stored, since the Help
+    menu's "What's New" item is wired straight to it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    assert (
+        display.display.view_patch_notes_callback is display.view_patch_notes_callback
     )
 
 
@@ -761,8 +784,8 @@ def test_build_widgets_wires_the_view_menu(display):
 
 def test_build_widgets_wires_the_help_menu(display):
     """
-    Tests that the Help menu offers About and Check for Updates, each wired to its
-    handler
+    Tests that the Help menu offers About, Check for Updates and What's New, each
+    wired to its handler
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -777,6 +800,10 @@ def test_build_widgets_wires_the_help_menu(display):
     assert calls[1].kwargs == {
         "label": "Check for Updates",
         "command": display.display.handle_check_for_updates,
+    }
+    assert calls[2].kwargs == {
+        "label": "What's New",
+        "command": display.display.handle_view_patch_notes,
     }
 
 
@@ -1339,6 +1366,52 @@ def test_handle_check_for_updates_invokes_the_callback(display):
     display.display.handle_check_for_updates()
 
     display.check_for_updates_callback.assert_called_once_with()
+
+
+###############################################################################
+###          Tests InventoryAppDisplay -> handle_view_patch_notes()         ###
+###############################################################################
+def test_handle_view_patch_notes_invokes_the_callback(display):
+    """
+    Tests that "What's New" asks the controller for the patch notes, rather than
+    reading the notes file itself
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.handle_view_patch_notes()
+
+    display.view_patch_notes_callback.assert_called_once_with()
+
+
+###############################################################################
+###             Tests InventoryAppDisplay -> show_patch_notes()             ###
+###############################################################################
+def test_show_patch_notes_opens_the_patch_notes_window(display):
+    """
+    Tests that the patch notes are shown in the shared window, styled with the
+    active theme/font, with the application name, version and notes the controller
+    supplied. The window is application-agnostic, so all three are injected.
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.show_patch_notes(APP_NAME, VERSION, "## 2.3.0\n\n- Added a thing")
+
+    display.patch_notes_window_cls.assert_called_once_with(
+        parent=display.display,
+        title="What's New",
+        app_name=APP_NAME,
+        version=VERSION,
+        notes="## 2.3.0\n\n- Added a thing",
+        theme=display.display.current_theme,
+        font_family=display.display.current_font_family,
+        font_size=display.display.current_font_size,
+    )
 
 
 ###############################################################################

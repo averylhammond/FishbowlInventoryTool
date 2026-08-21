@@ -6,7 +6,7 @@ APP_NAME = "Fishbowl Inventory Tool"
 
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
-VERSION = "2.2.1"
+VERSION = "2.3.0"
 
 # GitHub repository ("owner/name") this app releases from. Passed to the shared
 # UpdateCoordinator so it knows which repo's releases to compare VERSION against.
@@ -18,6 +18,12 @@ GITHUB_REPO = "averylhammond/FishbowlInventoryTool"
 # app names its own installer; a release without a matching asset simply offers the
 # manual download instead. Must stay in step with installer.iss's OutputBaseFilename.
 INSTALLER_ASSET_PATTERN = "FishbowlInventoryTool_Setup.exe"
+
+# Patch notes shipped alongside the executable, holding one "## X.Y.Z" section
+# per release. Shown on the first launch after an update and available any time
+# from Help -> What's New. Read at runtime rather than fetched, so the first
+# launch after an update needs no network.
+PATCH_NOTES_PATH = Path("PATCH_NOTES.md")
 
 # Base directories. The specific file paths below are composed from these.
 INVENTORY_DIR = Path("InventoryAvailability")
@@ -43,6 +49,10 @@ SETTING_KEY_THEME = "theme"
 SETTING_KEY_FONT_FAMILY = "font_family"
 SETTING_KEY_FONT_SIZE = "font_size"
 SETTING_KEY_GEOMETRY = "window_geometry"
+
+# Version the application was running the last time it was launched, compared
+# against VERSION on startup to spot the first launch after an update.
+SETTING_KEY_LAST_SEEN_VERSION = "last_seen_version"
 
 # Prefix each column's checkbox state is persisted under, e.g. "column_OnHand".
 # The column key itself completes the setting key, so a column added to

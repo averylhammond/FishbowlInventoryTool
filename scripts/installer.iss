@@ -91,6 +91,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; payload; the input folders ship empty and are handled in [Dirs] below.
 Source: "{#SourceRoot}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\USER_GUIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
+; Patch notes: ignoreversion like the rest of the program files, and deliberately
+; NOT onlyifdoesntexist/uninsneveruninstall. Those flags exist to protect the
+; customer's own data; this is app content that MUST be replaced on upgrade, or the
+; app would announce an update by showing the previous release's notes.
+Source: "{#SourceRoot}\PATCH_NOTES.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 ; Guarantee the app's writable folders exist, and keep the ones holding the
@@ -106,6 +111,7 @@ Name: "{app}\TurnoverReports"; Flags: uninsneveruninstall
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\User Guide"; Filename: "{app}\USER_GUIDE.txt"
+Name: "{group}\What's New"; Filename: "{app}\PATCH_NOTES.md"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 

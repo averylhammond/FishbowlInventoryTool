@@ -5,8 +5,11 @@ from unittest.mock import patch, call, MagicMock
 
 from source.columns import all_columns_selected
 from source.constants import (
+    APP_NAME,
     GITHUB_REPO,
     INSTALLER_ASSET_PATTERN,
+    PATCH_NOTES_PATH,
+    SETTING_KEY_LAST_SEEN_VERSION,
     SETTINGS_DB_PATH,
     VERSION,
 )
@@ -127,6 +130,20 @@ def test_init_does_not_build_the_update_coordinator(controller):
     assert controller.controller.update_coordinator is None
 
 
+def test_init_does_not_build_the_patch_notes_reader(controller):
+    """
+    Tests that constructing the controller builds no patch notes reader. Its
+    notes are only ever shown in a window, and headless mode builds none, so it
+    is not created until the GUI branch of start_application() is reached.
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    assert controller.controller.patch_notes is None
+
+
 ###############################################################################
 ###           Tests InventoryAppController -> start_application()           ###
 ###############################################################################
@@ -145,6 +162,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch("source.InventoryAppController.UpdateCoordinator"),
+        patch("source.InventoryAppController.PatchNotes"),
     ):
         mock_settings_cls.return_value.get_all_settings.return_value = {
             "theme": "Ocean"
@@ -155,6 +173,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
         process_callback=controller.controller.handle_process_inventory,
         read_file_callback=controller.file_io.read_text_file,
         check_for_updates_callback=controller.controller.handle_check_for_updates,
+        view_patch_notes_callback=controller.controller.handle_view_patch_notes,
         save_settings_callback=controller.controller.handle_save_setting,
         title="Automated Inventory Processor",
         window_resolution="700x700",
@@ -178,6 +197,7 @@ def test_start_application_loads_the_persisted_settings(controller):
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch("source.InventoryAppController.UpdateCoordinator"),
+        patch("source.InventoryAppController.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -199,6 +219,7 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository"),
         patch("source.InventoryAppController.UpdateCoordinator"),
+        patch("source.InventoryAppController.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -221,6 +242,7 @@ def test_start_application_wires_the_gui_popup_into_the_settings_repository(cont
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch("source.InventoryAppController.UpdateCoordinator"),
+        patch("source.InventoryAppController.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -250,6 +272,7 @@ def test_start_application_starts_a_background_update_check(controller):
         patch(
             "source.InventoryAppController.UpdateCoordinator"
         ) as mock_coordinator_cls,
+        patch("source.InventoryAppController.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -285,6 +308,7 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
         patch(
             "source.InventoryAppController.UpdateCoordinator"
         ) as mock_coordinator_cls,
+        patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
     ):
         controller.controller.start_application()
 
@@ -292,9 +316,214 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
     mock_display_cls.assert_not_called()
     mock_settings_cls.assert_not_called()
     mock_coordinator_cls.assert_not_called()
+    mock_patch_notes_cls.assert_not_called()
     assert controller.controller.display is None
     assert controller.controller.settings_repository is None
     assert controller.controller.update_coordinator is None
+    assert controller.controller.patch_notes is None
+
+
+def test_start_application_builds_the_patch_notes_reader(controller):
+    """
+    Tests that a normal run builds the reader over the notes file shipped with
+    the application, and checks whether this launch is the first one after an
+    update
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    with (
+        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
+        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
+        patch("source.InventoryAppController.UpdateCoordinator"),
+        patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
+        patch.object(controller.controller, "show_patch_notes_if_updated") as mock_show,
+    ):
+        mock_settings_cls.return_value.get_all_settings.return_value = {
+            "last_seen_version": "2.1.0"
+        }
+        controller.controller.start_application()
+
+    mock_patch_notes_cls.assert_called_once_with(notes_path=PATCH_NOTES_PATH)
+    mock_show.assert_called_once_with({"last_seen_version": "2.1.0"})
+
+
+###############################################################################
+###       Tests InventoryAppController -> show_patch_notes_if_updated()     ###
+###############################################################################
+def _prepared_controller(controller, notes: str = "## 2.3.0\n\n- Added a thing"):
+    """
+    Puts a controller into the state start_application() leaves it in, with the
+    display and the patch notes reader mocked, so the startup patch notes check
+    can be called directly
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+        notes (str): The notes the reader should return
+
+    Returns:
+        InventoryAppController: The controller, ready for the check to be called
+    """
+
+    controller.controller.display = MagicMock()
+    controller.controller.settings_repository = MagicMock()
+    controller.controller.patch_notes = MagicMock()
+    controller.controller.patch_notes.notes_since.return_value = notes
+
+    return controller.controller
+
+
+def test_show_patch_notes_if_updated_shows_the_notes_after_an_update(controller):
+    """
+    Tests that a launch following an update shows the notes for every version the
+    user moved through, and stamps the running version so they are shown once
+    rather than on every launch after it
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller)
+
+    prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: "2.1.0"})
+
+    prepared.patch_notes.notes_since.assert_called_once_with(VERSION, "2.1.0")
+    prepared.settings_repository.save_setting.assert_called_once_with(
+        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
+    )
+
+    # Opened through after() rather than inline: the shared window centers itself
+    # over the main window, whose geometry is not known until it has been mapped
+    prepared.display.after.assert_called_once_with(
+        0,
+        prepared.display.show_patch_notes,
+        APP_NAME,
+        VERSION,
+        "## 2.3.0\n\n- Added a thing",
+    )
+
+
+def test_show_patch_notes_if_updated_shows_nothing_on_a_fresh_install(controller):
+    """
+    Tests that a launch with no stored version shows nothing but still stamps the
+    running version. No update happened: this is either a first-time user, who has
+    no interest in what changed before they arrived, or someone upgrading from a
+    build that never wrote the setting, which is indistinguishable from one.
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller)
+
+    prepared.show_patch_notes_if_updated({})
+
+    prepared.settings_repository.save_setting.assert_called_once_with(
+        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
+    )
+    prepared.display.after.assert_not_called()
+
+
+def test_show_patch_notes_if_updated_shows_nothing_on_an_ordinary_relaunch(controller):
+    """
+    Tests that reopening the same version shows nothing, so the notes appear once
+    after an update rather than every time the application starts
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller)
+
+    prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: VERSION})
+
+    prepared.display.after.assert_not_called()
+
+
+def test_show_patch_notes_if_updated_shows_nothing_after_a_downgrade(controller):
+    """
+    Tests that a launch following a downgrade or a sideways install shows nothing
+    and stamps the running version, since the user has already seen these notes
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller)
+
+    prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: "99.0.0"})
+
+    prepared.settings_repository.save_setting.assert_called_once_with(
+        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
+    )
+    prepared.display.after.assert_not_called()
+
+
+def test_show_patch_notes_if_updated_shows_nothing_when_there_are_no_notes(controller):
+    """
+    Tests that an update whose notes file is missing or says nothing about the
+    versions passed through opens no window. The notes are a convenience, so a
+    missing file leaves the launch exactly as it was before the feature existed.
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller, notes="")
+
+    prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: "2.1.0"})
+
+    prepared.display.after.assert_not_called()
+
+
+###############################################################################
+###        Tests InventoryAppController -> handle_view_patch_notes()        ###
+###############################################################################
+def test_handle_view_patch_notes_shows_every_version_up_to_this_one(controller):
+    """
+    Tests that the Help menu's "What's New" shows the notes for every version up
+    to the running one, so a user who dismissed the window after an update still
+    has a way back to what changed
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller)
+
+    prepared.handle_view_patch_notes()
+
+    prepared.patch_notes.notes_since.assert_called_once_with(VERSION, None)
+    prepared.display.show_patch_notes.assert_called_once_with(
+        APP_NAME, VERSION, "## 2.3.0\n\n- Added a thing"
+    )
+
+
+def test_handle_view_patch_notes_reports_when_there_are_no_notes(controller):
+    """
+    Tests that a request the user made explicitly is answered even when the notes
+    file is missing, unlike the silent startup check which simply shows nothing
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    prepared = _prepared_controller(controller, notes="")
+
+    prepared.handle_view_patch_notes()
+
+    prepared.display.show_patch_notes.assert_not_called()
+    prepared.display.show_popup.assert_called_once()
 
 
 ###############################################################################

@@ -36,7 +36,8 @@ focused, single-responsibility classes.
   `release.txt` plus `pytest`/`pytest-cov`); `requirements/release.txt` alone is what the
   shipped app needs. `release.txt` pulls `fishbowl-common` (import name
   `fishbowl_common`) from GitHub — the shared package providing `ArgumentProvider`,
-  `SettingsRepository`, `UpdateChecker` and `UpdateCoordinator`; see the sibling
+  `SettingsRepository`, `UpdateChecker`, `UpdateCoordinator` and `PatchNotes`; see the
+  sibling
   `FishbowlInvoiceTool` for the shared-package story. All four
   classes are application-agnostic and take every app-specific value by constructor
   injection, which is why `UpdateCoordinator` is handed `VERSION` and `GITHUB_REPO`, and
@@ -44,7 +45,7 @@ focused, single-responsibility classes.
   `UpdateCoordinator` are covered by their own tests in that package, so this repo tests
   only the wiring around them — `UpdateChecker` is not imported here at all, since the
   coordinator constructs it.
-  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.2.1`), which
+  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.3.0`), which
   adds the package's GUI half — the themed subwindows, the tooltip and the styling data
   this app shares with the sibling. The extra installs no additional requirements (its only
   dependency is tkinter, which ships with CPython); it marks intent, since the top-level
@@ -129,14 +130,16 @@ uses `@v4` and no cache — a deliberate mirror of the sibling's file rather tha
 `windows-latest` (see the release-packaging section below for why the platform is not
 negotiable) it verifies the tag matches `VERSION` in `source/constants.py` — stripping the
 `v` and failing with `::error::` on a mismatch, so a release can never ship an About box
-that disagrees with the tag — then runs the unit tests and the integration test, installs
+that disagrees with the tag — checks that `PATCH_NOTES.md` carries a `## <VERSION>`
+section, with the same `::error::` treatment, since a release whose notes never mention it
+would ship silently and only surface when a customer updated into it — then runs the unit tests and the integration test, installs
 Inno Setup via Chocolatey, runs `scripts/package_release.sh`, writes a `SHA256SUMS.txt`
 over the built artifacts, and uploads `release/FishbowlInventoryTool.zip`,
 `release/FishbowlInventoryTool_Setup.exe` and `release/SHA256SUMS.txt` to a
 GitHub Release with `gh release create --generate-notes`. It checks out the submodule (for
 `canonical_correct_results.txt`) and so needs `CUSTOMER_DATA_PAT`; the packaging itself
-needs nothing from the submodule. Cutting a release is therefore: bump `VERSION`, merge,
-then push a matching `vX.Y.Z` tag.
+needs nothing from the submodule. Cutting a release is therefore: bump `VERSION`, add that version's section to
+`PATCH_NOTES.md`, merge, then push a matching `vX.Y.Z` tag.
 
 ## Release Packaging
 
@@ -151,8 +154,8 @@ executable. Three divergences from the sibling, each load-bearing:
 
 - **The release ships no sample data.** The sibling stages `Configs/` (and optionally
   `Invoices/`) out of its testing submodule; this app has no config files, so the payload
-  is just the executable and `USER_GUIDE.txt` alongside **empty** `InventoryAvailability/`
-  and `TurnoverReports/` folders. That is why the script takes no arguments and never
+  is just the executable, `USER_GUIDE.txt` and `PATCH_NOTES.md` alongside **empty**
+  `InventoryAvailability/` and `TurnoverReports/` folders. That is why the script takes no arguments and never
   touches `automated-inventory-testing` — packaging must not require access to a private
   repo.
 - **The payload's input folders are created with `mkdir`, never copied from the repo
@@ -177,7 +180,11 @@ of truth. The install is per-user (`PrivilegesRequired=lowest`, `{autopf}` resol
 CWD — a Program Files install would leave the app unable to write its own `logs/`, `data/`
 and `.xlsx` output. `InventoryAvailability/` and `TurnoverReports/` are `[Dirs]` entries
 flagged `uninsneveruninstall` so a customer's PDFs survive upgrades and uninstalls; they
-have no `[Files]` entries at all, since nothing ships inside them. `data/` (the settings
+have no `[Files]` entries at all, since nothing ships inside them. `PATCH_NOTES.md` is a
+`[Files]` entry flagged plain `ignoreversion` and deliberately **not**
+`onlyifdoesntexist uninsneveruninstall`: those flags protect the customer's own data,
+while this is app content that must be replaced on upgrade — a stale copy would have the
+app announce an update by showing the previous release's notes. `data/` (the settings
 database) is a `[Dirs]` entry too but deliberately **not** flagged `uninsneveruninstall`,
 matching the sibling: it is this install's own state rather than the customer's data. An
 upgrade preserves it regardless, because nothing in `[Files]` installs into that folder. The
@@ -281,6 +288,30 @@ data classes + spreadsheet writer**.
   - `handle_save_setting(key, value)` is the display's settings callback, forwarding to
     `settings_repository.save_setting()`. It is the display's only route to the database —
     the display itself never imports the repository.
+  - **The patch notes.** `PatchNotes` from `fishbowl-common` reads `PATCH_NOTES_PATH`, the
+    `## X.Y.Z` changelog packaged next to the executable, and returns the sections between
+    two versions. The controller owns both halves of the feature the shared package cannot:
+    - `show_patch_notes_if_updated(saved_settings)`, called from `start_application()`
+      once the display exists, compares `SETTING_KEY_LAST_SEEN_VERSION` against `VERSION`
+      with the shared `compare_versions()` and shows what changed only when the stored
+      version is **older**. A fresh install (nothing stored), an ordinary relaunch and a
+      downgrade all show nothing, and every one of the four cases stamps `VERSION` — so
+      an update's notes appear once rather than on every launch after it. The first launch
+      after upgrading *into* this feature shows nothing either, since a build that never
+      wrote the key is indistinguishable from a fresh install.
+    - **The window is opened through `display.after(0, ...)`, not inline**, and it must
+      stay that way: `ThemedSubwindow._center_over_parent()` reads the parent's geometry,
+      which is `1x1+0+0` until the root window has been mapped, so an inline call would
+      put the window in the corner of the screen instead of over the app.
+    - `handle_view_patch_notes()` is the display's Help-menu callback, showing every
+      section up to `VERSION` (`notes_since(VERSION, None)`) — a user who dismissed the
+      window after an update has no other way back to the notes, and without the menu item
+      the feature is unreachable in a manual test without hand-editing the settings
+      database. Unlike the silent startup check it reports when there is nothing to show,
+      the same manual-versus-automatic split the update check makes.
+    - Both the reader and the window are built **only** in the GUI branch, and
+      `tests/InventoryAppController_tests.py` asserts `PatchNotes` is never constructed in
+      integration-test mode.
   - **The update check** — `UpdateCoordinator` from `fishbowl-common` owns the whole
     feature: the `daemon=True` worker thread, the `UpdateChecker` call, the
     `display.after(0, ...)` hop back onto the GUI thread, and the decision to open the
@@ -351,7 +382,8 @@ data classes + spreadsheet writer**.
     never imports the controller. It owns the
     file picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText` output box,
     and a menu bar (File/View/Preferences/Help), and exposes `show_popup()`,
-    `show_update_available()`, `write_output()`, `clear_output()` and `get_selected_columns()`. `write_output()` calls
+    `show_update_available()`, `show_patch_notes()`, `write_output()`, `clear_output()` and
+    `get_selected_columns()`. `write_output()` calls
     `update_idletasks()` because processing runs on the GUI thread, so without it a status
     line would not paint until the work it announces had already finished.
     - **Settings restore happens in `__init__`, before `build_widgets()`**, so every widget is
@@ -379,7 +411,10 @@ data classes + spreadsheet writer**.
       (About opens `AboutWindow` with `APP_NAME` and `VERSION` from `constants.py` — the
       shared window is application-agnostic and takes both by injection; Check for Updates just
       calls `check_for_updates_callback` — the display never touches the network itself, and
-      the controller reports the outcome back through `show_update_available()`/`show_popup()`).
+      the controller reports the outcome back through `show_update_available()`/`show_popup()`;
+      What's New likewise just calls `view_patch_notes_callback`, and the controller hands the
+      notes back through `show_patch_notes()`, so the display reads no file and holds no
+      version of its own).
     - **`apply_theme()`** / **`apply_font_family()`** / **`apply_font_size()`** /
       **`_apply_font()`** apply a Preferences choice live by explicitly reconfiguring every
       widget the display owns, including every checkbutton in `column_checkbuttons` (the
@@ -419,6 +454,12 @@ data classes + spreadsheet writer**.
       why `APP_NAME` lives in `source/constants.py` alongside `VERSION`.
     - `FileEditorWindow`'s `editable` flag toggles a Save button; this app only ever opens
       it with `editable=False`, since there are no editable config files here.
+    - `PatchNotesWindow` shows what changed in the version now running: a heading naming
+      the app and version, the notes in a read-only `ScrolledText`, and a Close button. It
+      takes the notes as a **string**, not a path — they are frequently several releases'
+      sections concatenated — which is why it is not a `FileEditorWindow(editable=False)`.
+      The display's whole share of it is passing the current theme/font, exactly as
+      `handle_about()` does.
     - `UpdateWindow` announces a newer release: its "Exit and Update" button
       `webbrowser.open()`s the release page, then closes the **whole application** after
       `CLOSE_DELAY_MS` (3s) via the injected `close_app_callback` — the display's
@@ -500,10 +541,12 @@ data classes + spreadsheet writer**.
   (`INVENTORY_DIR`, `TURNOVER_DIR`), the generated spreadsheets (`OUTPUT_DIR`, the
   application root — shared by `create_workbook()` and the display's View -> Spreadsheets
   browser so the two cannot point at different folders), the diagnostics log (`LOGS_DIR`,
-  `RESULTS_FILE`) and the settings database (`DATA_DIR`, `SETTINGS_DB_PATH`),
+  `RESULTS_FILE`), the settings database (`DATA_DIR`, `SETTINGS_DB_PATH`) and the packaged
+  patch notes (`PATCH_NOTES_PATH`),
   resolved against the executable's CWD (mirrors the sibling invoice tool's `constants.py`).
   It also holds the keys user settings are persisted under — `SETTING_KEY_THEME`,
-  `SETTING_KEY_FONT_FAMILY`, `SETTING_KEY_FONT_SIZE`, `SETTING_KEY_GEOMETRY` and the
+  `SETTING_KEY_FONT_FAMILY`, `SETTING_KEY_FONT_SIZE`, `SETTING_KEY_GEOMETRY`,
+  `SETTING_KEY_LAST_SEEN_VERSION` and the
   `SETTING_KEY_COLUMN_PREFIX` each column's key is appended to — shared between the display
   that reads/writes them and any other consumer so the two never drift apart.
 - **`InventoryEntry`** (`source/InventoryEntry.py`) — `@dataclass` holding one inventory
@@ -658,6 +701,7 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
     time. As written the block holds sixteen items, so there is room for four more —
     verify with a trial `compile()` before assuming a new patch fits. The mocks come back
     as a dict (`tk_methods["geometry"]`). Add new Tk-method patches inside that call.
+    `PatchNotesWindow` brought the block to seventeen items, verified that way.
   - **`tk.StringVar` and `tk.BooleanVar` are patched with the `_FakeStringVar` /
     `_FakeBooleanVar` stubs, not bare `MagicMock`s.** A tkinter variable cannot be built
     without a default root window, so the real classes raise "Too early to create variable";
@@ -701,12 +745,14 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   GitHub during the run; the threading and result-handling those tests used to cover
   directly are now `UpdateCoordinator`'s own tests upstream, and this repo asserts only that
   the coordinator is built with this app's `VERSION`/`GITHUB_REPO`/display and started.
-  **`SettingsRepository` is deliberately absent from the `controller` fixture** — it is built
-  in `start_application()`, so only the tests reaching that method patch it (at
-  `source.InventoryAppController.SettingsRepository`, the ordinary point of use). Every test
-  that calls `start_application()` must patch it, or it opens a real SQLite database and
+  **`SettingsRepository` and `PatchNotes` are deliberately absent from the `controller`
+  fixture** — both are built in `start_application()`, so only the tests reaching that method
+  patch them (at `source.InventoryAppController.<name>`, the ordinary point of use). Every test
+  that calls `start_application()` must patch both, or it opens a real SQLite database and
   leaves a `data/` directory in the working tree, breaking the "no new artifacts after a run"
-  rule below.
+  rule below. The patch-notes decision table is covered by calling
+  `show_patch_notes_if_updated()` directly on a controller with its display, settings
+  repository and reader replaced, one test per row.
 - `tests/InventoryProcessor_tests.py` — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to
   the constructor while the `PdfTableParser` the processor builds itself is patched at

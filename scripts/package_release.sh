@@ -108,9 +108,11 @@ else
 fi
 
 # Move the necessary existing files over to the release directory, including
-# the executable created by PyInstaller, and the user guide
+# the executable created by PyInstaller, the user guide, and the patch notes the
+# app shows on the first launch after an update
 mv "$ROOT_DIR/dist/AutoInventoryProc$BINARY_EXT" "$RELEASE_DIR/"
 cp "$ROOT_DIR/USER_GUIDE.txt" "$RELEASE_DIR/"
+cp "$ROOT_DIR/PATCH_NOTES.md" "$RELEASE_DIR/"
 
 # Zip up the release folder for distribution. Use Python's shutil.make_archive (the
 # build venv is active here, so python is guaranteed available) to produce a real,

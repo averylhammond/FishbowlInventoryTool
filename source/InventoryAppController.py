@@ -1,8 +1,17 @@
-from fishbowl_common import ArgumentProvider, SettingsRepository, UpdateCoordinator
+from fishbowl_common import (
+    ArgumentProvider,
+    PatchNotes,
+    SettingsRepository,
+    UpdateCoordinator,
+    compare_versions,
+)
 from source.columns import all_columns_selected
 from source.constants import (
+    APP_NAME,
     GITHUB_REPO,
     INSTALLER_ASSET_PATTERN,
+    PATCH_NOTES_PATH,
+    SETTING_KEY_LAST_SEEN_VERSION,
     SETTINGS_DB_PATH,
     VERSION,
 )
@@ -46,6 +55,10 @@ class InventoryAppController:
         # start_application() since it reports its outcome through the display
         self.update_coordinator = None
 
+        # The patch notes reader, constructed alongside the GUI in
+        # start_application() since its notes are only ever shown in a window
+        self.patch_notes = None
+
         # Start each run with a clean results file
         self.file_io.reset_results_file()
 
@@ -60,6 +73,67 @@ class InventoryAppController:
         """
 
         self.update_coordinator.start(manual=True)
+
+    ###########################################################################
+    ###          InventoryAppController -> handle_view_patch_notes()        ###
+    ###########################################################################
+    def handle_view_patch_notes(self):
+        """
+        Shows the patch notes on demand, triggered by the Help menu's "What's New"
+        item. Every version up to the running one is shown, newest first, since a
+        user who has already been shown an update's notes has no other way back to
+        them. Wired into the display as its patch notes callback.
+        """
+
+        notes = self.patch_notes.notes_since(VERSION, None)
+
+        # Unlike the startup check below, a request the user made explicitly is
+        # answered even when there is nothing to show
+        if notes:
+            self.display.show_patch_notes(APP_NAME, VERSION, notes)
+        else:
+            self.display.show_popup(
+                title="No Patch Notes",
+                message=f"No patch notes found at: {PATCH_NOTES_PATH}.",
+            )
+
+    ###########################################################################
+    ###        InventoryAppController -> show_patch_notes_if_updated()      ###
+    ###########################################################################
+    def show_patch_notes_if_updated(self, saved_settings: dict):
+        """
+        Shows the user what changed when this launch is the first one after an
+        update, and records the running version either way.
+
+        Nothing is shown on a fresh install (no version was ever stored), on an
+        ordinary relaunch, or after a downgrade: in none of those cases did an
+        update just happen. The very first launch after upgrading into this
+        feature shows nothing either, since a user coming from a build that never
+        wrote the setting is indistinguishable from a first-time user.
+
+        Args:
+            saved_settings (dict): The settings persisted by the last run, holding
+                the version that run was on
+        """
+
+        last_seen_version = saved_settings.get(SETTING_KEY_LAST_SEEN_VERSION)
+
+        # Record the running version before deciding anything, so an update's
+        # notes are shown once rather than on every launch that follows it
+        self.handle_save_setting(SETTING_KEY_LAST_SEEN_VERSION, VERSION)
+
+        if not last_seen_version or compare_versions(last_seen_version, VERSION) >= 0:
+            return
+
+        # Every version the user skipped, not just the one they landed on
+        notes = self.patch_notes.notes_since(VERSION, last_seen_version)
+        if not notes:
+            return
+
+        # Open the window once the main loop is running rather than inline: the
+        # shared window centers itself over this one, whose geometry is not known
+        # until the root window has been mapped
+        self.display.after(0, self.display.show_patch_notes, APP_NAME, VERSION, notes)
 
     ###########################################################################
     ###         InventoryAppController -> handle_process_inventory()        ###
@@ -157,6 +231,7 @@ class InventoryAppController:
             process_callback=self.handle_process_inventory,
             read_file_callback=self.file_io.read_text_file,
             check_for_updates_callback=self.handle_check_for_updates,
+            view_patch_notes_callback=self.handle_view_patch_notes,
             save_settings_callback=self.handle_save_setting,
             title="Automated Inventory Processor",
             window_resolution="700x700",
@@ -182,5 +257,11 @@ class InventoryAppController:
             asset_pattern=INSTALLER_ASSET_PATTERN,
         )
         self.update_coordinator.start()
+
+        # Tell the user what changed if this is the first launch after an update.
+        # Built here, in the GUI branch, for the same reason as everything above
+        # it: headless mode reads no settings and opens no window.
+        self.patch_notes = PatchNotes(notes_path=PATCH_NOTES_PATH)
+        self.show_patch_notes_if_updated(saved_settings)
 
         self.display.mainloop()

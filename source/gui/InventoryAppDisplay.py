@@ -30,6 +30,7 @@ from fishbowl_common.gui import (
     AboutWindow,
     FileEditorWindow,
     MessageWindow,
+    PatchNotesWindow,
     Theme,
     Tooltip,
     UpdateWindow,
@@ -58,6 +59,7 @@ class InventoryAppDisplay(tk.Tk):
         process_callback: Callable[[str, dict], bool],
         read_file_callback: Callable[[Path], str],
         check_for_updates_callback: Callable[[], None],
+        view_patch_notes_callback: Callable[[], None],
         save_settings_callback: Callable[[str, str], None],
         title: str,
         window_resolution: str,
@@ -79,6 +81,9 @@ class InventoryAppDisplay(tk.Tk):
             check_for_updates_callback (Callable[[], None]): Callback that triggers
                 an on-demand update check, invoked when the user selects
                 "Check for Updates" from the Help menu
+            view_patch_notes_callback (Callable[[], None]): Callback that shows the
+                patch notes, invoked when the user selects "What's New" from the
+                Help menu
             save_settings_callback (Callable[[str, str], None]): Callback that
                 persists a single user setting (key, value), invoked when the user
                 changes a preference, toggles a column, or exits the application
@@ -121,6 +126,9 @@ class InventoryAppDisplay(tk.Tk):
 
         # Callback to trigger an on-demand update check from the Help menu
         self.check_for_updates_callback = check_for_updates_callback
+
+        # Callback to show the patch notes on demand from the Help menu
+        self.view_patch_notes_callback = view_patch_notes_callback
 
         # Callback to persist a single changed user setting
         self.save_settings_callback = save_settings_callback
@@ -340,10 +348,14 @@ class InventoryAppDisplay(tk.Tk):
         # Help dropdown
         #  -> About option to show the current application version
         #  -> Check for Updates option to manually check for a newer release
+        #  -> What's New option to re-read the patch notes at any time
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="About", command=self.handle_about)
         self.help_menu.add_command(
             label="Check for Updates", command=self.handle_check_for_updates
+        )
+        self.help_menu.add_command(
+            label="What's New", command=self.handle_view_patch_notes
         )
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
@@ -885,6 +897,43 @@ class InventoryAppDisplay(tk.Tk):
         """
 
         self.check_for_updates_callback()
+
+    ###########################################################################
+    ###          InventoryAppDisplay -> handle_view_patch_notes()           ###
+    ###########################################################################
+    def handle_view_patch_notes(self):
+        """
+        On "What's New" menu press, asks the controller for the patch notes. The
+        controller reads them and hands them back through show_patch_notes(), so
+        the display never reads a file of its own.
+        """
+
+        self.view_patch_notes_callback()
+
+    ###########################################################################
+    ###             InventoryAppDisplay -> show_patch_notes()               ###
+    ###########################################################################
+    def show_patch_notes(self, app_name: str, version: str, notes: str):
+        """
+        Shows the user what changed, in a themed window matching the rest of the
+        application
+
+        Args:
+            app_name (str): The application name to display in the heading
+            version (str): The version whose notes are being announced
+            notes (str): The notes to display, already selected by the controller
+        """
+
+        PatchNotesWindow(
+            parent=self,
+            title="What's New",
+            app_name=app_name,
+            version=version,
+            notes=notes,
+            theme=self.current_theme,
+            font_family=self.current_font_family,
+            font_size=self.current_font_size,
+        )
 
     ###########################################################################
     ###            InventoryAppDisplay -> show_update_available()           ###

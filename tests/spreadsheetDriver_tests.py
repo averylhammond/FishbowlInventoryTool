@@ -619,32 +619,12 @@ def test_write_inventory_entry_accepts_the_row_number_as_a_string(
     assert all(row == 7 for row, _col, _value in written_cells(worksheet))
 
 
-def test_write_inventory_entry_records_the_row_it_was_written_to(
-    workbook, worksheet
-):
-    """
-    Tests that the entry remembers the row it landed on, which is the join key the
-    turnover writer later uses to line its columns up with this part.
-
-    Args:
-        workbook (pytest.fixture): Test fixture to create the workbook
-        worksheet (pytest.fixture): Test fixture to create the worksheet
-    """
-
-    # An entry is written partway down the sheet
-    entry = build_inventory_entry()
-    writeInventoryEntryToSpreadsheet(workbook, worksheet, "4", entry, checkboxes())
-
-    # The entry carries the row number, as a number rather than the string given
-    assert entry.row_written_to == 4
-
-
 def test_write_inventory_entry_writes_nothing_when_nothing_is_checked(
     workbook, worksheet
 ):
     """
-    Tests that an entry with no checked columns writes no cells, leaves its row
-    unrecorded, and reports the first column as still free.
+    Tests that an entry with no checked columns writes no cells and reports the
+    first column as still free.
 
     Args:
         workbook (pytest.fixture): Test fixture to create the workbook
@@ -652,14 +632,12 @@ def test_write_inventory_entry_writes_nothing_when_nothing_is_checked(
     """
 
     # No column is checked
-    entry = build_inventory_entry()
     next_col = writeInventoryEntryToSpreadsheet(
-        workbook, worksheet, "1", entry, checkboxes(default=False)
+        workbook, worksheet, "1", build_inventory_entry(), checkboxes(default=False)
     )
 
-    # Nothing is written, and no row is claimed for turnover data to match against
+    # Nothing is written, and no column is claimed
     worksheet.write.assert_not_called()
-    assert entry.row_written_to == 0
     assert next_col == 0
 
 
@@ -902,10 +880,9 @@ def test_append_turnover_writes_each_entry_to_its_matching_inventory_row(
         worksheet (pytest.fixture): Test fixture to create the worksheet
     """
 
-    # Two parts sit on known rows, and the turnover report lists them the other way
+    # Two parts occupy the first two data rows, and the turnover report lists them
+    # the other way around
     inventory = [build_inventory_entry("PART-A"), build_inventory_entry("PART-B")]
-    inventory[0].row_written_to = 3
-    inventory[1].row_written_to = 7
     turnover = [build_turnover_entry("PART-B"), build_turnover_entry("PART-A")]
 
     checkbox_dict = checkboxes()
@@ -914,8 +891,8 @@ def test_append_turnover_writes_each_entry_to_its_matching_inventory_row(
     # Each entry follows its part to that part's row, in the same free column
     workbook.get_worksheet_by_name.assert_called_once_with("Sheet1")
     assert mock_write_entry.call_args_list == [
-        call(workbook, worksheet, 7, 11, turnover[0], checkbox_dict),
-        call(workbook, worksheet, 3, 11, turnover[1], checkbox_dict),
+        call(workbook, worksheet, 2, 11, turnover[0], checkbox_dict),
+        call(workbook, worksheet, 1, 11, turnover[1], checkbox_dict),
     ]
 
 
@@ -935,7 +912,6 @@ def test_append_turnover_matches_parts_ignoring_spaces(
 
     # The inventory report spaces the part out, the turnover report runs it together
     inventory = [build_inventory_entry('3/4"  BLANK HINGE')]
-    inventory[0].row_written_to = 5
     turnover = [build_turnover_entry('3/4"BLANKHINGE')]
 
     checkbox_dict = checkboxes()
@@ -943,7 +919,7 @@ def test_append_turnover_matches_parts_ignoring_spaces(
 
     # The part is recognized and its turnover data lands on its row
     mock_write_entry.assert_called_once_with(
-        workbook, worksheet, 5, 11, turnover[0], checkbox_dict
+        workbook, worksheet, FIRST_DATA_ROW, 11, turnover[0], checkbox_dict
     )
 
 
@@ -968,6 +944,47 @@ def test_append_turnover_skips_an_entry_with_no_matching_part(
 
     # Nothing is written for the unmatched part
     mock_write_entry.assert_not_called()
+
+
+def test_append_turnover_never_writes_over_the_header_row(workbook, worksheet):
+    """
+    Tests that turnover data lands below the header however few inventory columns the
+    user checked. This test drives the real writers rather than mocking them, since
+    the bug it guards lived in the handoff between them: the row an entry occupied
+    used to be recorded only from inside a checked column's branch, so an inventory
+    with every column unchecked left every entry claiming row zero and the turnover
+    data overwrote the headers.
+
+    Args:
+        workbook (pytest.fixture): Test fixture to create the workbook
+        worksheet (pytest.fixture): Test fixture to create the worksheet
+    """
+
+    # Not one inventory column is checked, so no inventory cell is ever written
+    checkbox_dict = checkboxes({key: False for key in COLUMN_KEYS if key[0] != "t"})
+    inventory = [build_inventory_entry("PART-A"), build_inventory_entry("PART-B")]
+    turnover = [build_turnover_entry("PART-A"), build_turnover_entry("PART-B")]
+
+    next_col = setupMainSpreadsheet(workbook, inventory, checkbox_dict)
+    setupSpreadsheetTurnoverHeader(
+        workbook, checkbox_dict, next_col, "Q1-2024", len(inventory)
+    )
+    appendTurnoverToSpreadsheet(workbook, turnover, inventory, next_col, checkbox_dict)
+
+    # Row zero still holds nothing but the turnover headers
+    assert [
+        (col, value) for row, col, value in written_cells(worksheet) if row == 0
+    ] == [
+        (0, "TO Description"),
+        (1, "Units Sold Q1-2024"),
+        (2, "Avg QOH Q1-2024"),
+        (3, "Avg TO Days Q1-2024"),
+        (4, "TO Rate Q1-2024"),
+    ]
+
+    # Each part's turnover data sits on the data row that part occupies
+    assert (FIRST_DATA_ROW, 0, "PART-A") in written_cells(worksheet)
+    assert (FIRST_DATA_ROW + 1, 0, "PART-B") in written_cells(worksheet)
 
 
 ###############################################################################

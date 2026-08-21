@@ -39,9 +39,6 @@ def test_inventory_entry_initialization():
     assert entry.committed == 0
     assert entry.short == 0
 
-    # Check that the spreadsheet row the entry is written to starts at zero
-    assert entry.row_written_to == 0
-
 
 def test_inventory_entry_initialization_with_arguments():
     """
@@ -62,14 +59,12 @@ def test_inventory_entry_initialization_with_arguments():
     assert entry.description == ""
     assert entry.uom == ""
     assert entry.allocated == 0
-    assert entry.row_written_to == 0
 
 
 def test_inventory_entry_initialization_from_a_parsed_row():
     """
     Tests that a row from PdfTableParser expands positionally into the constructor,
-    landing each field in declaration order and leaving row_written_to at its default
-    since no row supplies it
+    landing each field in declaration order and filling the entry completely
     """
 
     # Build the entry the way the controller does
@@ -87,9 +82,6 @@ def test_inventory_entry_initialization_from_a_parsed_row():
     assert entry.on_order == 20
     assert entry.committed == 5
     assert entry.short == 0
-
-    # The row is supplied later, by the spreadsheet writer
-    assert entry.row_written_to == 0
 
 
 def test_inventory_entry_keeps_a_fractional_quantity_as_a_float():
@@ -131,7 +123,6 @@ def test_inventory_entry_to_formatted_string_default():
     assert "onOrder: 0\n" in output
     assert "committed: 0\n" in output
     assert "short: 0\n" in output
-    assert "rowWrittenTo: 0\n" in output
 
 
 def test_inventory_entry_to_formatted_string_values():
@@ -142,9 +133,8 @@ def test_inventory_entry_to_formatted_string_values():
     canonical copy
     """
 
-    # Create an entry from a parsed row and place it on a spreadsheet row
+    # Create an entry from a parsed row
     entry = InventoryEntry(*PARSED_ROW)
-    entry.row_written_to = 7
 
     # Get the entry attributes as a formatted string
     output = entry.to_formatted_string()
@@ -161,7 +151,6 @@ def test_inventory_entry_to_formatted_string_values():
     assert "onOrder: 20\n" in output
     assert "committed: 5\n" in output
     assert "short: 0\n" in output
-    assert "rowWrittenTo: 7\n" in output
 
 
 def test_inventory_entry_to_formatted_string_is_wrapped_in_banners():

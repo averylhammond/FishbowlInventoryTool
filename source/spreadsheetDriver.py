@@ -1,6 +1,11 @@
 import xlsxwriter
 
 
+# Row 0 of the worksheet holds the column headers, so the inventory data starts on
+# the row below it. Every writer that addresses a data row measures from here.
+FIRST_DATA_ROW = 1
+
+
 # formatTurnoverRow will pre-fill a turnover column with a placeholder in every data
 # row, so that a part the turnover report never mentions reads as N/A rather than as
 # an empty cell
@@ -26,9 +31,9 @@ def formatTurnoverRow(workbook, col, rowCount):
     # Get worksheet
     worksheet = workbook.get_worksheet_by_name("Sheet1")
 
-    # Alternate row colors for visibility. Row 0 holds the column title, so the data
-    # rows run from 1 to rowCount
-    for row in range(1, rowCount + 1):
+    # Alternate row colors for visibility, over the same data rows the inventory
+    # entries occupy
+    for row in range(FIRST_DATA_ROW, rowCount + 1):
         if row % 2 == 0:
             worksheet.write(row, col, 'N/A', evenFormat)
         else:
@@ -195,57 +200,46 @@ def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDi
     col = 0
     if checkboxDict["Part"] == True:
         worksheet.write(row, col, entry.part, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Description"] == True:
         worksheet.write(row, col, entry.description, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["UOM"] == True:
         worksheet.write(row, col, entry.uom, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["OnHand"] == True:
         worksheet.write(row, col, entry.on_hand, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Allocated"] == True:
         worksheet.write(row, col, entry.allocated, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["NotAvailable"] == True:
         worksheet.write(row, col, entry.not_available, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["DropShip"] == True:
         worksheet.write(row, col, entry.drop_ship, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Available"] == True:
         worksheet.write(row, col, entry.available, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["OnOrder"] == True:
         worksheet.write(row, col, entry.on_order, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Committed"] == True:
         worksheet.write(row, col, entry.committed, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     if checkboxDict["Short"] == True:
         worksheet.write(row, col, entry.short, entryFormat)
-        entry.row_written_to = row
         col+=1
 
     return col
@@ -311,8 +305,8 @@ def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkb
 # returns: nextCol, int, the next column that can be written to
 def setupMainSpreadsheet(workbook, inventory, checkboxDict):
     
-    # Start writing data on row 1 since header data is written to row 0
-    row = 1
+    # Start writing data below the header row
+    row = FIRST_DATA_ROW
     nextCol = 0
 
     worksheet = workbook.add_worksheet()
@@ -342,10 +336,11 @@ def appendTurnoverToSpreadsheet(workbook, turnover, inventory, col, checkboxDict
     worksheet = workbook.get_worksheet_by_name("Sheet1")
 
     # Need to loop through each TurnoverEntry object and match it to an InventoryEntry object
-    # based on the part name. If the names match, find the row that the InventoryEntry was
-    # written to and write the TurnoverEntry data to that same row, but new column
+    # based on the part name. The inventory was written one entry per row starting below
+    # the header, so an entry's position in the list is the row it occupies. If the names
+    # match, write the TurnoverEntry data to that same row, but new column
     for tEntry in turnover:
-        for iEntry in inventory:
+        for row, iEntry in enumerate(inventory, start=FIRST_DATA_ROW):
             if (iEntry.part.replace(' ', '')) == (tEntry.part_description.replace(' ', '')):
-                writeTurnoverEntryToSpreadsheet(workbook, worksheet, iEntry.row_written_to,
+                writeTurnoverEntryToSpreadsheet(workbook, worksheet, row,
                                                 col, tEntry, checkboxDict)

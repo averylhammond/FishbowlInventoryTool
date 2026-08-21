@@ -6,7 +6,7 @@ APP_NAME = "Fishbowl Inventory Tool"
 
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
-VERSION = "2.2.1"
+VERSION = "2.3.0"
 
 # GitHub repository ("owner/name") this app releases from. Passed to the shared
 # UpdateCoordinator so it knows which repo's releases to compare VERSION against.

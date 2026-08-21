@@ -571,7 +571,9 @@ data classes + spreadsheet writer**.
   the inventory header + rows; `setupSpreadsheetTurnoverHeader` /
   `appendTurnoverToSpreadsheet` add a turnover report's columns and match each
   `TurnoverEntry` to its `InventoryEntry` by part name, writing to that entry's
-  `rowWrittenTo`. Helpers (`writeInventoryEntryToSpreadsheet`,
+  `rowWrittenTo`. `setupSpreadsheetTurnoverHeader` **returns the first free column after
+  the ones it filled**, and the caller assigns that value rather than advancing by a
+  fixed amount — see the stride convention below. Helpers (`writeInventoryEntryToSpreadsheet`,
   `writeTurnoverEntryToSpreadsheet`, `formatTurnoverRow`) handle per-cell styling.
 
 ### Key conventions
@@ -585,6 +587,14 @@ data classes + spreadsheet writer**.
   `source/columns.py`**, and `InventoryAppDisplay` builds its checkbox grid by iterating
   the same tuples the writers walk, so the GUI cannot offer a column the spreadsheet does
   not know about or miss one it does. Add a column there, not in three places.
+- **A turnover report is as many columns wide as the user checked, so the caller must
+  never guess its stride.** `setupSpreadsheetTurnoverHeader` returns the first free
+  column and `process_inventory()` assigns it (`nextCol = endCol`), exactly as
+  `setupMainSpreadsheet` reports back where the inventory columns ended. It used to
+  advance by `+= 1`, which silently overwrote all but the first column of every turnover
+  report but the last — a data-loss bug invisible to CI, since the results file is built
+  from the entry objects and never from the sheet. Whatever replaces these writers must
+  keep reporting its true end column.
 - **`get_selected_columns()` wraps every value in `bool()`, and that is load-bearing.**
   The spreadsheet writers test `if checkboxDict["Part"] == True`, which a `tk.BooleanVar`
   fails — the column would be silently dropped from the report rather than raising.

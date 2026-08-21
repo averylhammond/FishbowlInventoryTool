@@ -402,6 +402,127 @@ def test_setup_spreadsheet_turnover_header_prefills_each_column_written(
     ]
 
 
+# The whole turnover group, a middle-sized selection, and a single column - the
+# width of a report is whatever the user checked, so the caller cannot assume one.
+@pytest.mark.parametrize(
+    "unchecked, width",
+    [
+        ({}, 5),
+        ({"tDescription": False, "tAvg QOH": False}, 3),
+        (
+            {
+                "tDescription": False,
+                "tUnits Sold": False,
+                "tAvg QOH": False,
+                "tAvg TO Days": False,
+            },
+            1,
+        ),
+    ],
+)
+@patch("source.spreadsheetDriver.formatTurnoverRow")
+def test_setup_spreadsheet_turnover_header_returns_the_first_free_column(
+    _mock_format_row, unchecked, width, workbook, worksheet
+):
+    """
+    Tests that setupSpreadsheetTurnoverHeader() reports back the column after the
+    last one it filled, however many turnover columns the user checked. The caller
+    has no other way to know how wide a report turned out to be, and a report is
+    between one and five columns wide.
+
+    Args:
+        _mock_format_row (unittest.mock.MagicMock): Mocks the placeholder pre-fill
+        unchecked (dict): The turnover columns the user left out of this report
+        width (int): The number of columns the remaining selection occupies
+        workbook (pytest.fixture): Test fixture to create the workbook
+        worksheet (pytest.fixture): Test fixture to create the worksheet
+    """
+
+    # A turnover report is appended after the eleven inventory columns
+    next_col = setupSpreadsheetTurnoverHeader(
+        workbook, checkboxes(unchecked), 11, "Turnover_Jan2024", 300
+    )
+
+    # The columns run contiguously from the first free one, and the value handed
+    # back is the next one along
+    assert [cell[1] for cell in written_cells(worksheet)] == list(range(11, 11 + width))
+    assert next_col == 11 + width
+
+
+@patch("source.spreadsheetDriver.formatTurnoverRow")
+def test_setup_spreadsheet_turnover_header_places_two_reports_side_by_side(
+    _mock_format_row, workbook, worksheet
+):
+    """
+    Tests that threading one report's returned column into the next lays the two
+    reports out side by side rather than the second overwriting the first. A caller
+    advancing by a fixed column instead would leave the first report with only its
+    leftmost column and two "TO Description" titles in the header row.
+
+    Args:
+        _mock_format_row (unittest.mock.MagicMock): Mocks the placeholder pre-fill
+        workbook (pytest.fixture): Test fixture to create the workbook
+        worksheet (pytest.fixture): Test fixture to create the worksheet
+    """
+
+    # The second report starts wherever the first one reported that it ended
+    next_col = setupSpreadsheetTurnoverHeader(
+        workbook, checkboxes(), 11, "Turnover_Q3-2023", 300
+    )
+    setupSpreadsheetTurnoverHeader(
+        workbook, checkboxes(), next_col, "Turnover_Q1-2024", 300
+    )
+
+    # Both reports keep a complete set of columns, and none is written to twice
+    assert written_cells(worksheet) == [
+        (0, 11, "TO Description"),
+        (0, 12, "Units Sold Turnover_Q3-2023"),
+        (0, 13, "Avg QOH Turnover_Q3-2023"),
+        (0, 14, "Avg TO Days Turnover_Q3-2023"),
+        (0, 15, "TO Rate Turnover_Q3-2023"),
+        (0, 16, "TO Description"),
+        (0, 17, "Units Sold Turnover_Q1-2024"),
+        (0, 18, "Avg QOH Turnover_Q1-2024"),
+        (0, 19, "Avg TO Days Turnover_Q1-2024"),
+        (0, 20, "TO Rate Turnover_Q1-2024"),
+    ]
+
+
+@patch("source.spreadsheetDriver.formatTurnoverRow")
+def test_setup_spreadsheet_turnover_header_returns_its_starting_column_when_nothing_is_checked(
+    _mock_format_row, workbook, worksheet
+):
+    """
+    Tests that a report with no turnover column checked leaves the cursor where it
+    found it, so the columns after it are not pushed across by an empty report
+
+    Args:
+        _mock_format_row (unittest.mock.MagicMock): Mocks the placeholder pre-fill
+        workbook (pytest.fixture): Test fixture to create the workbook
+        worksheet (pytest.fixture): Test fixture to create the worksheet
+    """
+
+    # The user wants the inventory columns only
+    next_col = setupSpreadsheetTurnoverHeader(
+        workbook,
+        checkboxes(
+            {
+                "tDescription": False,
+                "tUnits Sold": False,
+                "tAvg QOH": False,
+                "tAvg TO Days": False,
+                "tTO Rate": False,
+            }
+        ),
+        11,
+        "Turnover_Jan2024",
+        300,
+    )
+
+    assert written_cells(worksheet) == []
+    assert next_col == 11
+
+
 ###############################################################################
 ###      Tests spreadsheetDriver -> writeInventoryEntryToSpreadsheet()      ###
 ###############################################################################

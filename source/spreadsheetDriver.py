@@ -109,7 +109,7 @@ def setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict):
 # params: col, int, the leftmost empty column to write to
 # params: filename, str, the filename of the turnover report
 # params: rowCount, int, the number of inventory data rows below the header
-# returns: N/A 
+# returns: col, int, the first free column after the ones this report filled
 def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename, rowCount):
 
     headerFormat = workbook.add_format({
@@ -153,6 +153,8 @@ def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename, rowCou
         worksheet.write(0, col, f"TO Rate {filename}", headerFormat)
         formatTurnoverRow(workbook, col, rowCount)
         col+=1
+
+    return col
 
 
 # writeInventoryEntryToSpreadSheet will write all of the data present in a InventoryEntry object

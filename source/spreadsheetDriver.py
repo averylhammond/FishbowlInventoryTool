@@ -1,6 +1,14 @@
 import xlsxwriter
 
-def formatTurnoverRow(workbook, col):
+
+# formatTurnoverRow will pre-fill a turnover column with a placeholder in every data
+# row, so that a part the turnover report never mentions reads as N/A rather than as
+# an empty cell
+# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
+# params: col, int, the column to pre-fill
+# params: rowCount, int, the number of inventory data rows below the header
+# returns: N/A
+def formatTurnoverRow(workbook, col, rowCount):
     
     evenFormat = workbook.add_format({
             "valign": "vcenter",
@@ -18,11 +26,12 @@ def formatTurnoverRow(workbook, col):
     # Get worksheet
     worksheet = workbook.get_worksheet_by_name("Sheet1")
 
-    # Alternate row colors for visibility
-    for row in range(618):
-        if row % 2 == 0 and row != 0:
+    # Alternate row colors for visibility. Row 0 holds the column title, so the data
+    # rows run from 1 to rowCount
+    for row in range(1, rowCount + 1):
+        if row % 2 == 0:
             worksheet.write(row, col, 'N/A', evenFormat)
-        elif row % 2 == 1 and row != 0:
+        else:
             worksheet.write(row, col, 'N/A', oddFormat)
 
 
@@ -99,8 +108,9 @@ def setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict):
 # params: checkboxDict, dict, the state of all column checkboxes from GUI
 # params: col, int, the leftmost empty column to write to
 # params: filename, str, the filename of the turnover report
+# params: rowCount, int, the number of inventory data rows below the header
 # returns: N/A 
-def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename):
+def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename, rowCount):
 
     headerFormat = workbook.add_format({
         "valign": "vcenter",
@@ -121,27 +131,27 @@ def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename):
     # next write.
     if checkboxDict["tDescription"] == True:
         worksheet.write(0, col, "TO Description", headerFormat)
-        formatTurnoverRow(workbook, col)
+        formatTurnoverRow(workbook, col, rowCount)
         col+=1
 
     if checkboxDict["tUnits Sold"] == True:
         worksheet.write(0, col, f"Units Sold {filename}", headerFormat)
-        formatTurnoverRow(workbook, col)
+        formatTurnoverRow(workbook, col, rowCount)
         col+=1
 
     if checkboxDict["tAvg QOH"] == True:
         worksheet.write(0, col, f"Avg QOH {filename}", headerFormat)
-        formatTurnoverRow(workbook, col)
+        formatTurnoverRow(workbook, col, rowCount)
         col+=1
 
     if checkboxDict["tAvg TO Days"] == True:
         worksheet.write(0, col, f"Avg TO Days {filename}", headerFormat)
-        formatTurnoverRow(workbook, col)
+        formatTurnoverRow(workbook, col, rowCount)
         col+=1
 
     if checkboxDict["tTO Rate"] == True:
         worksheet.write(0, col, f"TO Rate {filename}", headerFormat)
-        formatTurnoverRow(workbook, col)
+        formatTurnoverRow(workbook, col, rowCount)
         col+=1
 
 

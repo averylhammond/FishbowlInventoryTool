@@ -204,6 +204,45 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
     report_status.assert_called_with("Successfully processed Inventory Availability!")
 
 
+def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor):
+    """
+    Tests that the turnover header is told how many inventory rows the report
+    holds, so the placeholder pre-fill reaches the last row of a report of any
+    length rather than stopping at a fixed row
+
+    Args:
+        processor (pytest.fixture): Test fixture building the processor with its
+            file I/O controller and parser mocked
+    """
+
+    processor.file_io.list_turnover_files.return_value = [
+        Path("TurnoverReports/January.pdf")
+    ]
+    processor.file_io.save_workbook.return_value = True
+
+    # An inventory long enough that a hardcoded row limit would be visible
+    inventory = [InventoryEntry(part=f"PART-{index}") for index in range(700)]
+
+    with (
+        patch.object(
+            processor.processor, "process_inventory_file", return_value=inventory
+        ),
+        patch.object(processor.processor, "process_turnover_file", return_value=[]),
+        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
+        patch(
+            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader"
+        ) as mock_turnover_header,
+        patch("source.InventoryProcessor.appendTurnoverToSpreadsheet"),
+    ):
+        processor.processor.process_inventory(
+            "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
+        )
+
+    # The row count handed over is the number of rows actually written
+    mock_turnover_header.assert_called_once()
+    assert mock_turnover_header.call_args.args[4] == len(inventory)
+
+
 def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
     """
     Tests that the spreadsheet is named after the date in the inventory PDF's

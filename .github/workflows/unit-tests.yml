@@ -35,8 +35,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements/dev.txt
 
-    # Run unit tests with pytest. The glob is required: test files use the
-    # _tests.py suffix, which pytest's default discovery does not match.
+    # Run unit tests with pytest
     - name: Run unit tests
       run: |
-        pytest tests/*
+        pytest tests/

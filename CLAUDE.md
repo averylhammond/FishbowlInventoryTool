@@ -62,11 +62,11 @@ focused, single-responsibility classes.
 - Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
   `python main.py --integration-test` then
   `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`.
-- Run all unit tests: `pytest tests/*` (from the repo root)
-- Run a single test file: `pytest tests/InventoryAppFileIO_tests.py`
+- Run all unit tests: `pytest tests/` (from the repo root)
+- Run a single test file: `pytest tests/test_InventoryAppFileIO.py`
 - Run a single test:
-  `pytest tests/InventoryAppFileIO_tests.py::test_read_pdf_extracts_each_page_in_layout_mode`
-- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/*`
+  `pytest tests/test_InventoryAppFileIO.py::test_read_pdf_extracts_each_page_in_layout_mode`
+- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/`
 - Package a release executable: `./scripts/package_release.sh` (no arguments). Builds via
   PyInstaller into `release/FishbowlInventoryTool/` and zips it. On Windows with Inno Setup
   installed, it additionally builds `release/FishbowlInventoryTool_Setup.exe` (via
@@ -96,20 +96,19 @@ every PR. If one ever slips through to a release, add a `windows-latest` leg to 
 `strategy.matrix` here.
 
 `.github/workflows/unit-tests.yml` runs the unit tests. On `ubuntu-latest` it installs
-`requirements/dev.txt` (`release.txt` plus `pytest`/`pytest-cov`) and runs `pytest tests/*`.
-The glob is required because the test files use the `_tests.py` suffix, which pytest's
-default discovery does not match. Unlike the integration job it checks out **without** the
-submodule and needs no repo secret — unit tests mock all their I/O, so pulling the private
-test data would only slow the job and tie it to `CUSTOMER_DATA_PAT`. Keep it that way: a
-unit test that needs a real PDF belongs in the integration test instead. The GUI test files
-do import `tkinter` at module scope, and no `python3-tk` system package is installed — none
+`requirements/dev.txt` (`release.txt` plus `pytest`/`pytest-cov`) and runs `pytest tests/`.
+Unlike the integration job it checks out **without** the submodule and needs no repo
+secret — unit tests mock all their I/O, so pulling the private test data would only slow
+the job and tie it to `CUSTOMER_DATA_PAT`. Keep it that way: a unit test that needs a real
+PDF belongs in the integration test instead. The GUI test files do import `tkinter` at
+module scope, and no `python3-tk` system package is installed — none
 is needed, because `actions/setup-python`'s CPython builds bundle `_tkinter` and its Tcl/Tk
 libraries. No X display is needed either: the display tests patch `tk.Tk.__init__` and every
 widget class, so a real window is never created. The sibling's identical job has been
 running tkinter GUI tests on `ubuntu-latest` this way for months.
 
 `.github/workflows/code-coverage.yml` runs the same unit tests under coverage
-(`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*`) and uploads `coverage.xml`
+(`pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/`) and uploads `coverage.xml`
 to Codecov, which serves the README badge and posts the PR coverage comment. The upload step
 is `if: always()` so the report still lands when the gate fails — that is when the comment is
 most useful. It needs the `CODECOV_TOKEN` repo secret, and like the unit-test job it checks
@@ -281,7 +280,7 @@ data classes + spreadsheet writer**.
     deliberate divergence from the sibling, which builds its own in `__init__`. The
     integration test must perform no database I/O and leave no `data/` directory behind, the
     same reason the display itself is built here.
-    `tests/InventoryAppController_tests.py` guards it with
+    `tests/test_InventoryAppController.py` guards it with
     `mock_settings_cls.assert_not_called()`. Because `SettingsRepository.__init__` runs
     `initialize_database()` before any display exists, an error from that first call falls to
     the repository's no-op default reporter; only later reads and writes reach `show_popup`.
@@ -310,7 +309,7 @@ data classes + spreadsheet writer**.
       database. Unlike the silent startup check it reports when there is nothing to show,
       the same manual-versus-automatic split the update check makes.
     - Both the reader and the window are built **only** in the GUI branch, and
-      `tests/InventoryAppController_tests.py` asserts `PatchNotes` is never constructed in
+      `tests/test_InventoryAppController.py` asserts `PatchNotes` is never constructed in
       integration-test mode.
   - **The update check** — `UpdateCoordinator` from `fishbowl-common` owns the whole
     feature: the `daemon=True` worker thread, the `UpdateChecker` call, the
@@ -328,7 +327,7 @@ data classes + spreadsheet writer**.
 
     The coordinator is constructed **only** in `start_application()`'s GUI branch, after the
     `integration_test_mode` early return. Keep it there: a headless CI run must perform no
-    network I/O, and `tests/InventoryAppController_tests.py` asserts the class is never
+    network I/O, and `tests/test_InventoryAppController.py` asserts the class is never
     called. The coordinator takes its display as a `typing.Protocol`, which is what lets it
     live in the headless half of `fishbowl_common` rather than `fishbowl_common.gui`; the
     display satisfies it through `after()`, `show_update_available()` and `show_popup()`.
@@ -658,7 +657,7 @@ data classes + spreadsheet writer**.
   window. That is also why the display is built here rather than in `__init__`, which is
   where the sibling builds its own — the sibling's integration job runs on Windows and can
   afford it. Do not "clean this up" into a module-scope import.
-  `tests/InventoryAppController_tests.py` guards this with
+  `tests/test_InventoryAppController.py` guards this with
   `mock_display_cls.assert_not_called()`.
 - **GUI styling conventions, ported from the sibling.** Pure `tk`, zero `ttk`; a
   `###`-bordered banner above every method; a `# fmt:off` block of aligned
@@ -681,17 +680,17 @@ data classes + spreadsheet writer**.
 Unit tests live in `tests/` and run under `pytest`. Two reference implementations — mirror
 them (and the sibling's `tests/` suite) rather than inventing new patterns:
 
-- `tests/InventoryAppFileIO_tests.py` — a class with collaborators and I/O. Follow it for
+- `tests/test_InventoryAppFileIO.py` — a class with collaborators and I/O. Follow it for
   the mocking and error-path conventions below.
-- `tests/PdfTableParser_tests.py` — a pure-logic class with no collaborators, so nothing
+- `tests/test_PdfTableParser.py` — a pure-logic class with no collaborators, so nothing
   is mocked and the fixture just constructs the object. Follow it for parser-style tests,
   including the synthetic-fixture rule below.
-- `tests/InventoryEntry_tests.py` / `tests/TurnoverEntry_tests.py` — a dataclass, so there
+- `tests/test_InventoryEntry.py` / `tests/test_TurnoverEntry.py` — a dataclass, so there
   is no fixture at all: each test constructs the object it needs. Cover the defaults, a
   subset of keyword arguments, positional construction from a `PARSED_ROW` module constant
   shaped like the parser's output, and `to_formatted_string()` asserted against the
   report's labels rather than the field names.
-- `tests/spreadsheetDriver_tests.py` — module-level functions writing through a mocked
+- `tests/test_spreadsheetDriver.py` — module-level functions writing through a mocked
   `xlsxwriter` workbook. Follow it for spreadsheet-writer tests: `workbook` and `worksheet`
   fixtures (`MagicMock(spec=xlsxwriter.Workbook)` / `spec=Worksheet)`, with
   `add_format.side_effect = lambda spec: dict(spec)` so each format is the spec dict it was
@@ -704,7 +703,7 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they are inert data
   holders with no I/O — but each is given a distinct value per field so a column/data
   desync fails loudly instead of matching by coincidence.
-- `tests/InventoryAppDisplay_tests.py` — a tkinter GUI class. The `display` fixture
+- `tests/test_InventoryAppDisplay.py` — a tkinter GUI class. The `display` fixture
   neutralizes `tk.Tk.__init__`, mocks the inherited Tk methods the display calls
   (title/geometry/resizable/configure/config/protocol/destroy/winfo_geometry), and
   replaces every widget class at its point of use
@@ -752,7 +751,7 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   covered upstream in `fishbowl-common/tests/gui/`; this repo tests only its own display
   and the wiring around them. Do not re-add a local test file for one — a gap in their
   coverage is a change to make in that repo.
-- `tests/InventoryAppController_tests.py` — the wiring, with `ArgumentProvider`,
+- `tests/test_InventoryAppController.py` — the wiring, with `ArgumentProvider`,
   `InventoryAppFileIO` and `InventoryProcessor` patched at
   `source.InventoryAppController.<name>` as usual. Because the processor is mocked there,
   the GUI and headless paths are asserted against `processor.process_inventory` directly
@@ -774,7 +773,7 @@ them (and the sibling's `tests/` suite) rather than inventing new patterns:
   rule below. The patch-notes decision table is covered by calling
   `show_patch_notes_if_updated()` directly on a controller with its display, settings
   repository and reader replaced, one test per row.
-- `tests/InventoryProcessor_tests.py` — a class whose collaborator is injected rather than
+- `tests/test_InventoryProcessor.py` — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to
   the constructor while the `PdfTableParser` the processor builds itself is patched at
   `source.InventoryProcessor.PdfTableParser`. The `spec=` is safe only because the processor
@@ -825,9 +824,7 @@ touch the real filesystem, a real PDF, or the GUI.
 
 ### Conventions
 
-- Test files are named `<ClassName>_tests.py` (suffix, not the pytest-default `test_`
-  prefix), which is why pytest is always invoked as `pytest tests/*` rather than relying on
-  default discovery.
+- Test files are named `test_<ClassName>.py`, matching pytest's default discovery pattern.
 - Flat module-level `test_<method>_<behavior>` functions — no test classes. Error paths are
   suffixed `_reports_on_error` / `_reports_and_returns_<x>_on_error`.
 - `tests/__init__.py`, `source/__init__.py` and `source/gui/__init__.py` are empty but
@@ -846,7 +843,7 @@ touch the real filesystem, a real PDF, or the GUI.
   reproduces the report's *geometry* — header offsets, column gaps, the wrapped `Avg. TO`
   label, the page footer — under invented part numbers and descriptions, at reduced column
   widths so the lines stay readable. Because those column positions are load-bearing, build
-  a page by joining explicit line literals (`build_page()` in `PdfTableParser_tests.py`)
+  a page by joining explicit line literals (`build_page()` in `test_PdfTableParser.py`)
   rather than dedenting a triple-quoted block an editor could reflow.
 
 ## Git Workflow (when working on a GitHub issue)

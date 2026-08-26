@@ -1,6 +1,6 @@
 import pytest
 
-from source.InventoryEntry import *
+from source.InventoryEntry import InventoryEntry
 
 
 ###############################################################################

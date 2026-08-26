@@ -4,7 +4,7 @@ import xlsxwriter
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
-from source.InventoryAppFileIO import *
+from source.InventoryAppFileIO import InventoryAppFileIO
 
 
 ###############################################################################

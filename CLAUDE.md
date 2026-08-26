@@ -827,11 +827,23 @@ touch the real filesystem, a real PDF, or the GUI.
 - Test files are named `test_<ClassName>.py`, matching pytest's default discovery pattern.
 - Flat module-level `test_<method>_<behavior>` functions — no test classes. Error paths are
   suffixed `_reports_on_error` / `_reports_and_returns_<x>_on_error`.
+- **Import the names under test explicitly — never `from <module> import *`.** A wildcard
+  import binds whatever the module happens to export, so a name deleted or renamed in
+  `source/` fails at the point of *use*, in one test, rather than at import, in every test
+  that file holds — which makes a rename far harder to trace. Import lists are sorted and
+  parenthesized across lines once they no longer fit on one. (`source/InventoryProcessor.py`
+  still star-imports `source.spreadsheetDriver`; that is application code, and it is what
+  makes `source.InventoryProcessor.<name>` the patch target described above.)
+- **One fixture convention: build the unit under test in a pytest fixture**, and give a test
+  that needs a differently-constructed object its arguments through indirect parametrization
+  (`@pytest.mark.parametrize("display", [{"theme": FOREST}], indirect=True)`) rather than a
+  `_build_window(...)`-style helper function. The helper form left this repo with the shared
+  subwindow classes; do not reintroduce it.
 - `tests/__init__.py`, `source/__init__.py` and `source/gui/__init__.py` are empty but
   **load-bearing**: with `tests/__init__.py` present, pytest's prepend import mode walks up
   past `tests/` and puts the repo root on `sys.path`, which is what makes
-  `from source.InventoryAppFileIO import *` resolve. There is deliberately no `conftest.py`
-  and no pytest config file.
+  `from source.InventoryAppFileIO import InventoryAppFileIO` resolve. There is deliberately
+  no `conftest.py` and no pytest config file.
 - `.coveragerc` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
   `tests/`, the virtualenv and the empty `__init__.py` files. Nothing else is omitted: the
   inert styling data that used to be excluded now lives upstream in `fishbowl_common.gui`.

@@ -1,6 +1,6 @@
 import pytest
 
-from source.TurnoverEntry import *
+from source.TurnoverEntry import TurnoverEntry
 
 
 ###############################################################################

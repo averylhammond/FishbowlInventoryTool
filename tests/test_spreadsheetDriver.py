@@ -3,7 +3,16 @@ import xlsxwriter
 from xlsxwriter.worksheet import Worksheet
 from unittest.mock import patch, call, MagicMock
 
-from source.spreadsheetDriver import *
+from source.spreadsheetDriver import (
+    FIRST_DATA_ROW,
+    appendTurnoverToSpreadsheet,
+    formatTurnoverRow,
+    setupMainSpreadsheet,
+    setupSpreadsheetInventoryHeader,
+    setupSpreadsheetTurnoverHeader,
+    writeInventoryEntryToSpreadsheet,
+    writeTurnoverEntryToSpreadsheet,
+)
 from source.InventoryEntry import InventoryEntry
 from source.TurnoverEntry import TurnoverEntry
 

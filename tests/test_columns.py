@@ -1,6 +1,12 @@
 import pytest
 
-from source.columns import *
+from source.columns import (
+    ALL_COLUMNS,
+    COLUMN_KEYS,
+    INVENTORY_COLUMNS,
+    TURNOVER_COLUMNS,
+    all_columns_selected,
+)
 
 
 ###############################################################################

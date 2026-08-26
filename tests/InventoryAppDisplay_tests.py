@@ -13,6 +13,7 @@ from source.constants import (
     VERSION,
 )
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
+from fishbowl_common import UpdateCheckResult
 from fishbowl_common.gui import (
     ALL_THEMES,
     DARK,
@@ -1428,7 +1429,7 @@ def test_show_update_available_opens_the_update_window(display):
             fully mocked out
     """
 
-    result = SimpleNamespace(
+    result = UpdateCheckResult(
         update_available=True,
         latest_version="9.9.9",
         release_url="https://example.com/release",
@@ -1461,7 +1462,7 @@ def test_show_update_available_forwards_the_install_callback(display):
             fully mocked out
     """
 
-    result = SimpleNamespace(
+    result = UpdateCheckResult(
         update_available=True,
         latest_version="9.9.9",
         release_url="https://example.com/release",

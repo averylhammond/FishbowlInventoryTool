@@ -45,7 +45,7 @@ focused, single-responsibility classes.
   `UpdateCoordinator` are covered by their own tests in that package, so this repo tests
   only the wiring around them — `UpdateChecker` is not imported here at all, since the
   coordinator constructs it.
-  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.3.0`), which
+  The pin requests the **`[gui]` extra** (`fishbowl-common[gui] @ git+…@v1.5.0`), which
   adds the package's GUI half — the themed subwindows, the tooltip and the styling data
   this app shares with the sibling. The extra installs no additional requirements (its only
   dependency is tkinter, which ships with CPython); it marks intent, since the top-level

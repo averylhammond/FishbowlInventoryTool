@@ -18,6 +18,7 @@ from source.constants import (
     TURNOVER_DIR,
     VERSION,
 )
+from fishbowl_common import UpdateCheckResult
 from fishbowl_common.gui import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
@@ -940,7 +941,7 @@ class InventoryAppDisplay(tk.Tk):
     ###########################################################################
     def show_update_available(
         self,
-        result,
+        result: UpdateCheckResult,
         start_install: (
             Callable[[Callable[[int, int], None], Callable[[bool], None]], None] | None
         ) = None,

@@ -45,9 +45,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements/dev.txt
 
-    # Run unit tests with pytest, and generate code coverage report xml. The
-    # tests/* glob is required: test files use the _tests.py suffix, which
-    # pytest's default discovery does not match.
+    # Run unit tests with pytest, and generate code coverage report xml.
     # --cov-fail-under=90 fails this job (and thus blocks the PR, once this check
     # is marked required in branch protection) whenever total coverage drops below 90%.
     # Every measured module is currently at 100%, so 90 leaves headroom for an
@@ -56,7 +54,7 @@ jobs:
     # which can be easier to manual use
     - name: Run tests and code coverage
       run: |
-        pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/*
+        pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/
 
     # Upload the coverage report to Codecov, which serves the README badge and
     # posts the PR coverage comment. CODECOV_TOKEN is the repo upload token.

@@ -176,4 +176,6 @@ rather than landing beside it.
   This tool is being incrementally brought up to its architecture and engineering
   standards.
 - [fishbowl-common](https://github.com/averylhammond/fishbowl-common) — the shared
-  infrastructure package both apps depend on, providing `ArgumentProvider`.
+  infrastructure and GUI package both apps depend on. This app uses `ArgumentProvider`,
+  `SettingsRepository`, `UpdateCoordinator`, `PatchNotes` and `compare_versions()` from its
+  headless half, and the themed windows and theme/font data from `fishbowl_common.gui`.

@@ -50,10 +50,10 @@ else
     fi
 
     # Run a git clean to clean up the project tree before packaging, including removing
-    # the old virtual environment if necessary. Note this is a single -f, unlike the
-    # sibling invoice tool's -ff: a single -f makes git skip nested repositories, which
-    # leaves the automated-inventory-testing submodule checkout intact. Nothing here is
-    # packaged from that submodule, so there is no reason to delete and re-init it.
+    # the old virtual environment if necessary. A single -f on purpose: git skips the
+    # registered automated-inventory-testing submodule either way, and a second -f would
+    # only widen what could be deleted for no gain. This matches the sibling
+    # FishbowlInvoiceTool, which cleans the same way.
     git clean -fdx
 fi
 

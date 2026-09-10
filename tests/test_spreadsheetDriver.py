@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock, call, patch
+
 import pytest
 import xlsxwriter
 from xlsxwriter.worksheet import Worksheet
-from unittest.mock import patch, call, MagicMock
 
+from source.InventoryEntry import InventoryEntry
 from source.spreadsheetDriver import (
     FIRST_DATA_ROW,
     appendTurnoverToSpreadsheet,
@@ -13,9 +15,7 @@ from source.spreadsheetDriver import (
     writeInventoryEntryToSpreadsheet,
     writeTurnoverEntryToSpreadsheet,
 )
-from source.InventoryEntry import InventoryEntry
 from source.TurnoverEntry import TurnoverEntry
-
 
 ###############################################################################
 ###                    spreadsheetDriver -> Test Fixtures                   ###

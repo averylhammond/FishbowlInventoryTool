@@ -27,13 +27,12 @@ class InventoryEntry:
     ###########################################################################
     ###               InventoryEntry -> to_formatted_string()               ###
     ###########################################################################
-    def to_formatted_string(self):
+    def to_formatted_string(self) -> str:
         """
         Returns a formatted string of the attributes of a given InventoryEntry object
 
         Returns:
-            str: A formatted string containing all of the entry's fields on separate
-                lines
+            A formatted string containing all of the entry's fields on separate lines
         """
 
         return (

@@ -1,8 +1,9 @@
-import pytest
-import pypdf
-import xlsxwriter
 from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
+
+import pypdf
+import pytest
+import xlsxwriter
 
 from source.InventoryAppFileIO import InventoryAppFileIO
 

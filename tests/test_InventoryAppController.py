@@ -1,7 +1,8 @@
-import pytest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch, call, MagicMock
+from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 from source.columns import all_columns_selected
 from source.constants import (

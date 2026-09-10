@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from fishbowl_common import (
     ArgumentProvider,
     PatchNotes,
@@ -5,6 +7,7 @@ from fishbowl_common import (
     UpdateCoordinator,
     compare_versions,
 )
+
 from source.columns import all_columns_selected
 from source.constants import (
     APP_NAME,
@@ -18,6 +21,12 @@ from source.constants import (
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryProcessor import InventoryProcessor
 
+# Imported for the display attribute's annotation only. A runtime import here
+# would load tkinter on a headless run, which start_application() goes out of
+# its way to avoid.
+if TYPE_CHECKING:
+    from source.gui.InventoryAppDisplay import InventoryAppDisplay
+
 
 # InventoryAppController class to drive logic for processing inventory and
 # turnover report PDFs.
@@ -26,7 +35,7 @@ class InventoryAppController:
     ###########################################################################
     ###                InventoryAppController -> __init__()                 ###
     ###########################################################################
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initializes the InventoryAppController object.
         """
@@ -45,19 +54,19 @@ class InventoryAppController:
 
         # The GUI, constructed in start_application() rather than here so that a
         # headless run never builds a window it has no display for
-        self.display = None
+        self.display: InventoryAppDisplay | None = None
 
         # The persisted settings store, constructed alongside the GUI in
         # start_application() so that a headless run touches no database
-        self.settings_repository = None
+        self.settings_repository: SettingsRepository | None = None
 
         # The update coordinator, constructed alongside the GUI in
         # start_application() since it reports its outcome through the display
-        self.update_coordinator = None
+        self.update_coordinator: UpdateCoordinator | None = None
 
         # The patch notes reader, constructed alongside the GUI in
         # start_application() since its notes are only ever shown in a window
-        self.patch_notes = None
+        self.patch_notes: PatchNotes | None = None
 
         # Start each run with a clean results file
         self.file_io.reset_results_file()
@@ -65,7 +74,7 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> handle_check_for_updates()       ###
     ###########################################################################
-    def handle_check_for_updates(self):
+    def handle_check_for_updates(self) -> None:
         """
         Runs an on-demand update check, triggered by the Help menu's
         "Check for Updates" item. Wired into the display as its update callback,
@@ -77,7 +86,7 @@ class InventoryAppController:
     ###########################################################################
     ###          InventoryAppController -> handle_view_patch_notes()        ###
     ###########################################################################
-    def handle_view_patch_notes(self):
+    def handle_view_patch_notes(self) -> None:
         """
         Shows the patch notes on demand, triggered by the Help menu's "What's New"
         item. Every version up to the running one is shown, newest first, since a
@@ -100,7 +109,7 @@ class InventoryAppController:
     ###########################################################################
     ###        InventoryAppController -> show_patch_notes_if_updated()      ###
     ###########################################################################
-    def show_patch_notes_if_updated(self, saved_settings: dict):
+    def show_patch_notes_if_updated(self, saved_settings: dict[str, str]) -> None:
         """
         Shows the user what changed when this launch is the first one after an
         update, and records the running version either way.
@@ -112,8 +121,8 @@ class InventoryAppController:
         wrote the setting is indistinguishable from a first-time user.
 
         Args:
-            saved_settings (dict): The settings persisted by the last run, holding
-                the version that run was on
+            saved_settings: The settings persisted by the last run, holding the
+                version that run was on
         """
 
         last_seen_version = saved_settings.get(SETTING_KEY_LAST_SEEN_VERSION)
@@ -139,7 +148,7 @@ class InventoryAppController:
     ###         InventoryAppController -> handle_process_inventory()        ###
     ###########################################################################
     def handle_process_inventory(
-        self, inventory_pdf_path: str, checkbox_dict: dict
+        self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]
     ) -> bool:
         """
         Processes the inventory PDF the user chose in the GUI, routing status
@@ -147,11 +156,11 @@ class InventoryAppController:
         callback.
 
         Args:
-            inventory_pdf_path (str): Path to the inventory availability PDF to process
-            checkbox_dict (dict): Column-selection dict deciding which columns to emit
+            inventory_pdf_path: Path to the inventory availability PDF to process
+            checkbox_dict: Column-selection dict deciding which columns to emit
 
         Returns:
-            bool: True if the spreadsheet was saved, False if any step failed
+            True if the spreadsheet was saved, False if any step failed
         """
 
         return self.processor.process_inventory(
@@ -161,14 +170,14 @@ class InventoryAppController:
     ###########################################################################
     ###           InventoryAppController -> handle_save_setting()           ###
     ###########################################################################
-    def handle_save_setting(self, key: str, value: str):
+    def handle_save_setting(self, key: str, value: str) -> None:
         """
         Persists a single user setting so it is restored on the next launch. Wired
         into the display as its settings callback.
 
         Args:
-            key (str): The setting's identifier (e.g. "theme", "font_family")
-            value (str): The setting's value to store
+            key: The setting's identifier (e.g. "theme", "font_family")
+            value: The setting's value to store
         """
 
         self.settings_repository.save_setting(key=key, value=value)
@@ -176,7 +185,7 @@ class InventoryAppController:
     ###########################################################################
     ###           InventoryAppController -> run_integration_test()          ###
     ###########################################################################
-    def run_integration_test(self):
+    def run_integration_test(self) -> None:
         """
         Runs the application headless (no GUI): every inventory/turnover column is
         included and every inventory PDF in the inventory directory is processed. This
@@ -199,7 +208,7 @@ class InventoryAppController:
     ###########################################################################
     ###            InventoryAppController -> start_application()            ###
     ###########################################################################
-    def start_application(self):
+    def start_application(self) -> None:
         """
         Starts the application by building the GUI and running the tkinter main
         loop until the user exits.

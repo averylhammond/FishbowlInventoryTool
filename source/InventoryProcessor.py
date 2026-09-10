@@ -1,10 +1,12 @@
 import re
+from collections.abc import Callable
 from pathlib import Path
+
 from source.InventoryAppFileIO import InventoryAppFileIO
-from source.PdfTableParser import PdfTableParser
 from source.InventoryEntry import InventoryEntry
-from source.TurnoverEntry import TurnoverEntry
+from source.PdfTableParser import PdfTableParser
 from source.spreadsheetDriver import *
+from source.TurnoverEntry import TurnoverEntry
 
 
 # InventoryProcessor class to parse inventory and turnover report PDFs and write
@@ -14,13 +16,13 @@ class InventoryProcessor:
     ###########################################################################
     ###                  InventoryProcessor -> __init__()                   ###
     ###########################################################################
-    def __init__(self, file_io: InventoryAppFileIO):
+    def __init__(self, file_io: InventoryAppFileIO) -> None:
         """
         Initializes the InventoryProcessor object.
 
         Args:
-            file_io (InventoryAppFileIO): File I/O controller used to read the PDFs,
-                open and save the workbook, and write the results file
+            file_io: File I/O controller used to read the PDFs, open and save the
+                workbook, and write the results file
         """
 
         # File I/O controller used for every read and write this class performs
@@ -32,16 +34,16 @@ class InventoryProcessor:
     ###########################################################################
     ###            InventoryProcessor -> process_inventory_file()           ###
     ###########################################################################
-    def process_inventory_file(self, filepath: str) -> list:
+    def process_inventory_file(self, filepath: str) -> list[InventoryEntry]:
         """
         Processes an inventory PDF by parsing every page into rows, then converting
         each row into an InventoryEntry
 
         Args:
-            filepath (str): The path to the inventory PDF to be opened and processed
+            filepath: The path to the inventory PDF to be opened and processed
 
         Returns:
-            list: A list of InventoryEntry objects for the file's inventory entries
+            A list of InventoryEntry objects for the file's inventory entries
         """
 
         # Read pdf data
@@ -71,17 +73,16 @@ class InventoryProcessor:
     ###########################################################################
     ###            InventoryProcessor -> process_turnover_file()            ###
     ###########################################################################
-    def process_turnover_file(self, filepath: Path) -> list:
+    def process_turnover_file(self, filepath: Path) -> list[TurnoverEntry]:
         """
         Processes a turnover report PDF by parsing every page into rows, then
         converting each row into a TurnoverEntry
 
         Args:
-            filepath (Path): The path to the turnover report PDF to be opened and
-                processed
+            filepath: The path to the turnover report PDF to be opened and processed
 
         Returns:
-            list: A list of TurnoverEntry objects for the file's turnover entries
+            A list of TurnoverEntry objects for the file's turnover entries
         """
 
         # Read pdf data
@@ -110,7 +111,10 @@ class InventoryProcessor:
     ###               InventoryProcessor -> process_inventory()             ###
     ###########################################################################
     def process_inventory(
-        self, inventory_pdf_path: str, checkbox_dict: dict, report_status
+        self,
+        inventory_pdf_path: str,
+        checkbox_dict: dict[str, bool],
+        report_status: Callable[[str], None],
     ) -> bool:
         """
         Processes a single inventory availability PDF into an output spreadsheet,
@@ -118,13 +122,13 @@ class InventoryProcessor:
         the GUI event loop and the headless integration-test path.
 
         Args:
-            inventory_pdf_path (str): Path to the inventory availability PDF to process
-            checkbox_dict (dict): Column-selection dict deciding which columns to emit
-            report_status (Callable[[str], None]): Callback for user-facing status
-                messages (the GUI output line, or stdout in headless mode)
+            inventory_pdf_path: Path to the inventory availability PDF to process
+            checkbox_dict: Column-selection dict deciding which columns to emit
+            report_status: Callback for user-facing status messages (the GUI output
+                line, or stdout in headless mode)
 
         Returns:
-            bool: True if the spreadsheet was saved, False if any step failed
+            True if the spreadsheet was saved, False if any step failed
         """
 
         report_status("Processing Inventory... Please wait.")

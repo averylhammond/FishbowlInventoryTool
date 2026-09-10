@@ -70,12 +70,12 @@ COLUMN_KEYS = tuple(column.key for column in ALL_COLUMNS)
 ###############################################################################
 ###                     columns -> all_columns_selected()                   ###
 ###############################################################################
-def all_columns_selected() -> dict:
+def all_columns_selected() -> dict[str, bool]:
     """
     Builds a checkbox dict with every column included, used by the headless
     integration test path where there is no GUI to read selections from
 
     Returns:
-        dict: A mapping of every column key to True
+        A mapping of every column key to True
     """
     return {key: True for key in COLUMN_KEYS}

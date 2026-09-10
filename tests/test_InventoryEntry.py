@@ -2,7 +2,6 @@ import pytest
 
 from source.InventoryEntry import InventoryEntry
 
-
 ###############################################################################
 ###                    InventoryEntry -> Row Fixture                        ###
 ###############################################################################

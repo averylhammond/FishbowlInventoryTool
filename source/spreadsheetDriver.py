@@ -1,5 +1,7 @@
 import xlsxwriter
 
+from source.InventoryEntry import InventoryEntry
+from source.TurnoverEntry import TurnoverEntry
 
 # Row 0 of the worksheet holds the column headers, so the inventory data starts on
 # the row below it. Every writer that addresses a data row measures from here.
@@ -9,11 +11,7 @@ FIRST_DATA_ROW = 1
 # formatTurnoverRow will pre-fill a turnover column with a placeholder in every data
 # row, so that a part the turnover report never mentions reads as N/A rather than as
 # an empty cell
-# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
-# params: col, int, the column to pre-fill
-# params: rowCount, int, the number of inventory data rows below the header
-# returns: N/A
-def formatTurnoverRow(workbook, col, rowCount):
+def formatTurnoverRow(workbook: xlsxwriter.Workbook, col: int, rowCount: int) -> None:
     
     evenFormat = workbook.add_format({
             "valign": "vcenter",
@@ -41,11 +39,11 @@ def formatTurnoverRow(workbook, col, rowCount):
 
 
 # setupSpreadsheetInventoryHeader will write the header information for each column to the spreadsheet
-# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
-# params: worksheet, workbook.worksheet, the sheet to write the header information to
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: N/A 
-def setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict):
+def setupSpreadsheetInventoryHeader(
+    workbook: xlsxwriter.Workbook,
+    worksheet: xlsxwriter.worksheet.Worksheet,
+    checkboxDict: dict[str, bool],
+) -> None:
     
     headerFormat = workbook.add_format({
         "valign": "vcenter",
@@ -109,13 +107,14 @@ def setupSpreadsheetInventoryHeader(workbook, worksheet, checkboxDict):
 
 
 # setupSpreadsheetTurnoverHeader will write the header information for each column to the spreadsheet
-# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# params: col, int, the leftmost empty column to write to
-# params: filename, str, the filename of the turnover report
-# params: rowCount, int, the number of inventory data rows below the header
-# returns: col, int, the first free column after the ones this report filled
-def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename, rowCount):
+# Returns the first free column after the ones this report filled
+def setupSpreadsheetTurnoverHeader(
+    workbook: xlsxwriter.Workbook,
+    checkboxDict: dict[str, bool],
+    col: int,
+    filename: str,
+    rowCount: int,
+) -> int:
 
     headerFormat = workbook.add_format({
         "valign": "vcenter",
@@ -164,13 +163,15 @@ def setupSpreadsheetTurnoverHeader(workbook, checkboxDict, col, filename, rowCou
 
 # writeInventoryEntryToSpreadSheet will write all of the data present in a InventoryEntry object
 # to the corresponding column and row in the workbook
-# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
-# params: worksheet, workbook.worksheet, the sheet to write the header information to
-# params: row, str, the row number to write to
-# params: entry, InventoryEntry, the object holding all inventory entry data to be written to the row
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: col, int, the next available free column that can be written to
-def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDict):
+# The row arrives as a string from setupMainSpreadsheet and is cast below; #57 removes
+# the round trip. Returns the next free column that can be written to
+def writeInventoryEntryToSpreadsheet(
+    workbook: xlsxwriter.Workbook,
+    worksheet: xlsxwriter.worksheet.Worksheet,
+    row: str,
+    entry: InventoryEntry,
+    checkboxDict: dict[str, bool],
+) -> int:
 
     # Cast to int (is str initially)
     row = int(row)
@@ -247,14 +248,14 @@ def writeInventoryEntryToSpreadsheet(workbook, worksheet, row, entry, checkboxDi
 
 # writeTurnoverEntryToSpreadSheet will write all of the data present in a TurnoverEntry object
 # to the corresponding column and row in the workbook
-# params: workbook, xlsx.Workbook, the workbook object containing the worksheet
-# params: worksheet, workbook.worksheet, the sheet to write the header information to
-# params: row, int, the row number to write to
-# params: col, int, the column to write to
-# params: entry, TurnoverEntry, the object holding all turnover entry data to be written to the row
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: N/A
-def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkboxDict):
+def writeTurnoverEntryToSpreadsheet(
+    workbook: xlsxwriter.Workbook,
+    worksheet: xlsxwriter.worksheet.Worksheet,
+    row: int,
+    col: int,
+    entry: TurnoverEntry,
+    checkboxDict: dict[str, bool],
+) -> None:
 
     # Alternate row colors for visibility
     if row % 2 == 0:
@@ -299,11 +300,12 @@ def writeTurnoverEntryToSpreadsheet(workbook, worksheet, row, col, entry, checkb
 
 
 # setupMainSpreadSheet will create a .xlsx file and write all parsed contents to it
-# params: workbook: xlsx object, the open workbook to be written to
-# params: inventory: list of InventoryEntry objects, to be written to spreadsheet
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: nextCol, int, the next column that can be written to
-def setupMainSpreadsheet(workbook, inventory, checkboxDict):
+# Returns the next column that can be written to
+def setupMainSpreadsheet(
+    workbook: xlsxwriter.Workbook,
+    inventory: list[InventoryEntry],
+    checkboxDict: dict[str, bool],
+) -> int:
     
     # Start writing data below the header row
     row = FIRST_DATA_ROW
@@ -323,14 +325,15 @@ def setupMainSpreadsheet(workbook, inventory, checkboxDict):
 
 # appendTurnoverToSpreadsheet takes a given workbook and writes the turnover pdf data to the most
 # recent unused column, matching the turnover entries to the inventory entries
-# params: workbook: xlsxwriter class, the spreadsheet object
-# params: turnover: list, list of TurnoverEntry objects from the turnover pdf
-# params: inventory: list, list of InventoryEntry objects from the inventory pdf
-# params: coll: int, the column to start writing to since the previous columns
-# are holding inventory entry data
-# params: checkboxDict, dict, the state of all column checkboxes from GUI
-# returns: N/A
-def appendTurnoverToSpreadsheet(workbook, turnover, inventory, col, checkboxDict):
+# col is the column to start writing to, since the previous columns are holding
+# inventory entry data
+def appendTurnoverToSpreadsheet(
+    workbook: xlsxwriter.Workbook,
+    turnover: list[TurnoverEntry],
+    inventory: list[InventoryEntry],
+    col: int,
+    checkboxDict: dict[str, bool],
+) -> None:
 
     # Only using one worksheet, so it's always index 0
     worksheet = workbook.get_worksheet_by_name("Sheet1")

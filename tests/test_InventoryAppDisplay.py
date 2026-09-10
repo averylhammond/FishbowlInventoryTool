@@ -1,18 +1,8 @@
 import tkinter as tk
-import pytest
 from types import SimpleNamespace
-from unittest.mock import DEFAULT, patch, MagicMock
+from unittest.mock import DEFAULT, MagicMock, patch
 
-from source.columns import ALL_COLUMNS, COLUMN_KEYS
-from source.constants import (
-    APP_NAME,
-    INVENTORY_DIR,
-    OUTPUT_DIR,
-    RESULTS_FILE,
-    TURNOVER_DIR,
-    VERSION,
-)
-from source.gui.InventoryAppDisplay import InventoryAppDisplay
+import pytest
 from fishbowl_common import UpdateCheckResult
 from fishbowl_common.gui import (
     ALL_THEMES,
@@ -24,6 +14,17 @@ from fishbowl_common.gui import (
     FOREST,
     LIGHT,
 )
+
+from source.columns import ALL_COLUMNS, COLUMN_KEYS
+from source.constants import (
+    APP_NAME,
+    INVENTORY_DIR,
+    OUTPUT_DIR,
+    RESULTS_FILE,
+    TURNOVER_DIR,
+    VERSION,
+)
+from source.gui.InventoryAppDisplay import InventoryAppDisplay
 
 
 ###############################################################################
@@ -1121,22 +1122,6 @@ def test_write_output_appends_the_message_and_scrolls_to_it(display):
     display.display.output_box.update_idletasks.assert_called_once_with()
 
 
-def test_write_output_does_nothing_before_the_output_box_exists(display):
-    """
-    Tests that a status message arriving before the widgets are built is dropped
-    rather than raising, so the caller never has to check
-
-    Args:
-        display (pytest.fixture): Test fixture building the display with tkinter
-            fully mocked out
-    """
-
-    display.display.output_box = None
-
-    # No assertion beyond not raising: there is nowhere to write the message
-    display.display.write_output("Some status")
-
-
 ###############################################################################
 ###                Tests InventoryAppDisplay -> clear_output()              ###
 ###############################################################################
@@ -1152,20 +1137,6 @@ def test_clear_output_empties_the_output_box(display):
     display.display.clear_output()
 
     display.display.output_box.delete.assert_called_once_with(1.0, tk.END)
-
-
-def test_clear_output_does_nothing_before_the_output_box_exists(display):
-    """
-    Tests that clearing before the widgets are built is a no-op rather than an error
-
-    Args:
-        display (pytest.fixture): Test fixture building the display with tkinter
-            fully mocked out
-    """
-
-    display.display.output_box = None
-
-    display.display.clear_output()
 
 
 ###############################################################################

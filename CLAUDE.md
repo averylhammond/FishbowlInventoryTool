@@ -661,7 +661,7 @@ data classes + spreadsheet writer**.
   `mock_display_cls.assert_not_called()`.
 - **GUI styling conventions, ported from the sibling.** Pure `tk`, zero `ttk`; a
   `###`-bordered banner above every method; a `# fmt:off` block of aligned
-  `self.widget: tk.X | None = None` declarations in `__init__`, with `build_widgets()`
+  `self.widget: tk.X` declarations in `__init__`, with `build_widgets()`
   called last; `pack` for the vertical page flow and `grid` inside frames. Buttons use one
   recipe — `bg=theme.button_bg, fg=theme.button_fg, activebackground=theme.accent,
   activeforeground=theme.fg_text, relief="flat", font=(family, size, "bold")` — with the
@@ -671,6 +671,27 @@ data classes + spreadsheet writer**.
   interior white and draws a light focus ring, both of which read as rendering artifacts
   against a dark `bg_main`. Their font is deliberately not bold: fifteen bold labels crowd
   the two grids.
+- **The widget declarations are annotations, not assignments, and the widgets are not
+  optional.** `build_widgets()` is the last statement of `__init__` and creates every
+  widget in the `# fmt:off` block, so nothing can observe one unset and no method needs
+  to guard against `None`. A new widget goes in that block *and* in `build_widgets()`.
+  `write_output()` and `clear_output()` used to open with `if self.output_box is None:
+  return`; both guards were unreachable and are gone.
+- **Every `def` under `source/` is fully annotated**, `-> None` included, and container
+  types are spelled out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a
+  bare `list` tells a reader as little as no annotation at all. Use `X | None`, never
+  `Optional[X]`. Where a union would be spelled out twice in one signature, name it once
+  at module scope instead, as `PdfTableParser.ParsedRow` does.
+- **The annotation is the only place a type is written.** Under `source/`, an `Args:`
+  entry is `name: description` and a `Returns:` block is the description alone — no
+  parenthesized or prefixed type repeating the signature. Under `tests/` the docstring
+  type stays, because test parameters are deliberately unannotated and the docstring is
+  the only place a fixture's or mock's type is recorded.
+- **Imports are grouped standard library, third party, first party**, one blank line
+  between groups and each group sorted case-insensitively. `fishbowl_common` is third
+  party — it installs from a pinned git tag — so it never sits among the `source.*`
+  imports. This is exactly what ruff's isort defaults produce, so adopting the linter
+  (#65) reorders nothing.
 - Keep comments concise: a comment should explain only what the immediately adjacent
   code does. Do not document the behavior of other objects, functions, or modules from
   within a comment — describe those where they are defined, not at the call site.

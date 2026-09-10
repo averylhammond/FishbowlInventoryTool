@@ -39,6 +39,13 @@ NUMERIC_VALUE = re.compile(r"[\d,.-]+")
 # to concatenate the fragments with nothing between them.
 CONTINUATION_SEPARATOR = " "
 
+# One parsed table row: the leading text cells exactly as the report printed them,
+# then one converted value per numeric column -- None where the report printed
+# nothing, and the raw token where it printed something to_number cannot convert.
+# Named so the two page parsers can declare what they hand back without spelling
+# the union out twice per signature.
+ParsedRow = list[str | int | float | None]
+
 
 # PdfTableParser class to turn layout-extracted PDF page text into the positional
 # field lists the entry data classes are constructed from
@@ -47,7 +54,7 @@ class PdfTableParser:
     ###########################################################################
     ###             PdfTableParser -> parse_inventory_page()                ###
     ###########################################################################
-    def parse_inventory_page(self, page: str, rows: list) -> list:
+    def parse_inventory_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
         """
         Parses one inventory availability page onto the running list of rows. A row
         whose part or description wrapped across several lines is folded back into
@@ -55,13 +62,13 @@ class PdfTableParser:
         passes the rows parsed so far back in.
 
         Args:
-            page (str): Layout-extracted text for a single page
-            rows (list): The rows parsed so far
+            page: Layout-extracted text for a single page
+            rows: The rows parsed so far
 
         Returns:
-            list: The rows parsed so far plus this page's, each one a list of
-                [part, description, uom, on_hand, allocated, not_available, drop_ship,
-                available, on_order, committed, short], the quantities as numbers
+            The rows parsed so far plus this page's, each one a list of
+            [part, description, uom, on_hand, allocated, not_available, drop_ship,
+            available, on_order, committed, short], the quantities as numbers
         """
 
         lines = page.splitlines()
@@ -131,19 +138,19 @@ class PdfTableParser:
     ###########################################################################
     ###             PdfTableParser -> parse_turnover_page()                 ###
     ###########################################################################
-    def parse_turnover_page(self, page: str, rows: list) -> list:
+    def parse_turnover_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
         """
         Parses one turnover report page onto the running list of rows, adding a row
         for each part's "Totals:" line
 
         Args:
-            page (str): Layout-extracted text for a single page
-            rows (list): The rows parsed so far
+            page: Layout-extracted text for a single page
+            rows: The rows parsed so far
 
         Returns:
-            list: The rows parsed so far plus this page's, each one a list of
-                [part_description, units_sold, avg_qoh, avg_to_days, to_rate], the
-                trailing four as numbers
+            The rows parsed so far plus this page's, each one a list of
+            [part_description, units_sold, avg_qoh, avg_to_days, to_rate], the
+            trailing four as numbers
         """
 
         lines = page.splitlines()
@@ -193,7 +200,7 @@ class PdfTableParser:
     ###########################################################################
     ###               PdfTableParser -> align_to_columns()                  ###
     ###########################################################################
-    def align_to_columns(self, text: str, column_ends: list, offset: int) -> list:
+    def align_to_columns(self, text: str, column_ends: list[int], offset: int) -> list[str]:
         """
         Assigns each value in a row's numeric region to the column its right edge
         lines up with. Matching edges rather than counting values off the end of the
@@ -201,13 +208,13 @@ class PdfTableParser:
         later value one column to the left.
 
         Args:
-            text (str): The slice of the line holding the numeric columns
-            column_ends (list): End offset of each column's header label
-            offset (int): Offset of text within its line, so a value's right edge can
-                be compared against the header's
+            text: The slice of the line holding the numeric columns
+            column_ends: End offset of each column's header label
+            offset: Offset of text within its line, so a value's right edge can be
+                compared against the header's
 
         Returns:
-            list: One value per column, "" wherever the report printed nothing
+            One value per column, "" wherever the report printed nothing
         """
 
         values = [""] * len(column_ends)
@@ -225,7 +232,7 @@ class PdfTableParser:
     ###########################################################################
     ###                  PdfTableParser -> to_number()                      ###
     ###########################################################################
-    def to_number(self, text: str):
+    def to_number(self, text: str) -> int | float | str | None:
         """
         Converts one numeric cell of the report into the number it holds, dropping
         the thousands separators the report prints inside it. The cell is typed by
@@ -233,13 +240,12 @@ class PdfTableParser:
         whole and fractional values keeps each one as written.
 
         Args:
-            text (str): The cell as the report printed it
+            text: The cell as the report printed it
 
         Returns:
-            int: The value of a cell holding no decimal point
-            float: The value of a cell holding one
-            None: For a cell the report left blank, keeping that distinct from a
-                value of zero
+            An int for a cell holding no decimal point and a float for one that does;
+            None for a cell the report left blank, keeping that distinct from a value
+            of zero; or the cell unconverted when it holds a token that is neither
         """
 
         text = text.replace(",", "")

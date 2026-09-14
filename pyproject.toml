@@ -1,0 +1,25 @@
+# Tool configuration only. This project is a packaged desktop app, not a distributable
+# Python package, so there is deliberately no [project] or [build-system] table here.
+
+[tool.pytest.ini_options]
+# Both match pytest's defaults for this layout; they are pinned so a future rename cannot
+# silently stop the suite from being collected by a bare `pytest` -- the problem #86 fixed.
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["./source"]
+omit = [
+    "./main.py",
+    "./tests/*",
+    "./venv/*",
+    ".venv/*",
+    "./source/__init__.py",
+    "./source/constants.py",
+    "./source/gui/__init__.py",
+]
+
+[tool.coverage.report]
+# The 90% gate. Kept here rather than on the CI command line so a local `pytest --cov`
+# enforces exactly what code-coverage.yml does.
+fail_under = 90

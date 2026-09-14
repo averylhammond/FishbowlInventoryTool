@@ -15,11 +15,11 @@ invoke it as `pytest tests/` with no glob.
 **load-bearing**: with `tests/__init__.py` present, pytest's prepend import mode walks up past
 `tests/` and puts the repo root on `sys.path`, which is what makes
 `from source.InventoryAppFileIO import InventoryAppFileIO` resolve. There is deliberately no
-`conftest.py` and no pytest config file. `.coveragerc` scopes measurement to `./source`, omitting
-`main.py`, `constants.py`, `tests/`, the virtualenv and the empty `__init__.py` files; nothing
-else is omitted, since the inert styling data that used to be excluded now lives upstream in
-`fishbowl_common.gui`. The 90% gate itself is a flag in `code-coverage.yml`, not config — see
-`rules/ci.md`.
+`conftest.py`; pytest and coverage configuration lives in `pyproject.toml`, whose
+`[tool.coverage.run]` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
+`tests/`, the virtualenv and the empty `__init__.py` files; nothing else is omitted, since the
+inert styling data that used to be excluded now lives upstream in `fishbowl_common.gui`. Its
+`fail_under = 90` is the gate CI relies on — see `rules/ci.md`.
 
 ## The per-file reference implementations
 

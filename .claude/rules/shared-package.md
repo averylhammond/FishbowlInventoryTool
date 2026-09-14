@@ -29,7 +29,7 @@ intent: the top-level `fishbowl_common` stays importable with no tkinter present
 keeps a headless run tkinter-free.
 
 `requirements/dev.txt` is `-r release.txt` plus `pytest` and `pytest-cov`. There is **no ruff pin
-here yet** (#65) and no `pyproject.toml` (#64), unlike the sibling.
+here yet** (#65), unlike the sibling; `pyproject.toml` already exists to hold its config.
 
 ## Construction and gating in `InventoryAppController`
 

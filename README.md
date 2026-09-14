@@ -104,7 +104,7 @@ See [`USER_GUIDE.txt`](USER_GUIDE.txt) for end-user instructions.
 
 ```bash
 pytest tests/                                        # unit tests
-pytest --cov=./ --cov-report=term-missing tests/     # unit tests with a coverage table
+pytest --cov=./ --cov-report=term-missing tests/     # coverage table; fails under 90%
 ```
 
 Reproduce the integration test locally (after `./scripts/copy_resources.sh`):
@@ -128,7 +128,7 @@ PR diffs. The release workflow runs only on pushed `v*` tags.
 | --- | --- |
 | [Unit Tests](.github/workflows/unit-tests.yml) | `pytest tests/` on `ubuntu-latest`. |
 | [Integration Tests](.github/workflows/integration-tests.yml) | Runs the app headless and fails unless `logs/results.txt` matches the submodule's `canonical_correct_results.txt`. Needs the `CUSTOMER_DATA_PAT` secret to check out the private submodule. |
-| [Code Coverage](.github/workflows/code-coverage.yml) | `pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/`, uploaded to Codecov. Needs the `CODECOV_TOKEN` secret. |
+| [Code Coverage](.github/workflows/code-coverage.yml) | `pytest --cov=./ --cov-report=xml tests/`, uploaded to Codecov. The 90% gate is `fail_under` in `pyproject.toml`. Needs the `CODECOV_TOKEN` secret. |
 | [Release](.github/workflows/release.yml) | On a `v*` tag: verifies the tag matches `VERSION`, runs both test suites on `windows-latest`, packages the release, and publishes it. |
 
 Every measured module is currently at 100%, so the 90% gate is headroom for an

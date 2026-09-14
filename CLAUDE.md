@@ -54,23 +54,23 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Run a single test file: `pytest tests/test_InventoryAppFileIO.py`
 - Run a single test:
   `pytest tests/test_InventoryAppFileIO.py::test_read_pdf_extracts_each_page_in_layout_mode`
-- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/` — the 90% gate lives in
-  the workflow, not in config, so a local run does not enforce it
+- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/` — the 90% gate is
+  `fail_under` in `pyproject.toml`, so it applies locally too
 - Byte-compile sanity check:
   `python -m py_compile main.py source/*.py source/gui/*.py tests/*.py`
 - Package a release: `./scripts/package_release.sh` (no arguments). Builds via PyInstaller into
   `release/FishbowlInventoryTool/` and zips it; on Windows with Inno Setup installed it also
   builds `release/FishbowlInventoryTool_Setup.exe`.
 
-There is **no lint or format command yet** — ruff is not configured in this repo (#65), and there
-is no `pyproject.toml` (#64). Both are parity work tracked against the sibling.
+There is **no lint or format command yet** — ruff is not configured in this repo (#65). That is
+parity work tracked against the sibling; `pyproject.toml` is already here to hold the config.
 
 ## CI
 
 Four workflows in `.github/workflows/`: unit tests, code coverage and integration tests on
-`ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by a
-`--cov-fail-under=90` flag in `code-coverage.yml` (not a config `fail_under`, unlike the
-sibling). The integration check diffs `logs/results.txt` against the submodule's
+`ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by `fail_under` in
+`pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
+`code-coverage.yml`. The integration check diffs `logs/results.txt` against the submodule's
 `canonical_correct_results.txt`, so any change to parsing or output formatting breaks it until
 that canonical file is updated.
 

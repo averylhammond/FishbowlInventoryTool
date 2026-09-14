@@ -24,14 +24,13 @@ missing concurrency group and the `--cov=./` scope.
 
 Notes that are easy to get wrong:
 
-- **The coverage gate is a workflow flag, not config.** `code-coverage.yml` runs
-  `pytest --cov=./ --cov-report=xml --cov-fail-under=90 tests/`, so a local `pytest --cov` does
-  **not** enforce it. (The sibling moved its gate into `pyproject.toml`'s `fail_under`; this repo
-  has no `pyproject.toml` — #64.) `.coveragerc` only scopes *what* is measured; see
-  `rules/tests.md`. The Codecov upload step is `if: always()` so the report still lands when the
-  gate fails — exactly when the PR comment is most useful. `CODECOV_TOKEN` is the upload token,
-  and the extra `push: branches: [main]` trigger exists so Codecov records a main-branch baseline
-  for PR diffs; without it the badge never updates.
+- **The coverage gate is `fail_under = 90` in `pyproject.toml`**, not a workflow flag, so a local
+  `pytest --cov` enforces it too. `code-coverage.yml` runs
+  `pytest --cov=./ --cov-report=xml tests/`; the same file's `[tool.coverage.run]` scopes *what*
+  is measured, see `rules/tests.md`. The Codecov upload step is `if: always()` so the report
+  still lands when the gate fails — exactly when the PR comment is most useful. `CODECOV_TOKEN`
+  is the upload token, and the extra `push: branches: [main]` trigger exists so Codecov records a
+  main-branch baseline for PR diffs; without it the badge never updates.
 - **Every measured module is at 100%** (689 statements, 218 tests), so the 90% gate is headroom
   for an in-progress refactor rather than a target to climb toward, and it matches the sibling's.
   Keep it there: a new module landing untested should fail the check,

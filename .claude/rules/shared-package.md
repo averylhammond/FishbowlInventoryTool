@@ -28,8 +28,12 @@ additional requirements; its only dependency is tkinter, which ships with CPytho
 intent: the top-level `fishbowl_common` stays importable with no tkinter present, which is what
 keeps a headless run tkinter-free.
 
-`requirements/dev.txt` is `-r release.txt` plus `pytest` and `pytest-cov`. There is **no ruff pin
-here yet** (#65), unlike the sibling; `pyproject.toml` already exists to hold its config.
+`requirements/dev.txt` is `-r release.txt` plus `pytest`, `pytest-cov` and `openpyxl`. The last
+is the reader `scripts/dump_workbooks.py` uses for the integration test's spreadsheet check
+(`rules/ci.md`): `XlsxWriter` is write-only, but the app itself never reads a workbook, so it is
+deliberately **not** in `release.txt` where it would be bundled into the shipped executable for
+nothing. There is **no ruff pin here yet** (#65), unlike the sibling; `pyproject.toml` already
+exists to hold its config.
 
 ## Construction and gating in `InventoryAppController`
 

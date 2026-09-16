@@ -48,8 +48,11 @@ guidance here to name the open issue behind anything that has not caught up yet.
   and writes `logs/results.txt`, no GUI): `python main.py --integration-test`. `main.py` parses
   nothing itself — the flag is registered by the shared `ArgumentProvider`.
 - Reproduce the integration check locally (after `./scripts/copy_resources.sh`):
-  `python main.py --integration-test` then
-  `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt`
+  `python main.py --integration-test`, then **both** diffs —
+  `diff logs/results.txt automated-inventory-testing/canonical_correct_results.txt` and
+  `python scripts/dump_workbooks.py && diff logs/spreadsheet_dump.txt automated-inventory-testing/canonical_correct_spreadsheets.txt`
+- Dump the generated workbooks on their own: `python scripts/dump_workbooks.py` (writes
+  `logs/spreadsheet_dump.txt`; needs `openpyxl` from `requirements/dev.txt`)
 - Run all unit tests: `pytest tests/`
 - Run a single test file: `pytest tests/test_InventoryAppFileIO.py`
 - Run a single test:
@@ -70,9 +73,23 @@ parity work tracked against the sibling; `pyproject.toml` is already here to hol
 Four workflows in `.github/workflows/`: unit tests, code coverage and integration tests on
 `ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by `fail_under` in
 `pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
-`code-coverage.yml`. The integration check diffs `logs/results.txt` against the submodule's
-`canonical_correct_results.txt`, so any change to parsing or output formatting breaks it until
-that canonical file is updated.
+`code-coverage.yml`.
+
+The integration check diffs **two** artifacts against canonical copies in the submodule, and any
+change to parsing, layout or output formatting breaks it until the matching canonical file is
+regenerated:
+
+| Generated | Canonical | Covers |
+| --- | --- | --- |
+| `logs/results.txt` | `canonical_correct_results.txt` | The parser trace, built from the `InventoryEntry`/`TurnoverEntry` objects |
+| `logs/spreadsheet_dump.txt` | `canonical_correct_spreadsheets.txt` | The generated `.xlsx` files themselves, dumped cell by cell |
+
+The second exists because the first never touches the workbook, which is how three Priority-0
+spreadsheet bugs shipped alongside a green diff and 100% line coverage (#53, #54, #55).
+**Regenerating either canonical file is a commit in the private `automated-inventory-testing`
+repo plus a submodule pointer bump here** — and capture it from a build you have reason to
+trust, since a canonical file records whatever the app did, bug included. See
+`.claude/rules/ci.md`.
 
 Pushing a `v*` tag runs the release workflow, which refuses the tag unless it matches
 `constants.VERSION` **and** `PATCH_NOTES.md` has a matching `## <VERSION>` section. **Cutting a
@@ -185,5 +202,5 @@ matching file is opened. Put new detail in the matching rule file rather than gr
 | `rules/gui.md` | `source/gui/**` | The display, its menu bar, what comes from `fishbowl_common.gui`, theme/font reconfiguration, the styling recipes, the `after(0, …)` rule |
 | `rules/shared-package.md` | `InventoryAppController.py`, `constants.py`, `requirements/**` | What each shared class takes by injection, construction order and headless gating, patch-notes logic, `constants.py`'s catalogue |
 | `rules/tests.md` | `tests/**` | Per-file reference implementations, the `display` fixture, isolation rules, FIRST, conventions |
-| `rules/ci.md` | `.github/workflows/**` | Workflow internals, the coverage gate, the two release gates, submodule handling |
-| `rules/packaging.md` | `scripts/**` | `package_release.sh`, and the load-bearing `installer.iss` details the in-app updater depends on |
+| `rules/ci.md` | `.github/workflows/**`, `requirements/**` | Workflow internals, the coverage gate, the two canonical fixtures and `dump_workbooks.py`, the two release gates, submodule handling |
+| `rules/packaging.md` | `scripts/**` | `package_release.sh`, the load-bearing `installer.iss` details the in-app updater depends on, and which scripts are not packaging |

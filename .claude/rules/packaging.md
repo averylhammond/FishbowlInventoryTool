@@ -5,6 +5,11 @@ paths:
 
 # Release packaging and the installer
 
+Not everything in `scripts/` is packaging. **`scripts/dump_workbooks.py` is integration-test
+tooling** — it dumps the generated `.xlsx` files so CI can diff the spreadsheet itself, needs
+`openpyxl` from `requirements/dev.txt`, and is no part of the release build. It is documented in
+`rules/ci.md`; `copy_resources.sh` likewise stages test data rather than building anything.
+
 `scripts/package_release.sh` builds the payload; `scripts/installer.iss` turns it into
 `FishbowlInventoryTool_Setup.exe` with Inno Setup, and `.github/workflows/release.yml` publishes
 both when a `v*` tag is pushed (see `rules/ci.md` for the workflow side).

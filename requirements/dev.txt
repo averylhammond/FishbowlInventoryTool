@@ -1,3 +1,8 @@
 -r release.txt
+
+# Reader for the integration test's spreadsheet check (scripts/dump_workbooks.py).
+# XlsxWriter is write-only, but the app never reads a workbook, so this stays out of
+# release.txt rather than being bundled into the shipped executable.
+openpyxl==3.1.5
 pytest==8.4.1
 pytest-cov==7.0.0

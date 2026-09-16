@@ -92,6 +92,19 @@ jobs:
             exit 1
         fi
 
+    # Verify the generated spreadsheets too. The results file checked above is a parser
+    # trace and never touches the workbook, so this is the only check that looks at the
+    # artifact the release actually produces for a customer.
+    - name: Verify generated spreadsheet contents
+      run: |
+        python scripts/dump_workbooks.py
+        if diff --strip-trailing-cr -q ./logs/spreadsheet_dump.txt ./automated-inventory-testing/canonical_correct_spreadsheets.txt >/dev/null; then
+            echo -e "\e[1;3;32mSpreadsheets match, tests pass.\e[0m"
+        else
+            echo -e "\e[1;3;31mSpreadsheet mismatch, tests do not pass.\e[0m"
+            exit 1
+        fi
+
     # Install Inno Setup so package_release.sh can additionally build the Windows installer
     # (FishbowlInventoryTool_Setup.exe). Chocolatey is preinstalled on windows-latest and installs
     # ISCC.exe to the default location the packaging script probes.

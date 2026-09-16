@@ -217,12 +217,12 @@ def test_write_inventory_titles_every_checked_column(writer, worksheet):
         (0, 0, "Part"),
         (0, 1, "Description"),
         (0, 2, "UOM"),
-        (0, 3, "OnHand"),
+        (0, 3, "On Hand"),
         (0, 4, "Allocated"),
-        (0, 5, "NotAvailable"),
-        (0, 6, "DropShip"),
+        (0, 5, "Not Available"),
+        (0, 6, "Drop Ship"),
         (0, 7, "Available"),
-        (0, 8, "OnOrder"),
+        (0, 8, "On Order"),
         (0, 9, "Committed"),
         (0, 10, "Short"),
     ]
@@ -249,11 +249,11 @@ def test_write_inventory_skips_unchecked_columns(writer, worksheet):
     assert cells_in_row(worksheet, 0) == [
         (0, "Part"),
         (1, "Description"),
-        (2, "OnHand"),
+        (2, "On Hand"),
         (3, "Allocated"),
-        (4, "NotAvailable"),
+        (4, "Not Available"),
         (5, "Available"),
-        (6, "OnOrder"),
+        (6, "On Order"),
         (7, "Committed"),
         (8, "Short"),
     ]
@@ -488,7 +488,7 @@ def test_append_turnover_report_labels_each_column_with_the_report(writer, works
 
     # Each column is titled with the report it holds, except the shared description
     assert cells_in_row(worksheet, 0) == [
-        (11, "TO Description"),
+        (11, "Description Turnover_Jan2024"),
         (12, "Units Sold Turnover_Jan2024"),
         (13, "Avg QOH Turnover_Jan2024"),
         (14, "Avg TO Days Turnover_Jan2024"),
@@ -726,12 +726,12 @@ def test_append_turnover_report_places_two_reports_side_by_side(writer, workshee
 
     # Both reports keep a complete set of columns, and none is written to twice
     assert cells_in_row(worksheet, 0) == [
-        (11, "TO Description"),
+        (11, "Description Turnover_Q3-2023"),
         (12, "Units Sold Turnover_Q3-2023"),
         (13, "Avg QOH Turnover_Q3-2023"),
         (14, "Avg TO Days Turnover_Q3-2023"),
         (15, "TO Rate Turnover_Q3-2023"),
-        (16, "TO Description"),
+        (16, "Description Turnover_Q1-2024"),
         (17, "Units Sold Turnover_Q1-2024"),
         (18, "Avg QOH Turnover_Q1-2024"),
         (19, "Avg TO Days Turnover_Q1-2024"),
@@ -910,7 +910,7 @@ def test_append_turnover_report_never_writes_over_the_header_row(writer, workshe
 
     # Row zero still holds nothing but the turnover headers
     assert cells_in_row(worksheet, 0) == [
-        (0, "TO Description"),
+        (0, "Description Q1-2024"),
         (1, "Units Sold Q1-2024"),
         (2, "Avg QOH Q1-2024"),
         (3, "Avg TO Days Q1-2024"),

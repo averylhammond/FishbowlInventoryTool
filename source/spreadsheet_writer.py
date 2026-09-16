@@ -13,18 +13,6 @@ FIRST_DATA_ROW = 1
 # joined on, so a part the report never mentions reads as missing rather than blank
 MISSING_TURNOVER_VALUE = "N/A"
 
-# Header text the sheet carried before Column.label became authoritative. Kept for
-# one commit so the rewrite can be shown to have moved no cell, and deleted by the
-# commit that flips the headers. Note "tDescription" took no report suffix, which is
-# why a hit here replaces the whole header rather than just its label.
-LEGACY_HEADERS = {
-    "OnHand": "OnHand",
-    "NotAvailable": "NotAvailable",
-    "DropShip": "DropShip",
-    "OnOrder": "OnOrder",
-    "tDescription": "TO Description",
-}
-
 # The three formats every cell carries, built once per workbook in __init__. #F0F0F0
 # is a light gray and #E6F0FF a light blue; the module this replaced had the two
 # labelled the other way around in all three of its copies.
@@ -217,8 +205,9 @@ class SpreadsheetWriter:
         """
 
         for col, column in enumerate(columns, start=start_col):
-            header = LEGACY_HEADERS.get(column.key, f"{column.label}{suffix}")
-            self.worksheet.write(HEADER_ROW, col, header, self.header_format)
+            self.worksheet.write(
+                HEADER_ROW, col, f"{column.label}{suffix}", self.header_format
+            )
 
     ###########################################################################
     ###               SpreadsheetWriter -> _write_entry_row()               ###

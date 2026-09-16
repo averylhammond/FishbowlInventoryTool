@@ -12,7 +12,7 @@ paths:
 The pipeline is: `InventoryAppFileIO.read_pdf()` hands page text to `PdfTableParser`, which
 returns positional field lists; `InventoryProcessor` maps those onto `InventoryEntry` /
 `TurnoverEntry` objects, writes each entry's `to_formatted_string()` into the results file, and
-drives `spreadsheetDriver` (see `rules/spreadsheet.md`) to produce the `.xlsx`.
+drives `SpreadsheetWriter` (see `rules/spreadsheet.md`) to produce the `.xlsx`.
 
 ## `InventoryProcessor`
 
@@ -34,9 +34,12 @@ and user-facing status reaches the caller only through an injected callback.
   resulting rows onto the entry classes. **Every page is parsed before any entry is built**,
   because a row's part or description can wrap from the bottom of one page onto the top of the
   next.
-- It imports `spreadsheetDriver` with `from source.spreadsheetDriver import *` — the one wildcard
-  import left under `source/`, and why it calls `setupMainSpreadsheet` unqualified. Ruff would
-  flag it (`F403`/`F405`) once the linter lands (#65); prefer explicit imports for anything new.
+- It constructs **one `SpreadsheetWriter` per workbook**, after the `create_workbook()` `None`
+  guard — the writer opens the worksheet in its constructor, so a failed workbook must never
+  reach it — and threads each turnover report's returned end column into the next call. It used
+  to reach the writers through `from source.spreadsheetDriver import *`, the one wildcard import
+  under `source/`; #57 replaced that with an explicit import, so `F403`/`F405` have no subject
+  left in this repo when the linter lands (#65).
 
 ## `PdfTableParser`
 
@@ -84,7 +87,7 @@ Home of **all** file I/O. Directory and file paths come from `source/constants.p
   `Path`s ready to read.
 - It owns the output spreadsheet lifecycle: `create_workbook()` places the workbook under
   `OUTPUT_DIR`, `save_workbook()` saves it. The in-memory cell writing lives in
-  `spreadsheetDriver.py`, which receives the already-open workbook.
+  `SpreadsheetWriter`, which is constructed around the already-open workbook.
 - It owns the results log at `logs/results.txt`. `reset_results_file()` **deletes** it on startup
   rather than truncating it, and `write_to_results_file()` (append mode, which recreates the
   file) writes each line. The delete-not-truncate distinction is load-bearing:

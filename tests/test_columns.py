@@ -7,6 +7,8 @@ from source.columns import (
     TURNOVER_COLUMNS,
     all_columns_selected,
 )
+from source.InventoryEntry import InventoryEntry
+from source.TurnoverEntry import TurnoverEntry
 
 
 ###############################################################################
@@ -15,9 +17,9 @@ from source.columns import (
 def test_column_keys_are_in_spreadsheet_order():
     """
     Tests that COLUMN_KEYS holds every checkbox key in the order the spreadsheet
-    writers walk them. The literal is repeated here rather than derived so a
-    reordering or a renamed key fails loudly: spreadsheetDriver looks these keys
-    up by name, and a silent change would drop a column from the report.
+    writer walks them. The literal is repeated here rather than derived so a
+    reordering or a renamed key fails loudly: the writer emits columns in this
+    order, and a silent change would move or drop a column in every report.
     """
 
     assert COLUMN_KEYS == (
@@ -79,6 +81,38 @@ def test_every_column_has_a_tooltip():
         assert column.tooltip
 
 
+@pytest.mark.parametrize(
+    "columns, entry_class",
+    [(INVENTORY_COLUMNS, InventoryEntry), (TURNOVER_COLUMNS, TurnoverEntry)],
+)
+def test_every_column_field_names_an_attribute_of_its_entry(columns, entry_class):
+    """
+    Tests that every column's field resolves on the entry class that section is
+    written from. The writer reads each cell with getattr(entry, column.field), so
+    a typo or a renamed entry attribute would otherwise surface as an
+    AttributeError partway through writing a report rather than here.
+
+    Args:
+        columns (tuple): The column section under test
+        entry_class (type): The entry dataclass that section's values come from
+    """
+
+    entry = entry_class()
+
+    for column in columns:
+        assert hasattr(entry, column.field)
+
+
+def test_every_column_has_a_field():
+    """
+    Tests that every column carries a non-empty entry attribute name, since a
+    column added without one would write nothing rather than fail to build
+    """
+
+    for column in ALL_COLUMNS:
+        assert column.field
+
+
 def test_turnover_labels_drop_the_key_prefix():
     """
     Tests that the turnover columns show plain labels rather than their
@@ -109,8 +143,9 @@ def test_all_columns_selected_includes_every_column():
     # Every key the spreadsheet writers consult must be present
     assert tuple(selected.keys()) == COLUMN_KEYS
 
-    # Every column must be included, as real booleans: spreadsheetDriver compares
-    # each value against True with ==, so a truthy non-bool would drop the column
+    # Every column must be included, as real booleans. The writer only tests
+    # truthiness, but the display asserts these are bools and the settings layer
+    # round-trips them through str(), so a truthy non-bool would not survive
     for value in selected.values():
         assert value is True
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from source.InventoryAppFileIO import InventoryAppFileIO
 from source.InventoryEntry import InventoryEntry
 from source.PdfTableParser import PdfTableParser
-from source.spreadsheetDriver import *
+from source.spreadsheet_writer import SpreadsheetWriter
 from source.TurnoverEntry import TurnoverEntry
 
 
@@ -159,8 +159,11 @@ class InventoryProcessor:
             )
             return False
 
+        # Writer for this workbook, holding its worksheet and its cell formats
+        writer = SpreadsheetWriter(workbook)
+
         # Setup a spreadsheet with the inventory availability
-        nextCol = setupMainSpreadsheet(workbook, inventory, checkbox_dict)
+        next_col = writer.write_inventory(inventory, checkbox_dict)
 
         for i in inventory:
             self.file_io.write_to_results_file(i.to_formatted_string())
@@ -169,17 +172,11 @@ class InventoryProcessor:
         for file in self.file_io.list_turnover_files():
             turnover = self.process_turnover_file(file)
 
-            # The header writer reports back the first column past the ones this
-            # report filled, so the next report starts after it rather than over it
-            endCol = setupSpreadsheetTurnoverHeader(
-                workbook, checkbox_dict, nextCol, file.stem, len(inventory)
+            # Each report reports back the first column past the ones it filled, so
+            # the next report starts after it rather than over it
+            next_col = writer.append_turnover_report(
+                turnover, inventory, next_col, checkbox_dict, file.stem
             )
-
-            # Append turnover data to columns in workbook
-            appendTurnoverToSpreadsheet(
-                workbook, turnover, inventory, nextCol, checkbox_dict
-            )
-            nextCol = endCol
 
         # Save and close the spreadsheet
         if self.file_io.save_workbook(workbook):

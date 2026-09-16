@@ -134,3 +134,11 @@ case-insensitive on Windows, case-sensitive on POSIX). Errors and user-facing st
 Line endings are the one thing that may differ: the file is written in text mode, so it is CRLF
 on Windows and LF on Linux, and git's `core.autocrlf` translation of the canonical file cancels
 this out on both. Do not "fix" that asymmetry in one place without the other.
+
+**It is no longer the only fixture.** The results file is a parser trace built from the entry
+objects and never touches the workbook, so CI also diffs a cell dump of the generated `.xlsx`
+files (`scripts/dump_workbooks.py` → `canonical_correct_spreadsheets.txt`) — see `rules/ci.md`.
+Everything above applies to that dump too, except the line-ending cancellation: its diff passes
+`--strip-trailing-cr` instead of depending on `core.autocrlf`. A change to what this file logs
+breaks the first diff; a change to what reaches the sheet breaks the second; a parser change
+usually breaks both.

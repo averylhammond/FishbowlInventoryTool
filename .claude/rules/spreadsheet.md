@@ -49,7 +49,9 @@ filename, a concept `columns.py` cannot express.
 only to `columns.py` gets a checkbox and a settings key and is then silently never written —
 no error, no missing-key failure. **#57 rewrites these writers as a data-driven
 `spreadsheet_writer.py` and makes `columns.py` the real single source of truth**; until it lands,
-do not write guidance that assumes it already is.
+do not write guidance that assumes it already is. That rewrite touches every cell-writing path
+here, so check it against the spreadsheet dump (`rules/ci.md`) rather than the results file: the
+dump is the only thing in CI that sees the columns it produces.
 
 ## Rules that are easy to break
 
@@ -57,9 +59,12 @@ do not write guidance that assumes it already is.
   its stride.** `setupSpreadsheetTurnoverHeader` returns the first free column and
   `process_inventory()` assigns it (`nextCol = endCol`), exactly as `setupMainSpreadsheet` reports
   back where the inventory columns ended. It used to advance by `+= 1`, which silently overwrote
-  all but the first column of every turnover report but the last — a data-loss bug invisible to
-  CI, since the results file is built from the entry objects and never from the sheet. Whatever
-  replaces these writers must keep reporting its true end column.
+  all but the first column of every turnover report but the last (#53) — a data-loss bug the
+  results file cannot see, since it is built from the entry objects and never from the sheet.
+  **The spreadsheet dump added in #56 is what catches this class of bug now**: CI diffs a cell
+  dump of the generated `.xlsx` against a canonical copy, so a column that moves or disappears
+  fails the integration check. Whatever replaces these writers must keep reporting its true end
+  column — and must leave that dump unchanged, or explain why the output legitimately differs.
 - **Turnover rows are matched to inventory rows by `part` vs. `part_description`** with all
   spaces removed; the matched entry's **position in the inventory list** is its row on the sheet.
   `setupMainSpreadsheet` writes one row per entry starting at `FIRST_DATA_ROW` regardless of
@@ -69,7 +74,8 @@ do not write guidance that assumes it already is.
   and row 0 is the header. The entry used to carry a `row_written_to` field instead, assigned
   from inside each checked column's branch; with no inventory column checked nothing assigned it
   and every turnover row overwrote the header (#55). Deriving the row removes the failure mode
-  rather than guarding it — **do not reintroduce a stored row.**
+  rather than guarding it — **do not reintroduce a stored row.** The header row is row 0 of the
+  spreadsheet dump, so a writer that lands on it now fails CI rather than shipping.
 - **`get_selected_columns()` wraps every value in `bool()`, and that is load-bearing.** The
   writers test `if checkboxDict["Part"] == True`, which a `tk.BooleanVar` fails — the column
   would be silently dropped from the report rather than raising.

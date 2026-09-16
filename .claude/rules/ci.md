@@ -42,18 +42,55 @@ Notes that are easy to get wrong:
   its contents into a workflow log.** `unit-tests.yml` and `code-coverage.yml` check out
   **without** it and need no secret, because unit tests mock all their I/O. Keep it that way: a
   test that needs a real PDF belongs in the integration test instead.
-- **The integration check is a `diff`**, not an assertion suite: it runs
-  `python main.py --integration-test` and compares `logs/results.txt` against the submodule's
-  `canonical_correct_results.txt`. The diff is inlined in the workflow; the submodule's
-  `run_automated_tests.sh` is a local convenience script that CI never invokes. When the parser
-  changes output intentionally, regenerate `canonical_correct_results.txt` in the
-  `automated-inventory-testing` repo and bump the submodule pointer.
+- **The integration check is two `diff`s**, not an assertion suite. It runs
+  `python main.py --integration-test`, then `python scripts/dump_workbooks.py`, and compares each
+  output against a canonical copy in the submodule:
+
+  | Generated | Canonical | Covers |
+  | --- | --- | --- |
+  | `logs/results.txt` | `canonical_correct_results.txt` | The parser trace, built from the entry objects |
+  | `logs/spreadsheet_dump.txt` | `canonical_correct_spreadsheets.txt` | The generated `.xlsx` files, cell by cell |
+
+  They are **separate workflow steps** so a failure names which artifact drifted. Both diffs are
+  inlined in the workflow; the submodule's `run_automated_tests.sh` checks the same two files but
+  is a local convenience script CI never invokes. When the output changes intentionally,
+  regenerate the affected canonical file in the `automated-inventory-testing` repo and bump the
+  submodule pointer — and capture it from a build you have reason to trust, since the canonical
+  file records whatever the app did, bug included.
+- **`scripts/dump_workbooks.py` is what makes the spreadsheet checkable**, and it is CI tooling,
+  not application code: never imported by the app, no unit tests, and its `openpyxl` reader is
+  pinned in `requirements/dev.txt` **only** — `XlsxWriter` is write-only, but the app never reads
+  a workbook, so putting the reader in `release.txt` would bundle it into the shipped executable
+  for nothing. That pin is why `integration-tests.yml` installs `dev.txt` rather than
+  `release.txt`. The dump is one line per sheet row with each cell rendered as
+  `<style code>:<value>` (`H` header, `E`/`O` alternating data rows, `?` for a format the dumper
+  does not recognize, `-` for a cell that is both empty and unstyled), so a diff names the cell
+  that moved. It writes into the gitignored `logs/` directory and prints only a line count —
+  **the dump is full of customer part data and must never reach a CI log or this public repo.**
+  It exits non-zero if it finds no workbooks, so a run that produced nothing fails loudly instead
+  of diffing clean against a fixture.
+- **Why the check is a semantic dump rather than a comparison of the `.xlsx` itself.** Byte-
+  comparing the file is impossible without changing shipped behavior — xlsxwriter stamps
+  `<dcterms:created>` with the current time unless the app passes `set_properties()` — and
+  diffing the XML inside the zip would pin the fixture to xlsxwriter's emission rather than to
+  the spreadsheet: strings are `sharedStrings.xml` indices, formats are style indices numbered in
+  `add_format` call order, so hoisting a format out of a loop rewrites the whole sheet without
+  changing what a user opens. The dump gives up sheet-level properties (column widths, freeze
+  panes, merges); the writers set none of those today, and the `dims:` line plus the `?` code
+  cover the gap until they do.
 - **The integration job runs on Linux while the app ships as a Windows executable.** That is only
   safe because the results file is platform-independent by construction (see
-  `rules/inventory-processing.md`). `release.yml` re-runs the same integration test on
+  `rules/inventory-processing.md`); the spreadsheet dump is too, for the same reason — both are
+  written through Python's text mode and hold no paths. `release.yml` re-runs both checks on
   `windows-latest`, so a Windows-specific regression is caught at release time — but not on every
   PR. If one ever slips through to a release, add a `windows-latest` leg to a `strategy.matrix`
   here.
+- **The results diff quietly depends on `core.autocrlf` being on for the Windows runner.** Both
+  canonical files are stored LF, the app writes CRLF on Windows, and the results check passes
+  there only because git checks the fixture out as CRLF to match. The spreadsheet check does not
+  rely on that — it diffs with `--strip-trailing-cr`. If the results check ever fails on
+  `release.yml` with no visible difference, this is why; the fix is the same flag, not a
+  regenerated fixture.
 - **The GUI tests need no display and no `python3-tk`.** `actions/setup-python`'s CPython builds
   bundle `_tkinter` and its Tcl/Tk libraries, and the display tests patch `tk.Tk.__init__` and
   every widget class, so no real window is ever created.

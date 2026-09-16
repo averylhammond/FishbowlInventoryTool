@@ -6,8 +6,8 @@ paths:
 # Unit testing conventions
 
 Unit tests live in `tests/`, one `tests/test_<module_name>.py` per module under `source/` — the
-mirror is the *module*, not a class, which is why `test_columns.py` and `test_spreadsheetDriver.py`
-(both module-level code, no class) sit alongside the class files. That name matches pytest's
+mirror is the *module*, not a class, which is why `test_columns.py` (module-level code, no
+class) sits alongside the class files. That name matches pytest's
 default `python_files` pattern, so a bare `pytest` collects the whole suite and the workflows
 invoke it as `pytest tests/` with no glob.
 
@@ -40,26 +40,30 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
   order, that `COLUMN_KEYS` matches, and that `all_columns_selected()` maps every key to `True`.
   Keep it in step with `source/columns.py` whenever a column is added — it is the only test that
   notices a key or an `always` flag changing.
-- **`tests/test_spreadsheetDriver.py`** — module-level functions writing through a mocked
-  `xlsxwriter` workbook. Follow it for spreadsheet-writer tests: `workbook` and `worksheet`
-  fixtures (`MagicMock(spec=xlsxwriter.Workbook)` / `spec=Worksheet`), with
+- **`tests/test_spreadsheet_writer.py`** — a class driven end to end through a mocked
+  `xlsxwriter` workbook. Follow it for spreadsheet-writer tests: `worksheet` and `workbook`
+  fixtures (`MagicMock(spec=Worksheet)` / `spec=xlsxwriter.Workbook`), with
   `add_format.side_effect = lambda spec: dict(spec)` so each format is the spec dict it was built
-  from and one format is distinguishable from another; `written_cells()` / `written_formats()`
-  helpers reducing `worksheet.write.call_args_list` to `(row, col, value)` tuples and format
-  dicts, so assertions read as column layout; a `checkboxes()` helper building the checkbox dict
-  from a local `COLUMN_KEYS` tuple rather than importing the controller; and sibling functions in
-  the same module patched at `source.spreadsheetDriver.<name>` so each test exercises one
-  function. Real `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they are
-  inert data holders with no I/O — but each is given a distinct value per field so a column/data
-  desync fails loudly instead of matching by coincidence.
+  from and one format is distinguishable from another, and `add_worksheet` stubbed because
+  `SpreadsheetWriter.__init__` opens the sheet; then a `writer` fixture wrapping the writer
+  around it. `written_cells()` gives `(row, col, value)` tuples in write order, while
+  `final_cells()` / `cells_in_row()` give what the *saved* sheet would hold — a turnover report
+  writes each column twice, as a placeholder and then as the data landing on top of it, so the
+  call list alone does not say what the user sees. **Nothing is patched**: the writer's own
+  methods are exercised together, which is what lets a test assert an unmatched part still reads
+  `N/A`. `checkboxes()` builds the checkbox dict from the imported `source.columns.COLUMN_KEYS`,
+  but every layout assertion stays a literal `(row, col, value)` tuple — those are what fail when
+  a column moves. Real `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they
+  are inert data holders with no I/O — but each is given a distinct value per field so a
+  column/data desync fails loudly instead of matching by coincidence.
 - **`tests/test_InventoryProcessor.py`** — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to the
   constructor while the `PdfTableParser` the processor builds itself is patched at
   `source.InventoryProcessor.PdfTableParser`. The `spec=` is safe only because the processor never
   touches `report_error`, which is an instance attribute a spec'd mock would reject. The
-  spreadsheet writers reach the module through `from source.spreadsheetDriver import *`, which
-  makes `source.InventoryProcessor.setupMainSpreadsheet` (etc.) the point of use — never
-  `source.spreadsheetDriver.<name>`. `process_inventory()` is tested with its own parsing helpers
+  spreadsheet writer is imported by name, so `source.InventoryProcessor.SpreadsheetWriter` is
+  the point of use; a test drives the mocked class's `return_value` to stand in for the writer
+  the processor builds. `process_inventory()` is tested with its own parsing helpers
   replaced via `patch.object` on the instance, so each test exercises one method.
 - **`tests/test_InventoryAppController.py`** — the wiring, with `ArgumentProvider`,
   `InventoryAppFileIO` and `InventoryProcessor` patched at `source.InventoryAppController.<name>`
@@ -179,9 +183,8 @@ real filesystem, a real PDF, or the GUI.
   binds whatever the module happens to export, so a name deleted or renamed in `source/` fails at
   the point of *use*, in one test, rather than at import, in every test that file holds — which
   makes a rename far harder to trace. Import lists are sorted and parenthesized across lines once
-  they no longer fit on one. (`source/InventoryProcessor.py` still star-imports
-  `source.spreadsheetDriver`; that is application code, and it is what makes
-  `source.InventoryProcessor.<name>` the patch target described above.)
+  they no longer fit on one. There is no star import left under `source/` either — #57 removed
+  the last one, in `InventoryProcessor`.
 - **One fixture convention: build the unit under test in a pytest fixture**, and give a test that
   needs a differently-constructed object its arguments through indirect parametrization rather
   than a `_build_window(...)`-style helper function. The helper form left this repo with the

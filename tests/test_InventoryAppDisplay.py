@@ -1035,8 +1035,8 @@ def test_get_selected_columns_reports_every_column(display):
 def test_get_selected_columns_reflects_the_checkbox_state_as_real_booleans(display):
     """
     Tests that a checked column comes back True and an unchecked one False, as
-    real booleans rather than merely truthy values: the spreadsheet writers
-    compare each value against True with ==, so anything else drops the column
+    real booleans rather than merely truthy values: the settings layer round-trips
+    this dict through str(), so anything else is persisted as its repr
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter

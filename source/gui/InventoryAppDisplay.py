@@ -685,9 +685,9 @@ class InventoryAppDisplay(tk.Tk):
             A mapping of every column key to whether that column is included
         """
 
-        # bool() is required, not cosmetic: the spreadsheet writers compare each
-        # value against True with ==, which a BooleanVar would fail, silently
-        # dropping the column from the report
+        # bool() is required, not cosmetic: this dict is handed to the settings
+        # layer, which round-trips it through str(), and a BooleanVar would be
+        # persisted as its repr rather than as True or False
         return {key: bool(var.get()) for key, var in self.column_vars.items()}
 
     ###########################################################################

@@ -108,8 +108,8 @@ matching `vX.Y.Z` tag.** Details in `.claude/rules/ci.md`.
 | `source/InventoryProcessor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report |
 | `source/PdfTableParser.py` | Parsing only: layout-extracted page text → positional field lists (`align_to_columns`, `to_number`) |
 | `source/InventoryEntry.py` / `source/TurnoverEntry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
-| `source/columns.py` | The `(key, label, always, tooltip)` record for every selectable column, and `all_columns_selected()` |
-| `source/spreadsheetDriver.py` | All `xlsxwriter` output: module-level header, row and format writers |
+| `source/columns.py` | The `(key, label, field, always, tooltip)` record for every selectable column, and `all_columns_selected()` |
+| `source/spreadsheet_writer.py` | All `xlsxwriter` output: the `SpreadsheetWriter` class, built once around the open workbook |
 | `source/constants.py` | Paths, `APP_NAME`/`VERSION`/`GITHUB_REPO`/`INSTALLER_ASSET_PATTERN`, setting keys |
 | `source/gui/InventoryAppDisplay.py` | The `tk.Tk` root: main window, the two checkbox grids and the File/View/Preferences/Help menu bar |
 
@@ -135,16 +135,18 @@ Three responsibilities worth knowing before touching them:
   deliberate divergence from the sibling, which builds its own in `__init__`: the integration
   test must import no tkinter, perform no database I/O, leave no `data/` directory behind and
   make no network call, and this placement gets all four structurally. **Do not "fix" it.**
-- **`columns.py` is the single source of truth for the GUI, not for the spreadsheet.**
-  `spreadsheetDriver.py` hardcodes all 16 keys and its own header text, so adding a column there
-  too is part of adding a column. #57 is what makes it one source; see
+- **`columns.py` is the single source of truth for the GUI *and* the spreadsheet.** Each
+  `Column` carries the key the checkbox dict is read by, the label both the checkbox and the
+  sheet header show, and the entry attribute the value is read from. Adding a column is one
+  entry there plus the matching field on the entry dataclass — the writer needs no edit. See
   `.claude/rules/spreadsheet.md`.
 
 ## Key Conventions
 
-- The dynamic-column scheme is checkbox-driven: every header and row writer walks the same
-  `checkboxDict` keys in the same order, writing a column and advancing the column index only
-  when that box is checked. **Keep the header writer and the row writer in lockstep.**
+- The dynamic-column scheme is checkbox-driven: `SpreadsheetWriter` filters a section's columns
+  against `checkbox_dict` **once** and hands that same tuple to its header writer and its row
+  writer, so the two cannot drift apart. **Keep it that way** — a writer that re-filters for
+  itself is how a column and its data come to disagree.
 - `__debug__`-gated code is stripped from the release build, which compiles with **`python -OO`**
   per `scripts/package_release.sh`.
 - Prefer extending behavior through a `columns.py` entry, or new theme/font data upstream, over
@@ -157,6 +159,8 @@ Three responsibilities worth knowing before touching them:
 - **Modules are `PascalCase` today** (`source/InventoryAppFileIO.py`), matching the class inside,
   and `tests/` mirrors the module name. #92 renames them to `snake_case` and enables ruff's
   `N999`; until it lands, follow the existing names rather than introducing a mixed convention.
+  The exceptions are `columns.py`, `constants.py` and `spreadsheet_writer.py`, the last renamed
+  by #57 because that module was rewritten wholesale — so #92 covers seven modules, not eight.
 - **Every `def` under `source/` is fully annotated**, `-> None` included, and container types are
   spelled out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a bare `list` tells a
   reader as little as no annotation at all. Use `X | None`, never `Optional[X]`. Where a union
@@ -198,7 +202,7 @@ matching file is opened. Put new detail in the matching rule file rather than gr
 | File | Loads when you touch | Carries |
 | --- | --- | --- |
 | `rules/inventory-processing.md` | `InventoryProcessor.py`, `PdfTableParser.py`, `InventoryAppFileIO.py`, the two entry classes | The parse pipeline, layout mode, the error-reporting contract, the results file as a CI fixture |
-| `rules/spreadsheet.md` | `spreadsheetDriver.py`, `columns.py` | The writers, the column scheme, `FIRST_DATA_ROW`, the turnover stride and join |
+| `rules/spreadsheet.md` | `spreadsheet_writer.py`, `columns.py` | `SpreadsheetWriter`, the column scheme, `FIRST_DATA_ROW`, the turnover stride and join |
 | `rules/gui.md` | `source/gui/**` | The display, its menu bar, what comes from `fishbowl_common.gui`, theme/font reconfiguration, the styling recipes, the `after(0, …)` rule |
 | `rules/shared-package.md` | `InventoryAppController.py`, `constants.py`, `requirements/**` | What each shared class takes by injection, construction order and headless gating, patch-notes logic, `constants.py`'s catalogue |
 | `rules/tests.md` | `tests/**` | Per-file reference implementations, the `display` fixture, isolation rules, FIRST, conventions |

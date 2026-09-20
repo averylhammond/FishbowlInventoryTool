@@ -30,7 +30,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 WORKBOOK_DIR = Path(".")
 DUMP_PATH = Path("logs") / "spreadsheet_dump.txt"
 
-# The three formats spreadsheetDriver.py builds, keyed by the (bold, font size, fill
+# The three formats SpreadsheetWriter builds, keyed by the (bold, font size, fill
 # color) triple each produces, and the one-letter code each is dumped as. A cell whose
 # styling matches none of them dumps as UNKNOWN_STYLE, so a formatting regression shows
 # up as a diff rather than passing unnoticed.

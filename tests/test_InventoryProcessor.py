@@ -176,32 +176,25 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
             processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
         ),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch(
-            "source.InventoryProcessor.setupMainSpreadsheet", return_value=11
-        ) as mock_setup_main,
-        patch(
-            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader",
-            side_effect=[16, 21],
-        ) as mock_turnover_header,
-        patch(
-            "source.InventoryProcessor.appendTurnoverToSpreadsheet"
-        ) as mock_append,
+        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
+        writer = mock_writer_cls.return_value
+        writer.write_inventory.return_value = 11
+        writer.append_turnover_report.side_effect = [16, 21]
+
         result = processor.processor.process_inventory(
             "Inventory 01222024.pdf", all_columns_selected(), report_status
         )
 
     assert result is True
-    mock_setup_main.assert_called_once()
+    mock_writer_cls.assert_called_once_with(workbook)
+    writer.write_inventory.assert_called_once()
 
     # Each turnover report starts where the one before it reported that it ended,
     # and is named after its own file
-    assert [made.args[2] for made in mock_turnover_header.call_args_list] == [11, 16]
-    assert [made.args[3] for made in mock_turnover_header.call_args_list] == [
-        "January",
-        "February",
-    ]
-    assert [made.args[3] for made in mock_append.call_args_list] == [11, 16]
+    appended = writer.append_turnover_report.call_args_list
+    assert [made.args[2] for made in appended] == [11, 16]
+    assert [made.args[4] for made in appended] == ["January", "February"]
 
     processor.file_io.save_workbook.assert_called_once_with(workbook)
     report_status.assert_called_with("Successfully processed Inventory Availability!")
@@ -238,33 +231,34 @@ def test_process_inventory_starts_each_turnover_report_after_the_last(
             return_value=[InventoryEntry(part="PART-A")],
         ),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
-        patch(
-            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader",
-            # Stands in for the real writer, which fills one column per checked
-            # turnover column and reports back the first free one
-            side_effect=lambda workbook, checkboxes, col, name, rows: col + width,
-        ) as mock_turnover_header,
-        patch(
-            "source.InventoryProcessor.appendTurnoverToSpreadsheet"
-        ) as mock_append,
+        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
+        writer = mock_writer_cls.return_value
+        writer.write_inventory.return_value = 11
+
+        # Stands in for the real writer, which fills one column per checked
+        # turnover column and reports back the first free one
+        writer.append_turnover_report.side_effect = (
+            lambda turnover, inventory, col, checkboxes, report: col + width
+        )
+
         processor.processor.process_inventory(
             "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
         )
 
-    # No report starts inside the columns of the one before it, and the data is
-    # appended to the same columns their headers were written to
-    expected = [11, 11 + width, 11 + 2 * width]
-    assert [made.args[2] for made in mock_turnover_header.call_args_list] == expected
-    assert [made.args[3] for made in mock_append.call_args_list] == expected
+    # No report starts inside the columns of the one before it. The header and the
+    # data are no longer separately addressable, so there is no second column for
+    # them to disagree on: one call writes both.
+    assert [
+        made.args[2] for made in writer.append_turnover_report.call_args_list
+    ] == [11, 11 + width, 11 + 2 * width]
 
 
 def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor):
     """
-    Tests that the turnover header is told how many inventory rows the report
-    holds, so the placeholder pre-fill reaches the last row of a report of any
-    length rather than stopping at a fixed row
+    Tests that each turnover report is handed the inventory itself rather than a
+    count of it, so the placeholder pre-fill reaches the last row of a report of
+    any length rather than stopping at a row count the caller could get wrong
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
@@ -284,19 +278,19 @@ def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor
             processor.processor, "process_inventory_file", return_value=inventory
         ),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
-        patch(
-            "source.InventoryProcessor.setupSpreadsheetTurnoverHeader"
-        ) as mock_turnover_header,
-        patch("source.InventoryProcessor.appendTurnoverToSpreadsheet"),
+        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
+        writer = mock_writer_cls.return_value
+        writer.write_inventory.return_value = 11
+
         processor.processor.process_inventory(
             "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
         )
 
-    # The row count handed over is the number of rows actually written
-    mock_turnover_header.assert_called_once()
-    assert mock_turnover_header.call_args.args[4] == len(inventory)
+    # The entries handed over are the ones actually written, so the pre-fill is
+    # sized from the rows themselves
+    writer.append_turnover_report.assert_called_once()
+    assert writer.append_turnover_report.call_args.args[1] is inventory
 
 
 def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
@@ -316,7 +310,7 @@ def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
         patch.object(
             processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
         ),
-        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
+        patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
         processor.processor.process_inventory(
             "Inventory Availability 01222024.pdf", all_columns_selected(), MagicMock()
@@ -342,7 +336,7 @@ def test_process_inventory_falls_back_to_a_generic_output_name(processor):
         patch.object(
             processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
         ),
-        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
+        patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
         processor.processor.process_inventory(
             "Inventory Availability", all_columns_selected(), MagicMock()
@@ -382,7 +376,8 @@ def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
 ):
     """
     Tests that a workbook the file I/O controller could not create stops the run
-    before any column is written
+    before any column is written. The writer opens the worksheet in its
+    constructor, so it must never be built around a workbook that failed to open.
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
@@ -396,14 +391,14 @@ def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
         patch.object(
             processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
         ),
-        patch("source.InventoryProcessor.setupMainSpreadsheet") as mock_setup_main,
+        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
         result = processor.processor.process_inventory(
             "Inventory.pdf", all_columns_selected(), report_status
         )
 
     assert result is False
-    mock_setup_main.assert_not_called()
+    mock_writer_cls.assert_not_called()
     report_status.assert_called_with(
         "Could not create the output spreadsheet. See log for details."
     )
@@ -427,7 +422,7 @@ def test_process_inventory_reports_and_returns_false_when_the_save_fails(process
         patch.object(
             processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
         ),
-        patch("source.InventoryProcessor.setupMainSpreadsheet", return_value=11),
+        patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
         result = processor.processor.process_inventory(
             "Inventory.pdf", all_columns_selected(), report_status

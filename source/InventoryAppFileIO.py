@@ -9,10 +9,7 @@ from source.constants import INVENTORY_DIR, OUTPUT_DIR, RESULTS_FILE, TURNOVER_D
 
 # InventoryAppFileIO class to handle all file input/output operations
 class InventoryAppFileIO:
-
-    def __init__(
-        self, report_error: Callable[[str, str], None] = lambda *_: None
-    ) -> None:
+    def __init__(self, report_error: Callable[[str, str], None] = lambda *_: None) -> None:
         """
         Initializes the InventoryAppFileIO object
 
@@ -59,7 +56,7 @@ class InventoryAppFileIO:
         try:
             # mkdir is a safety net in case reset_results_file could not create it
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(RESULTS_FILE, "a", encoding="utf-8") as f:
+            with RESULTS_FILE.open("a", encoding="utf-8") as f:
                 f.write(contents + "\n")
 
         except OSError:
@@ -81,7 +78,7 @@ class InventoryAppFileIO:
         """
 
         try:
-            with open(file=file_path, mode="r") as f:
+            with file_path.open() as f:
                 return f.read()
 
         except OSError as error:
@@ -115,14 +112,15 @@ class InventoryAppFileIO:
             for page in pdf.pages:
                 pages.append(page.extract_text(extraction_mode="layout"))
 
-            return pages
-
         except (OSError, pypdf.errors.PdfReadError) as error:
             self.report_error(
                 "File Error",
                 f"Could not read the PDF at {filepath}: {error}",
             )
             return []
+
+        else:
+            return pages
 
     def list_inventory_files(self) -> list[Path]:
         """
@@ -215,7 +213,6 @@ class InventoryAppFileIO:
         try:
             # close() is where xlsxwriter flushes the spreadsheet to disk
             workbook.close()
-            return True
 
         except (OSError, xlsxwriter.exceptions.XlsxWriterException) as error:
             self.report_error(
@@ -223,3 +220,6 @@ class InventoryAppFileIO:
                 f"Could not save the output spreadsheet: {error}",
             )
             return False
+
+        else:
+            return True

@@ -1,7 +1,4 @@
-import pytest
-
 from source.InventoryEntry import InventoryEntry
-
 
 # One inventory row as PdfTableParser hands it over: the part, description and UOM
 # as strings, the eight quantities already converted to numbers. The entry is built

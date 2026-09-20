@@ -27,7 +27,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 # Directory the app writes its workbooks to, and where the dump is written. Kept as
 # literals rather than imported from source/constants.py so this script stays
 # independent of the application package it is checking.
-WORKBOOK_DIR = Path(".")
+WORKBOOK_DIR = Path()
 DUMP_PATH = Path("logs") / "spreadsheet_dump.txt"
 
 # The three formats SpreadsheetWriter builds, keyed by the (bold, font size, fill
@@ -35,7 +35,7 @@ DUMP_PATH = Path("logs") / "spreadsheet_dump.txt"
 # styling matches none of them dumps as UNKNOWN_STYLE, so a formatting regression shows
 # up as a diff rather than passing unnoticed.
 STYLE_CODES = {
-    (True, 16.0, "FFF0F0F0"): "H",   # Header row
+    (True, 16.0, "FFF0F0F0"): "H",  # Header row
     (False, 12.0, "FFF0F0F0"): "E",  # Even-numbered data row
     (False, 12.0, "FFE6F0FF"): "O",  # Odd-numbered data row
 }
@@ -82,7 +82,7 @@ def render_value(value: object) -> str:
     # column of quantities would otherwise hide
     text = value if isinstance(value, str) else repr(value)
 
-    return text.replace("\\", "\\\\").replace("|", "\|").replace("\n", "\n")
+    return text.replace("\\", "\\\\").replace("|", r"\|").replace("\n", "\n")
 
 
 def render_cell(cell: Cell) -> str:
@@ -122,9 +122,7 @@ def dump_worksheet(worksheet: Worksheet) -> list[str]:
     # Row 0 of the sheet is openpyxl's row 1, and it holds the headers; label it so a
     # diff in the column layout is obvious at a glance
     for index, row in enumerate(
-        worksheet.iter_rows(
-            min_row=1, max_row=worksheet.max_row, max_col=worksheet.max_column
-        )
+        worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, max_col=worksheet.max_column)
     ):
         label = "hdr" if index == 0 else "row"
         cells = " | ".join(render_cell(cell) for cell in row)

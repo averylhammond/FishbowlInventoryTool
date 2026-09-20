@@ -9,7 +9,6 @@ from dataclasses import dataclass
 # different keys.
 @dataclass(frozen=True)
 class Column:
-
     # fmt:off
     key:     str            # Key the spreadsheet writer looks up in the checkbox dict
     label:   str            # Text shown on this column's GUI checkbox and sheet header
@@ -80,4 +79,4 @@ def all_columns_selected() -> dict[str, bool]:
     Returns:
         A mapping of every column key to True
     """
-    return {key: True for key in COLUMN_KEYS}
+    return dict.fromkeys(COLUMN_KEYS, True)

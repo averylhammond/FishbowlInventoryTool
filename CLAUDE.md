@@ -38,8 +38,8 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Virtual env: `python -m venv venv`, then `source venv/Scripts/activate` (Windows) or
   `source venv/bin/activate` (Linux/Mac).
 - Install deps: `pip install -r requirements/dev.txt` (pulls in `release.txt` plus
-  pytest/pytest-cov). CI pins Python `3.11.9`, except the coverage job which floats on `3.11`
-  (#66).
+  pytest/pytest-cov and ruff). CI pins Python `3.11.9`, except the coverage job which floats on
+  `3.11` (#66).
 
 ## Common Commands
 
@@ -59,21 +59,21 @@ guidance here to name the open issue behind anything that has not caught up yet.
   `pytest tests/test_InventoryAppFileIO.py::test_read_pdf_extracts_each_page_in_layout_mode`
 - Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/` — the 90% gate is
   `fail_under` in `pyproject.toml`, so it applies locally too
+- Lint: `ruff check .` (add `--fix` to apply the safe fixes, `--statistics` for a summary)
+- Format: `ruff format .` (`--check` to verify without writing, as CI does)
 - Byte-compile sanity check:
-  `python -m py_compile main.py source/*.py source/gui/*.py tests/*.py`
+  `python -m py_compile main.py source/*.py source/gui/*.py tests/*.py scripts/*.py`
 - Package a release: `./scripts/package_release.sh` (no arguments). Builds via PyInstaller into
   `release/FishbowlInventoryTool/` and zips it; on Windows with Inno Setup installed it also
   builds `release/FishbowlInventoryTool_Setup.exe`.
 
-There is **no lint or format command yet** — ruff is not configured in this repo (#65). That is
-parity work tracked against the sibling; `pyproject.toml` is already here to hold the config.
-
 ## CI
 
-Four workflows in `.github/workflows/`: unit tests, code coverage and integration tests on
+Five workflows in `.github/workflows/`: unit tests, code coverage, lint and integration tests on
 `ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by `fail_under` in
 `pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
-`code-coverage.yml`.
+`code-coverage.yml`. The lint job fails on any `ruff check` finding or any formatting
+difference — the gate is the whole rule set, not a subset.
 
 The integration check diffs **two** artifacts against canonical copies in the submodule, and any
 change to parsing, layout or output formatting breaks it until the matching canonical file is
@@ -157,12 +157,14 @@ Three responsibilities worth knowing before touching them:
 - New logic goes in the class that owns that concern, not bolted onto `InventoryAppController`. If
   a method is doing two distinct jobs (parsing *and* formatting), split it.
 - **Modules are `PascalCase` today** (`source/InventoryAppFileIO.py`), matching the class inside,
-  and `tests/` mirrors the module name. #92 renames them to `snake_case` and enables ruff's
-  `N999`; until it lands, follow the existing names rather than introducing a mixed convention.
-  The exceptions are `columns.py`, `constants.py` and `spreadsheet_writer.py`, the last renamed
-  by #57 because that module was rewritten wholesale — so #92 covers seven modules, not eight.
-- **Every `def` under `source/` is fully annotated**, `-> None` included, and container types are
-  spelled out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a bare `list` tells a
+  and `tests/` mirrors the module name. `N999` is ignored in `pyproject.toml` because of it;
+  #92 renames them to `snake_case` and deletes that entry. Until it lands, follow the existing
+  names rather than introducing a mixed convention. The exceptions are `columns.py`,
+  `constants.py` and `spreadsheet_writer.py`, the last renamed by #57 because that module was
+  rewritten wholesale — so #92 covers seven modules, not eight.
+- **Every `def` under `source/` is fully annotated**, `-> None` included. `ANN` enforces that
+  they are present, and is off for `tests/**`; the rest is on you. Container types are spelled
+  out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a bare `list` tells a
   reader as little as no annotation at all. Use `X | None`, never `Optional[X]`. Where a union
   would be spelled out twice in one signature, name it once at module scope instead, as
   `PdfTableParser`'s `ParsedRow` does.
@@ -170,10 +172,15 @@ Three responsibilities worth knowing before touching them:
   `name: description` and a `Returns:` block is the description alone, with no parenthesized or
   prefixed type repeating the signature. Under `tests/` the docstring type stays, since test
   parameters are deliberately unannotated — see `.claude/rules/tests.md`.
-- **Imports are grouped standard library, third party, first party**, one blank line between
-  groups and each group sorted case-insensitively. `fishbowl_common` is third party — it installs
-  from a pinned git tag — so it never sits among the `source.*` imports. This is what ruff's isort
-  defaults produce, so adopting the linter (#65) will reorder nothing.
+- **Import grouping and ordering are enforced, not remembered.** `ruff check --fix` applies them;
+  `[tool.ruff.lint.isort]` in `pyproject.toml` is the statement of intent, including that
+  `fishbowl_common` is third party — it installs from a pinned git tag — and never sits among the
+  `source.*` imports.
+- **Style is the linter's job.** Line length, quoting and spacing live in `[tool.ruff]`; run
+  `ruff format` rather than matching the surrounding file by eye. Where a rule is suppressed, the
+  reason sits beside it — in `pyproject.toml` for a policy, in a comment at the site for a
+  one-off. A rationale comment must not begin with `# noqa`, or ruff reads it as a second
+  directive and reports it unused via `RUF100`.
 - **No banner comments above definitions.** `source/` and `tests/` carried a `###`-bordered
   banner above every method until they were removed for parity with the sibling, which had
   already dropped its own. A definition is introduced by its docstring; do not reintroduce a

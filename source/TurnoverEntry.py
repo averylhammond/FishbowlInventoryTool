@@ -9,7 +9,6 @@ from dataclasses import dataclass
 # a parsed row, e.g. TurnoverEntry(*row).
 @dataclass
 class TurnoverEntry:
-
     # fmt:off
     part_description: str              = ""    # Part description
     units_sold: int | float            = 0     # Units sold

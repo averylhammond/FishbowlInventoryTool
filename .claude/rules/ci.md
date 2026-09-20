@@ -6,12 +6,13 @@ paths:
 
 # CI workflows
 
-Four workflows live in `.github/workflows/`. There is **no lint job** — ruff is not configured in
-this repo yet (#65), so nothing here checks formatting or style.
+Five workflows live in `.github/workflows/`. All pin Python **3.11.9** (the coverage job floats
+on `3.11`) and install `requirements/dev.txt`, except the lint job — see below.
 
 | Workflow | Trigger | Runner | Does |
 | --- | --- | --- | --- |
 | `unit-tests.yml` | PRs to `main`, manual | `ubuntu-latest` | `pytest tests/` |
+| `lint.yml` | PRs to `main`, manual | `ubuntu-latest` | `ruff check` and `ruff format --check` |
 | `code-coverage.yml` | PRs to `main`, pushes to `main`, manual | `ubuntu-latest` | `pytest --cov` with the 90% gate, uploads to Codecov |
 | `integration-tests.yml` | PRs to `main`, manual | `ubuntu-latest` | Runs the app headless and diffs the output |
 | `release.yml` | pushes of a `v*` tag | `windows-latest` | Verifies, tests, packages and publishes the release |
@@ -23,6 +24,16 @@ sibling's file; the `3.11` vs `3.11.9` drift is not deliberate — **#66 covers 
 missing concurrency group and the `--cov=./` scope.
 
 Notes that are easy to get wrong:
+
+- **`lint.yml` installs only ruff**, via `pip install "$(grep '^ruff==' requirements/dev.txt)"`,
+  rather than the whole of `dev.txt` like the other four. Linting needs neither pypdf, openpyxl
+  nor fishbowl-common, and installing the last clones a git dependency on every run. The version
+  is still single-sourced from `dev.txt`, so CI and a developer's machine cannot drift. It does
+  not check out the submodule, and `extend-exclude` in `pyproject.toml` skips it regardless —
+  linting it would put the private repo's customer-data paths into the job log.
+- **The lint gate is the whole rule set**, not a subset: any `ruff check` finding or any
+  formatting difference fails the job. The configuration, and the reason behind every
+  suppression, lives in `[tool.ruff]` in `pyproject.toml`.
 
 - **The coverage gate is `fail_under = 90` in `pyproject.toml`**, not a workflow flag, so a local
   `pytest --cov` enforces it too. `code-coverage.yml` runs

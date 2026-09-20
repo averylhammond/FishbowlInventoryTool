@@ -160,7 +160,9 @@ real filesystem, a real PDF, or the GUI.
 - **Mock injected collaborators with `MagicMock(spec=Collaborator)`** so the mock only allows
   attributes the real class defines.
 - **Name unasserted mock parameters with a leading underscore** (`_mock_file`) and reserve plain
-  names (`mock_results_file`) for mocks you assert against.
+  names (`mock_results_file`) for mocks you assert against. `ARG001` catches the ones you
+  forget, since ruff treats a leading underscore as the marker for a deliberately unused
+  argument, and `ARG005` does the same for a stand-in lambda's parameters.
 
 ## Follow the FIRST principles
 
@@ -182,9 +184,16 @@ real filesystem, a real PDF, or the GUI.
 - **Import the names under test explicitly — never `from <module> import *`.** A wildcard import
   binds whatever the module happens to export, so a name deleted or renamed in `source/` fails at
   the point of *use*, in one test, rather than at import, in every test that file holds — which
-  makes a rename far harder to trace. Import lists are sorted and parenthesized across lines once
-  they no longer fit on one. There is no star import left under `source/` either — #57 removed
-  the last one, in `InventoryProcessor`.
+  makes a rename far harder to trace. `F403`/`F405` enforce it. Import lists are sorted and
+  parenthesized across lines once they no longer fit on one — `ruff check --fix` does that for
+  you, so run it rather than arranging them by hand. There is no star import left under
+  `source/` either — #57 removed the last one, in `InventoryProcessor`.
+- **`test_PdfTableParser.py`'s synthetic page fixtures carry `# noqa: E501`.** Their column
+  offsets are what `align_to_columns()` is tested against, so the eleven over-length lines
+  cannot be split or wrapped to satisfy the 120-column limit.
+- **A loop pairing a fixture against a captured `call_args_list` uses `zip(..., strict=True)`**,
+  so a length mismatch fails the test rather than silently truncating to the shorter side —
+  which is the regression those tests exist to catch.
 - **One fixture convention: build the unit under test in a pytest fixture**, and give a test that
   needs a differently-constructed object its arguments through indirect parametrization rather
   than a `_build_window(...)`-style helper function. The helper form left this repo with the
@@ -199,7 +208,10 @@ real filesystem, a real PDF, or the GUI.
   `source/` is annotated and its docstring carries no types; test functions and fixtures take no
   annotations, which makes the docstring the only place a fixture's or mock's type is recorded —
   `file_io (pytest.fixture)`, `mock_show_popup (unittest.mock.MagicMock)`,
-  `Returns: unittest.mock.call:`. Keep both halves of that split as they are.
+  `Returns: unittest.mock.call:`. Keep both halves of that split as they are. This is why
+  `per-file-ignores` turns `ANN` off for `tests/**`, alongside `PLR2004`: an assertion's
+  expected value belongs as a literal at the assertion, and hoisting `== 18` into a named
+  constant hides the number the test exists to pin.
 - **Sample page text is synthetic, never copied from the submodule.** The
   `automated-inventory-testing` reports are private company data, so a parser fixture reproduces
   the report's *geometry* — header offsets, column gaps, the wrapped `Avg. TO` label, the page

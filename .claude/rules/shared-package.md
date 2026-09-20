@@ -32,8 +32,9 @@ keeps a headless run tkinter-free.
 is the reader `scripts/dump_workbooks.py` uses for the integration test's spreadsheet check
 (`rules/ci.md`): `XlsxWriter` is write-only, but the app itself never reads a workbook, so it is
 deliberately **not** in `release.txt` where it would be bundled into the shipped executable for
-nothing. There is **no ruff pin here yet** (#65), unlike the sibling; `pyproject.toml` already
-exists to hold its config.
+nothing. `ruff` is pinned there too, at the version both sibling repos pin: a ruff release can
+add rules or change the formatter's output, so an unpinned version would fail CI on a commit
+that was clean the day before. `lint.yml` reads the pin straight out of this file.
 
 ## Construction and gating in `InventoryAppController`
 

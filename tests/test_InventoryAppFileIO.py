@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pypdf
 import pytest
@@ -66,17 +66,13 @@ def test_reset_results_file_deletes_an_existing_file(mock_results_file, file_io)
     file_io.reset_results_file()
 
     # The logs directory is ensured and the existing file is deleted
-    mock_results_file.parent.mkdir.assert_called_once_with(
-        parents=True, exist_ok=True
-    )
+    mock_results_file.parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
     mock_results_file.unlink.assert_called_once_with()
     file_io.report_error.assert_not_called()
 
 
 @patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_reset_results_file_does_nothing_when_no_file_exists(
-    mock_results_file, file_io
-):
+def test_reset_results_file_does_nothing_when_no_file_exists(mock_results_file, file_io):
     """
     Tests that reset_results_file() does not attempt to delete a results file
     that is not present, while still ensuring the logs directory exists.
@@ -92,9 +88,7 @@ def test_reset_results_file_does_nothing_when_no_file_exists(
     file_io.reset_results_file()
 
     # The directory is ensured but nothing is deleted
-    mock_results_file.parent.mkdir.assert_called_once_with(
-        parents=True, exist_ok=True
-    )
+    mock_results_file.parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
     mock_results_file.unlink.assert_not_called()
     file_io.report_error.assert_not_called()
 
@@ -119,84 +113,79 @@ def test_reset_results_file_reports_on_error(mock_results_file, file_io):
     file_io.report_error.assert_called_once()
 
 
-@patch("builtins.open", new_callable=mock_open)
-@patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_write_to_results_file_appends_with_newline(
-    mock_results_file, mock_file, file_io
-):
+def test_write_to_results_file_appends_with_newline(tmp_path, file_io):
     """
-    Tests that write_to_results_file() appends the given text to the results file
-    with a trailing newline.
+    Tests that write_to_results_file() appends each line to the results file with a
+    trailing newline, creating the logs directory if it does not exist yet.
 
     Args:
-        mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
-        mock_file (unittest.mock.MagicMock): Mocks the built-in open()
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # A line of processing output is written to the results file
-    file_io.write_to_results_file("some processing output")
+    # Two lines are written to a results file whose parent directory does not exist
+    results_file = tmp_path / "logs" / "results.txt"
+    with patch("source.InventoryAppFileIO.RESULTS_FILE", results_file):
+        file_io.write_to_results_file("some processing output")
+        file_io.write_to_results_file("more processing output")
 
-    # The logs directory is ensured and the line is appended with a newline
-    mock_results_file.parent.mkdir.assert_called_once_with(
-        parents=True, exist_ok=True
-    )
-    mock_file.assert_called_once_with(mock_results_file, "a", encoding="utf-8")
-    mock_file().write.assert_called_once_with("some processing output\n")
+    # Both landed in order, each terminated by a newline, and nothing was reported
+    assert results_file.read_text(encoding="utf-8") == "some processing output\nmore processing output\n"
     file_io.report_error.assert_not_called()
 
 
-@patch("builtins.open", side_effect=OSError("disk full"))
-@patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_write_to_results_file_reports_on_error(
-    mock_results_file, _mock_file, file_io
-):
+def test_write_to_results_file_reports_on_error(tmp_path, file_io):
     """
     Tests that write_to_results_file() swallows a write failure and surfaces it to
     the user instead of crashing the app.
 
     Args:
-        mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
-        _mock_file (unittest.mock.MagicMock): Mocks the built-in open() to raise
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
+    # A directory occupies the results file's path, so opening it for append fails
+    # the way an unwritable location would
+    results_file = tmp_path / "logs" / "results.txt"
+    results_file.mkdir(parents=True)
+
     # No exception is raised, and the failure is reported to the user
-    file_io.write_to_results_file("some processing output")
+    with patch("source.InventoryAppFileIO.RESULTS_FILE", results_file):
+        file_io.write_to_results_file("some processing output")
+
     file_io.report_error.assert_called_once()
 
 
-@patch("builtins.open", new_callable=mock_open, read_data="log contents")
-def test_read_text_file_returns_contents(mock_file, file_io):
+def test_read_text_file_returns_contents(tmp_path, file_io):
     """
     Tests that read_text_file() returns the full contents of the given text file.
 
     Args:
-        mock_file (unittest.mock.MagicMock): Mocks the built-in open()
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # The file's full contents are returned
-    assert file_io.read_text_file(Path("logs/results.txt")) == "log contents"
-    mock_file.assert_called_once_with(file=Path("logs/results.txt"), mode="r")
+    text_file = tmp_path / "results.txt"
+    text_file.write_text("log contents\nsecond line\n")
+
+    # Every line is returned as one string, not just the first
+    assert file_io.read_text_file(text_file) == "log contents\nsecond line\n"
     file_io.report_error.assert_not_called()
 
 
-@patch("builtins.open", side_effect=OSError("file not found"))
-def test_read_text_file_reports_and_returns_empty_string_on_error(
-    _mock_file, file_io
-):
+def test_read_text_file_reports_and_returns_empty_string_on_error(tmp_path, file_io):
     """
     Tests that read_text_file() returns an empty string and surfaces the failure
     when the text file cannot be read.
 
     Args:
-        _mock_file (unittest.mock.MagicMock): Mocks the built-in open() to raise
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # An empty string is returned and the failure is reported to the user
-    assert file_io.read_text_file(Path("logs/missing.txt")) == ""
+    # The file does not exist, so an empty string comes back and the failure is
+    # reported to the user
+    assert file_io.read_text_file(tmp_path / "missing.txt") == ""
     file_io.report_error.assert_called_once()
 
 
@@ -224,9 +213,7 @@ def test_read_pdf_extracts_each_page_in_layout_mode(mock_pdf_reader, file_io):
         "first page text",
         "second page text",
     ]
-    mock_pdf_reader.assert_called_once_with(
-        stream=Path("InventoryAvailability/report.pdf")
-    )
+    mock_pdf_reader.assert_called_once_with(stream=Path("InventoryAvailability/report.pdf"))
     first_page.extract_text.assert_called_once_with(extraction_mode="layout")
     second_page.extract_text.assert_called_once_with(extraction_mode="layout")
     file_io.report_error.assert_not_called()
@@ -274,9 +261,7 @@ def test_read_pdf_reports_and_returns_empty_on_os_error(_mock_pdf_reader, file_i
     "source.InventoryAppFileIO.pypdf.PdfReader",
     side_effect=pypdf.errors.PdfReadError("corrupt PDF"),
 )
-def test_read_pdf_reports_and_returns_empty_on_pdf_read_error(
-    _mock_pdf_reader, file_io
-):
+def test_read_pdf_reports_and_returns_empty_on_pdf_read_error(_mock_pdf_reader, file_io):
     """
     Tests that read_pdf() returns an empty list and surfaces the failure when the
     file exists but is not a readable PDF.
@@ -310,16 +295,12 @@ def test_list_inventory_files_returns_only_pdfs(mock_inventory_dir, file_io):
     ]
 
     # Only the PDF is returned, as a full path ready to read
-    assert file_io.list_inventory_files() == [
-        Path("InventoryAvailability/inventory.pdf")
-    ]
+    assert file_io.list_inventory_files() == [Path("InventoryAvailability/inventory.pdf")]
     file_io.report_error.assert_not_called()
 
 
 @patch("source.InventoryAppFileIO.INVENTORY_DIR")
-def test_list_inventory_files_matches_suffix_case_insensitively(
-    mock_inventory_dir, file_io
-):
+def test_list_inventory_files_matches_suffix_case_insensitively(mock_inventory_dir, file_io):
     """
     Tests that list_inventory_files() includes an uppercase .PDF extension, since
     the report exporter's casing is not guaranteed.
@@ -330,14 +311,10 @@ def test_list_inventory_files_matches_suffix_case_insensitively(
     """
 
     # The directory holds a PDF with an uppercase extension
-    mock_inventory_dir.iterdir.return_value = [
-        Path("InventoryAvailability/inventory.PDF")
-    ]
+    mock_inventory_dir.iterdir.return_value = [Path("InventoryAvailability/inventory.PDF")]
 
     # The uppercase extension is matched just like a lowercase one
-    assert file_io.list_inventory_files() == [
-        Path("InventoryAvailability/inventory.PDF")
-    ]
+    assert file_io.list_inventory_files() == [Path("InventoryAvailability/inventory.PDF")]
 
 
 @patch("source.InventoryAppFileIO.INVENTORY_DIR")
@@ -368,9 +345,7 @@ def test_list_inventory_files_sorts_by_name(mock_inventory_dir, file_io):
 
 
 @patch("source.InventoryAppFileIO.INVENTORY_DIR")
-def test_list_inventory_files_reports_and_returns_empty_on_error(
-    mock_inventory_dir, file_io
-):
+def test_list_inventory_files_reports_and_returns_empty_on_error(mock_inventory_dir, file_io):
     """
     Tests that list_inventory_files() returns an empty list and surfaces the
     failure when the inventory directory is missing or unreadable.
@@ -412,9 +387,7 @@ def test_list_turnover_files_returns_only_pdfs(mock_turnover_dir, file_io):
 
 
 @patch("source.InventoryAppFileIO.TURNOVER_DIR")
-def test_list_turnover_files_matches_suffix_case_insensitively(
-    mock_turnover_dir, file_io
-):
+def test_list_turnover_files_matches_suffix_case_insensitively(mock_turnover_dir, file_io):
     """
     Tests that list_turnover_files() includes an uppercase .PDF extension, since
     the report exporter's casing is not guaranteed.
@@ -459,9 +432,7 @@ def test_list_turnover_files_sorts_by_name(mock_turnover_dir, file_io):
 
 
 @patch("source.InventoryAppFileIO.TURNOVER_DIR")
-def test_list_turnover_files_reports_and_returns_empty_on_error(
-    mock_turnover_dir, file_io
-):
+def test_list_turnover_files_reports_and_returns_empty_on_error(mock_turnover_dir, file_io):
     """
     Tests that list_turnover_files() returns an empty list and surfaces the failure
     when the turnover reports directory is missing or unreadable.
@@ -481,9 +452,7 @@ def test_list_turnover_files_reports_and_returns_empty_on_error(
 
 @patch("source.InventoryAppFileIO.xlsxwriter.Workbook")
 @patch("source.InventoryAppFileIO.OUTPUT_DIR")
-def test_create_workbook_appends_xlsx_extension(
-    mock_output_dir, mock_workbook, file_io
-):
+def test_create_workbook_appends_xlsx_extension(mock_output_dir, mock_workbook, file_io):
     """
     Tests that create_workbook() appends the .xlsx extension under the output
     directory, ensures that directory exists, and returns the open workbook.
@@ -509,9 +478,7 @@ def test_create_workbook_appends_xlsx_extension(
     "source.InventoryAppFileIO.xlsxwriter.Workbook",
     side_effect=OSError("permission denied"),
 )
-def test_create_workbook_reports_and_returns_none_on_os_error(
-    _mock_workbook, file_io
-):
+def test_create_workbook_reports_and_returns_none_on_os_error(_mock_workbook, file_io):
     """
     Tests that create_workbook() returns None and surfaces the failure when the
     output spreadsheet cannot be created on disk.
@@ -530,9 +497,7 @@ def test_create_workbook_reports_and_returns_none_on_os_error(
     "source.InventoryAppFileIO.xlsxwriter.Workbook",
     side_effect=xlsxwriter.exceptions.XlsxWriterException("bad filename"),
 )
-def test_create_workbook_reports_and_returns_none_on_xlsxwriter_error(
-    _mock_workbook, file_io
-):
+def test_create_workbook_reports_and_returns_none_on_xlsxwriter_error(_mock_workbook, file_io):
     """
     Tests that create_workbook() returns None and surfaces the failure when
     xlsxwriter itself rejects the workbook.
@@ -594,9 +559,7 @@ def test_save_workbook_reports_and_returns_false_on_xlsxwriter_error(file_io):
 
     # xlsxwriter rejects the workbook while closing it
     mock_workbook = MagicMock(spec=xlsxwriter.Workbook)
-    mock_workbook.close.side_effect = xlsxwriter.exceptions.XlsxWriterException(
-        "duplicate worksheet name"
-    )
+    mock_workbook.close.side_effect = xlsxwriter.exceptions.XlsxWriterException("duplicate worksheet name")
 
     # False is returned and the failure is reported to the user
     assert file_io.save_workbook(mock_workbook) is False

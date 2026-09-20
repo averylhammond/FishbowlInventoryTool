@@ -6,3 +6,8 @@
 openpyxl==3.1.5
 pytest==8.4.1
 pytest-cov==7.0.0
+
+# The linter and formatter. Pinned to the version both sibling repos pin: a ruff release
+# can add rules or change the formatter's output, so an unpinned version would fail CI on
+# a commit that was clean the day before.
+ruff==0.16.5

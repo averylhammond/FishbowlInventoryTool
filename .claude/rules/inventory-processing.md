@@ -38,8 +38,8 @@ and user-facing status reaches the caller only through an injected callback.
   guard — the writer opens the worksheet in its constructor, so a failed workbook must never
   reach it — and threads each turnover report's returned end column into the next call. It used
   to reach the writers through `from source.spreadsheetDriver import *`, the one wildcard import
-  under `source/`; #57 replaced that with an explicit import, so `F403`/`F405` have no subject
-  left in this repo when the linter lands (#65).
+  under `source/`; #57 replaced that with an explicit import, which is why `F403`/`F405` have
+  no subject left in this repo.
 
 ## `PdfTableParser`
 

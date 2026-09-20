@@ -1,7 +1,4 @@
-import pytest
-
 from source.TurnoverEntry import TurnoverEntry
-
 
 # One turnover "Totals:" row as PdfTableParser hands it over: the part label as a
 # string, the four numeric columns already converted. Units sold is whole while the

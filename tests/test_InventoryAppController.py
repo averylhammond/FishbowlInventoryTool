@@ -37,7 +37,6 @@ def controller():
         patch("source.InventoryAppController.InventoryAppFileIO") as mock_file_io_cls,
         patch("source.InventoryAppController.InventoryProcessor") as mock_processor_cls,
     ):
-
         mock_arg_provider = mock_arg_cls.return_value
         mock_arg_provider.integration_test_mode = False
 
@@ -64,9 +63,7 @@ def test_init_constructs_the_collaborators(controller):
 
     controller.file_io_cls.assert_called_once_with()
     controller.processor_cls.assert_called_once_with(file_io=controller.file_io)
-    controller.arg_provider_cls.assert_called_once_with(
-        description="Fishbowl inventory availability report generator"
-    )
+    controller.arg_provider_cls.assert_called_once_with(description="Fishbowl inventory availability report generator")
 
 
 def test_init_clears_the_results_file(controller):
@@ -156,9 +153,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
         patch("source.InventoryAppController.UpdateCoordinator"),
         patch("source.InventoryAppController.PatchNotes"),
     ):
-        mock_settings_cls.return_value.get_all_settings.return_value = {
-            "theme": "Ocean"
-        }
+        mock_settings_cls.return_value.get_all_settings.return_value = {"theme": "Ocean"}
         controller.controller.start_application()
 
     mock_display_cls.assert_called_once_with(
@@ -215,9 +210,7 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
     ):
         controller.controller.start_application()
 
-    assert (
-        controller.file_io.report_error is mock_display_cls.return_value.show_popup
-    )
+    assert controller.file_io.report_error is mock_display_cls.return_value.show_popup
 
 
 def test_start_application_wires_the_gui_popup_into_the_settings_repository(controller):
@@ -238,10 +231,7 @@ def test_start_application_wires_the_gui_popup_into_the_settings_repository(cont
     ):
         controller.controller.start_application()
 
-    assert (
-        mock_settings_cls.return_value.report_error
-        is mock_display_cls.return_value.show_popup
-    )
+    assert mock_settings_cls.return_value.report_error is mock_display_cls.return_value.show_popup
 
 
 def test_start_application_starts_a_background_update_check(controller):
@@ -261,9 +251,7 @@ def test_start_application_starts_a_background_update_check(controller):
     with (
         patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository"),
-        patch(
-            "source.InventoryAppController.UpdateCoordinator"
-        ) as mock_coordinator_cls,
+        patch("source.InventoryAppController.UpdateCoordinator") as mock_coordinator_cls,
         patch("source.InventoryAppController.PatchNotes"),
     ):
         controller.controller.start_application()
@@ -292,14 +280,10 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
     controller.arg_provider.integration_test_mode = True
 
     with (
-        patch(
-            "source.gui.InventoryAppDisplay.InventoryAppDisplay"
-        ) as mock_display_cls,
+        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
         patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
         patch.object(controller.controller, "run_integration_test") as mock_headless,
-        patch(
-            "source.InventoryAppController.UpdateCoordinator"
-        ) as mock_coordinator_cls,
+        patch("source.InventoryAppController.UpdateCoordinator") as mock_coordinator_cls,
         patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
     ):
         controller.controller.start_application()
@@ -333,9 +317,7 @@ def test_start_application_builds_the_patch_notes_reader(controller):
         patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
         patch.object(controller.controller, "show_patch_notes_if_updated") as mock_show,
     ):
-        mock_settings_cls.return_value.get_all_settings.return_value = {
-            "last_seen_version": "2.1.0"
-        }
+        mock_settings_cls.return_value.get_all_settings.return_value = {"last_seen_version": "2.1.0"}
         controller.controller.start_application()
 
     mock_patch_notes_cls.assert_called_once_with(notes_path=PATCH_NOTES_PATH)
@@ -381,9 +363,7 @@ def test_show_patch_notes_if_updated_shows_the_notes_after_an_update(controller)
     prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: "2.1.0"})
 
     prepared.patch_notes.notes_since.assert_called_once_with(VERSION, "2.1.0")
-    prepared.settings_repository.save_setting.assert_called_once_with(
-        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
-    )
+    prepared.settings_repository.save_setting.assert_called_once_with(key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION)
 
     # Opened through after() rather than inline: the shared window centers itself
     # over the main window, whose geometry is not known until it has been mapped
@@ -412,9 +392,7 @@ def test_show_patch_notes_if_updated_shows_nothing_on_a_fresh_install(controller
 
     prepared.show_patch_notes_if_updated({})
 
-    prepared.settings_repository.save_setting.assert_called_once_with(
-        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
-    )
+    prepared.settings_repository.save_setting.assert_called_once_with(key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION)
     prepared.display.after.assert_not_called()
 
 
@@ -449,9 +427,7 @@ def test_show_patch_notes_if_updated_shows_nothing_after_a_downgrade(controller)
 
     prepared.show_patch_notes_if_updated({SETTING_KEY_LAST_SEEN_VERSION: "99.0.0"})
 
-    prepared.settings_repository.save_setting.assert_called_once_with(
-        key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION
-    )
+    prepared.settings_repository.save_setting.assert_called_once_with(key=SETTING_KEY_LAST_SEEN_VERSION, value=VERSION)
     prepared.display.after.assert_not_called()
 
 
@@ -489,9 +465,7 @@ def test_handle_view_patch_notes_shows_every_version_up_to_this_one(controller):
     prepared.handle_view_patch_notes()
 
     prepared.patch_notes.notes_since.assert_called_once_with(VERSION, None)
-    prepared.display.show_patch_notes.assert_called_once_with(
-        APP_NAME, VERSION, "## 2.3.0\n\n- Added a thing"
-    )
+    prepared.display.show_patch_notes.assert_called_once_with(APP_NAME, VERSION, "## 2.3.0\n\n- Added a thing")
 
 
 def test_handle_view_patch_notes_reports_when_there_are_no_notes(controller):
@@ -577,9 +551,7 @@ def test_handle_process_inventory_routes_status_to_the_output_box(controller):
     controller.processor.process_inventory.return_value = True
     checkbox_dict = all_columns_selected()
 
-    result = controller.controller.handle_process_inventory(
-        "Inventory 01222024.pdf", checkbox_dict
-    )
+    result = controller.controller.handle_process_inventory("Inventory 01222024.pdf", checkbox_dict)
 
     controller.processor.process_inventory.assert_called_once_with(
         "Inventory 01222024.pdf",
@@ -603,9 +575,7 @@ def test_handle_save_setting_delegates_to_the_settings_repository(controller):
 
     controller.controller.handle_save_setting("theme", "Forest")
 
-    controller.controller.settings_repository.save_setting.assert_called_once_with(
-        key="theme", value="Forest"
-    )
+    controller.controller.settings_repository.save_setting.assert_called_once_with(key="theme", value="Forest")
 
 
 def test_handle_check_for_updates_starts_a_manual_check(controller):

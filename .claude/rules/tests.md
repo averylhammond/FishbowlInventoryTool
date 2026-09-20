@@ -191,9 +191,10 @@ real filesystem, a real PDF, or the GUI.
   shared subwindow classes; do not reintroduce it. The exception is a module with no object to
   build: `test_InventoryEntry.py`, `test_TurnoverEntry.py` and `test_columns.py` have no fixture
   at all.
-- Group tests under the `###`-bordered banners used throughout the file, and give each test a
-  docstring describing what it verifies with an `Args:` block documenting every mock/fixture
-  parameter.
+- Keep the tests for one method together and in the order the methods appear in the module —
+  the grouping the `###`-bordered banners used to mark before they were removed — and give
+  each test a docstring describing what it verifies with an `Args:` block documenting every
+  mock/fixture parameter.
 - **`tests/` is deliberately unannotated, so the docstring type stays here.** Every `def` under
   `source/` is annotated and its docstring carries no types; test functions and fixtures take no
   annotations, which makes the docstring the only place a fixture's or mock's type is recorded —

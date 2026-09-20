@@ -136,9 +136,8 @@ Built inline in `build_widgets()`, with no separate `MenuBar` class (matching th
 
 ## Styling recipes
 
-Ported from the sibling: pure `tk`, zero `ttk`; a `###`-bordered banner above every method (the
-sibling has since dropped its banners — this repo still uses them, in `source/` and `tests/`
-alike); a `# fmt:off` block of aligned `self.widget: tk.X` declarations in `__init__`, with
+Ported from the sibling: pure `tk`, zero `ttk`; no banner comment above a method (both repos
+have now dropped the `###`-bordered banners they once carried); a `# fmt:off` block of aligned `self.widget: tk.X` declarations in `__init__`, with
 `build_widgets()` called last; `pack` for the vertical page flow and `grid` inside frames.
 
 Buttons use one recipe — `bg=theme.button_bg, fg=theme.button_fg,

@@ -20,7 +20,6 @@ from source.constants import (
     APP_NAME,
     INVENTORY_DIR,
     OUTPUT_DIR,
-    RESULTS_FILE,
     TURNOVER_DIR,
     VERSION,
 )

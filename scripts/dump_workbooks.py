@@ -27,7 +27,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 # Directory the app writes its workbooks to, and where the dump is written. Kept as
 # literals rather than imported from source/constants.py so this script stays
 # independent of the application package it is checking.
-WORKBOOK_DIR = Path(".")
+WORKBOOK_DIR = Path()
 DUMP_PATH = Path("logs") / "spreadsheet_dump.txt"
 
 # The three formats SpreadsheetWriter builds, keyed by the (bold, font size, fill
@@ -82,7 +82,7 @@ def render_value(value: object) -> str:
     # column of quantities would otherwise hide
     text = value if isinstance(value, str) else repr(value)
 
-    return text.replace("\\", "\\\\").replace("|", "\|").replace("\n", "\n")
+    return text.replace("\\", "\\\\").replace("|", r"\|").replace("\n", "\n")
 
 
 def render_cell(cell: Cell) -> str:

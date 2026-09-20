@@ -56,7 +56,7 @@ class InventoryAppFileIO:
         try:
             # mkdir is a safety net in case reset_results_file could not create it
             RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(RESULTS_FILE, "a", encoding="utf-8") as f:
+            with RESULTS_FILE.open("a", encoding="utf-8") as f:
                 f.write(contents + "\n")
 
         except OSError:
@@ -78,7 +78,7 @@ class InventoryAppFileIO:
         """
 
         try:
-            with open(file=file_path, mode="r") as f:
+            with file_path.open() as f:
                 return f.read()
 
         except OSError as error:

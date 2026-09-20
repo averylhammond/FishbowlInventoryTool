@@ -31,7 +31,7 @@ TURNOVER_DIR = Path("TurnoverReports")
 
 # Directory the generated .xlsx reports are written to. The application root
 # (i.e. the executable's CWD), so a finished spreadsheet sits next to the app.
-OUTPUT_DIR = Path(".")
+OUTPUT_DIR = Path()
 
 # Logs directory containing the results file with application output
 LOGS_DIR = Path("logs")

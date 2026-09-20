@@ -6,7 +6,6 @@ from source.PdfTableParser import (
     PdfTableParser,
 )
 
-
 # Synthetic page text, structurally identical to a Fishbowl report but at reduced
 # column widths so the lines stay readable. Column positions are load-bearing, so
 # each page is built by joining explicit line literals rather than by dedenting a

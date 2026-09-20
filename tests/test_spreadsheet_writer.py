@@ -25,7 +25,7 @@ def checkboxes(overrides: dict = None, default: bool = True) -> dict:
         dict: A checkbox state dictionary covering every column key
     """
 
-    state = {key: default for key in COLUMN_KEYS}
+    state = dict.fromkeys(COLUMN_KEYS, default)
     state.update(overrides or {})
     return state
 

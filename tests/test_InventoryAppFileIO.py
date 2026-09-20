@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pypdf
 import pytest
@@ -113,76 +113,79 @@ def test_reset_results_file_reports_on_error(mock_results_file, file_io):
     file_io.report_error.assert_called_once()
 
 
-@patch("builtins.open", new_callable=mock_open)
-@patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_write_to_results_file_appends_with_newline(mock_results_file, mock_file, file_io):
+def test_write_to_results_file_appends_with_newline(tmp_path, file_io):
     """
-    Tests that write_to_results_file() appends the given text to the results file
-    with a trailing newline.
+    Tests that write_to_results_file() appends each line to the results file with a
+    trailing newline, creating the logs directory if it does not exist yet.
 
     Args:
-        mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
-        mock_file (unittest.mock.MagicMock): Mocks the built-in open()
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # A line of processing output is written to the results file
-    file_io.write_to_results_file("some processing output")
+    # Two lines are written to a results file whose parent directory does not exist
+    results_file = tmp_path / "logs" / "results.txt"
+    with patch("source.InventoryAppFileIO.RESULTS_FILE", results_file):
+        file_io.write_to_results_file("some processing output")
+        file_io.write_to_results_file("more processing output")
 
-    # The logs directory is ensured and the line is appended with a newline
-    mock_results_file.parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
-    mock_file.assert_called_once_with(mock_results_file, "a", encoding="utf-8")
-    mock_file().write.assert_called_once_with("some processing output\n")
+    # Both landed in order, each terminated by a newline, and nothing was reported
+    assert results_file.read_text(encoding="utf-8") == "some processing output\nmore processing output\n"
     file_io.report_error.assert_not_called()
 
 
-@patch("builtins.open", side_effect=OSError("disk full"))
-@patch("source.InventoryAppFileIO.RESULTS_FILE")
-def test_write_to_results_file_reports_on_error(mock_results_file, _mock_file, file_io):
+def test_write_to_results_file_reports_on_error(tmp_path, file_io):
     """
     Tests that write_to_results_file() swallows a write failure and surfaces it to
     the user instead of crashing the app.
 
     Args:
-        mock_results_file (unittest.mock.MagicMock): Mocks the RESULTS_FILE constant
-        _mock_file (unittest.mock.MagicMock): Mocks the built-in open() to raise
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
+    # A directory occupies the results file's path, so opening it for append fails
+    # the way an unwritable location would
+    results_file = tmp_path / "logs" / "results.txt"
+    results_file.mkdir(parents=True)
+
     # No exception is raised, and the failure is reported to the user
-    file_io.write_to_results_file("some processing output")
+    with patch("source.InventoryAppFileIO.RESULTS_FILE", results_file):
+        file_io.write_to_results_file("some processing output")
+
     file_io.report_error.assert_called_once()
 
 
-@patch("builtins.open", new_callable=mock_open, read_data="log contents")
-def test_read_text_file_returns_contents(mock_file, file_io):
+def test_read_text_file_returns_contents(tmp_path, file_io):
     """
     Tests that read_text_file() returns the full contents of the given text file.
 
     Args:
-        mock_file (unittest.mock.MagicMock): Mocks the built-in open()
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # The file's full contents are returned
-    assert file_io.read_text_file(Path("logs/results.txt")) == "log contents"
-    mock_file.assert_called_once_with(file=Path("logs/results.txt"), mode="r")
+    text_file = tmp_path / "results.txt"
+    text_file.write_text("log contents\nsecond line\n")
+
+    # Every line is returned as one string, not just the first
+    assert file_io.read_text_file(text_file) == "log contents\nsecond line\n"
     file_io.report_error.assert_not_called()
 
 
-@patch("builtins.open", side_effect=OSError("file not found"))
-def test_read_text_file_reports_and_returns_empty_string_on_error(_mock_file, file_io):
+def test_read_text_file_reports_and_returns_empty_string_on_error(tmp_path, file_io):
     """
     Tests that read_text_file() returns an empty string and surfaces the failure
     when the text file cannot be read.
 
     Args:
-        _mock_file (unittest.mock.MagicMock): Mocks the built-in open() to raise
+        tmp_path (pathlib.Path): pytest's per-test temporary directory
         file_io (pytest.fixture): Test fixture to create the InventoryAppFileIO object
     """
 
-    # An empty string is returned and the failure is reported to the user
-    assert file_io.read_text_file(Path("logs/missing.txt")) == ""
+    # The file does not exist, so an empty string comes back and the failure is
+    # reported to the user
+    assert file_io.read_text_file(tmp_path / "missing.txt") == ""
     file_io.report_error.assert_called_once()
 
 

@@ -79,4 +79,4 @@ def all_columns_selected() -> dict[str, bool]:
     Returns:
         A mapping of every column key to True
     """
-    return {key: True for key in COLUMN_KEYS}
+    return dict.fromkeys(COLUMN_KEYS, True)

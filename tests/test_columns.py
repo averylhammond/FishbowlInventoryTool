@@ -11,9 +11,6 @@ from source.InventoryEntry import InventoryEntry
 from source.TurnoverEntry import TurnoverEntry
 
 
-###############################################################################
-###                    Tests columns -> Column Definitions                  ###
-###############################################################################
 def test_column_keys_are_in_spreadsheet_order():
     """
     Tests that COLUMN_KEYS holds every checkbox key in the order the spreadsheet
@@ -128,9 +125,6 @@ def test_turnover_labels_drop_the_key_prefix():
     ]
 
 
-###############################################################################
-###                  Tests columns -> all_columns_selected()                ###
-###############################################################################
 def test_all_columns_selected_includes_every_column():
     """
     Tests that all_columns_selected() returns every column key mapped to True,

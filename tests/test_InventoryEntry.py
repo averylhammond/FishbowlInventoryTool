@@ -2,18 +2,13 @@ import pytest
 
 from source.InventoryEntry import InventoryEntry
 
-###############################################################################
-###                    InventoryEntry -> Row Fixture                        ###
-###############################################################################
+
 # One inventory row as PdfTableParser hands it over: the part, description and UOM
 # as strings, the eight quantities already converted to numbers. The entry is built
 # straight from it, so the field order below is the constructor's argument order.
 PARSED_ROW = ["PART-A", "WIDGET ONE", "ea", 100, 5, 0, 0, 95, 20, 5, 0]
 
 
-###############################################################################
-###                   Tests InventoryEntry -> Constructor                   ###
-###############################################################################
 def test_inventory_entry_initialization():
     """
     Tests that the default initialization of the InventoryEntry() object will
@@ -95,9 +90,6 @@ def test_inventory_entry_keeps_a_fractional_quantity_as_a_float():
     assert entry.on_hand == 12.5
 
 
-###############################################################################
-###              Tests InventoryEntry -> to_formatted_string()              ###
-###############################################################################
 def test_inventory_entry_to_formatted_string_default():
     """
     Tests that to_formatted_string() will correctly print default values when the

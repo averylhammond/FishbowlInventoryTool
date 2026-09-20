@@ -10,9 +10,6 @@ from source.constants import INVENTORY_DIR, OUTPUT_DIR, RESULTS_FILE, TURNOVER_D
 # InventoryAppFileIO class to handle all file input/output operations
 class InventoryAppFileIO:
 
-    ###########################################################################
-    ###                 InventoryAppFileIO -> __init__()                    ###
-    ###########################################################################
     def __init__(
         self, report_error: Callable[[str, str], None] = lambda *_: None
     ) -> None:
@@ -29,9 +26,6 @@ class InventoryAppFileIO:
         # Callback used to report file I/O failures to the user
         self.report_error = report_error
 
-    ###########################################################################
-    ###            InventoryAppFileIO -> reset_results_file()               ###
-    ###########################################################################
     def reset_results_file(self) -> None:
         """
         Deletes the results file if it exists, so each run starts with no log
@@ -52,9 +46,6 @@ class InventoryAppFileIO:
                 f"Could not reset the results file at {RESULTS_FILE}: {error}",
             )
 
-    ###########################################################################
-    ###           InventoryAppFileIO -> write_to_results_file()             ###
-    ###########################################################################
     def write_to_results_file(self, contents: str) -> None:
         """
         Writes a line to the results file, which holds the inventory/turnover
@@ -77,9 +68,6 @@ class InventoryAppFileIO:
                 f"Could not write to the results file: {RESULTS_FILE}",
             )
 
-    ###########################################################################
-    ###                InventoryAppFileIO -> read_text_file()               ###
-    ###########################################################################
     def read_text_file(self, file_path: Path) -> str:
         """
         Reads the full contents of a text file into a single string
@@ -103,9 +91,6 @@ class InventoryAppFileIO:
             )
             return ""
 
-    ###########################################################################
-    ###                  InventoryAppFileIO -> read_pdf()                   ###
-    ###########################################################################
     def read_pdf(self, filepath: str | Path) -> list[str]:
         """
         Reads every page of a PDF into a list of strings, one string per page.
@@ -139,9 +124,6 @@ class InventoryAppFileIO:
             )
             return []
 
-    ###########################################################################
-    ###            InventoryAppFileIO -> list_inventory_files()             ###
-    ###########################################################################
     def list_inventory_files(self) -> list[Path]:
         """
         Lists the inventory availability PDFs found in the inventory directory
@@ -168,9 +150,6 @@ class InventoryAppFileIO:
             )
             return []
 
-    ###########################################################################
-    ###             InventoryAppFileIO -> list_turnover_files()             ###
-    ###########################################################################
     def list_turnover_files(self) -> list[Path]:
         """
         Lists the turnover report PDFs found in the turnover reports directory
@@ -195,9 +174,6 @@ class InventoryAppFileIO:
             )
             return []
 
-    ###########################################################################
-    ###               InventoryAppFileIO -> create_workbook()               ###
-    ###########################################################################
     def create_workbook(self, filename: str) -> xlsxwriter.Workbook | None:
         """
         Opens an xlsxwriter Workbook for the output spreadsheet
@@ -224,9 +200,6 @@ class InventoryAppFileIO:
             )
             return None
 
-    ###########################################################################
-    ###                InventoryAppFileIO -> save_workbook()                ###
-    ###########################################################################
     def save_workbook(self, workbook: xlsxwriter.Workbook) -> bool:
         """
         Saves and closes the output workbook, committing it to disk

@@ -18,9 +18,6 @@ class TurnoverEntry:
     to_rate: int | float | None        = None  # Turnover rate
     # fmt:on
 
-    ###########################################################################
-    ###               TurnoverEntry -> to_formatted_string()                ###
-    ###########################################################################
     def to_formatted_string(self) -> str:
         """
         Returns a formatted string of the attributes of a given TurnoverEntry object

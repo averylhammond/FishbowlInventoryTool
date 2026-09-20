@@ -51,9 +51,6 @@ ParsedRow = list[str | int | float | None]
 # field lists the entry data classes are constructed from
 class PdfTableParser:
 
-    ###########################################################################
-    ###             PdfTableParser -> parse_inventory_page()                ###
-    ###########################################################################
     def parse_inventory_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
         """
         Parses one inventory availability page onto the running list of rows. A row
@@ -135,9 +132,6 @@ class PdfTableParser:
 
         return rows
 
-    ###########################################################################
-    ###             PdfTableParser -> parse_turnover_page()                 ###
-    ###########################################################################
     def parse_turnover_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
         """
         Parses one turnover report page onto the running list of rows, adding a row
@@ -197,9 +191,6 @@ class PdfTableParser:
 
         return rows
 
-    ###########################################################################
-    ###               PdfTableParser -> align_to_columns()                  ###
-    ###########################################################################
     def align_to_columns(self, text: str, column_ends: list[int], offset: int) -> list[str]:
         """
         Assigns each value in a row's numeric region to the column its right edge
@@ -229,9 +220,6 @@ class PdfTableParser:
 
         return values
 
-    ###########################################################################
-    ###                  PdfTableParser -> to_number()                      ###
-    ###########################################################################
     def to_number(self, text: str) -> int | float | str | None:
         """
         Converts one numeric cell of the report into the number it holds, dropping

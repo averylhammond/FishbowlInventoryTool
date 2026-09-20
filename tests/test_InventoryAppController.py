@@ -17,9 +17,6 @@ from source.constants import (
 from source.InventoryAppController import InventoryAppController
 
 
-###############################################################################
-###                 InventoryAppController -> Test Fixture                  ###
-###############################################################################
 @pytest.fixture
 def controller():
     """
@@ -55,9 +52,6 @@ def controller():
         )
 
 
-###############################################################################
-###               Tests InventoryAppController -> __init__()                ###
-###############################################################################
 def test_init_constructs_the_collaborators(controller):
     """
     Tests that the controller builds the file I/O controller, the processor it
@@ -145,9 +139,6 @@ def test_init_does_not_build_the_patch_notes_reader(controller):
     assert controller.controller.patch_notes is None
 
 
-###############################################################################
-###           Tests InventoryAppController -> start_application()           ###
-###############################################################################
 def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
     """
     Tests that a normal run creates the display with the application's title and
@@ -351,9 +342,6 @@ def test_start_application_builds_the_patch_notes_reader(controller):
     mock_show.assert_called_once_with({"last_seen_version": "2.1.0"})
 
 
-###############################################################################
-###       Tests InventoryAppController -> show_patch_notes_if_updated()     ###
-###############################################################################
 def _prepared_controller(controller, notes: str = "## 2.3.0\n\n- Added a thing"):
     """
     Puts a controller into the state start_application() leaves it in, with the
@@ -485,9 +473,6 @@ def test_show_patch_notes_if_updated_shows_nothing_when_there_are_no_notes(contr
     prepared.display.after.assert_not_called()
 
 
-###############################################################################
-###        Tests InventoryAppController -> handle_view_patch_notes()        ###
-###############################################################################
 def test_handle_view_patch_notes_shows_every_version_up_to_this_one(controller):
     """
     Tests that the Help menu's "What's New" shows the notes for every version up
@@ -527,9 +512,6 @@ def test_handle_view_patch_notes_reports_when_there_are_no_notes(controller):
     prepared.display.show_popup.assert_called_once()
 
 
-###############################################################################
-###          Tests InventoryAppController -> run_integration_test()         ###
-###############################################################################
 def test_run_integration_test_processes_every_inventory_with_all_columns(controller):
     """
     Tests that the headless path includes every column and hands the processor
@@ -581,9 +563,6 @@ def test_run_integration_test_routes_errors_away_from_the_default_reporter(contr
     controller.file_io.report_error("File Error", "Could not read the file")
 
 
-###############################################################################
-###        Tests InventoryAppController -> handle_process_inventory()       ###
-###############################################################################
 def test_handle_process_inventory_routes_status_to_the_output_box(controller):
     """
     Tests that the GUI's process callback runs the processor with status directed
@@ -610,9 +589,6 @@ def test_handle_process_inventory_routes_status_to_the_output_box(controller):
     assert result is True
 
 
-###############################################################################
-###          Tests InventoryAppController -> handle_save_setting()          ###
-###############################################################################
 def test_handle_save_setting_delegates_to_the_settings_repository(controller):
     """
     Tests that the GUI's settings callback persists the changed setting through
@@ -632,9 +608,6 @@ def test_handle_save_setting_delegates_to_the_settings_repository(controller):
     )
 
 
-###############################################################################
-###        Tests InventoryAppController -> handle_check_for_updates()       ###
-###############################################################################
 def test_handle_check_for_updates_starts_a_manual_check(controller):
     """
     Tests that the Help menu's callback runs the check through the shared

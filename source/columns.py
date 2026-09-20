@@ -72,9 +72,6 @@ ALL_COLUMNS = INVENTORY_COLUMNS + TURNOVER_COLUMNS
 COLUMN_KEYS = tuple(column.key for column in ALL_COLUMNS)
 
 
-###############################################################################
-###                     columns -> all_columns_selected()                   ###
-###############################################################################
 def all_columns_selected() -> dict[str, bool]:
     """
     Builds a checkbox dict with every column included, used by the headless

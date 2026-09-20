@@ -27,9 +27,6 @@ from source.constants import (
 from source.gui.InventoryAppDisplay import InventoryAppDisplay
 
 
-###############################################################################
-###                  InventoryAppDisplay -> Test Helpers                    ###
-###############################################################################
 def _distinct_widget(*_args, **_kwargs):
     """
     Side effect for patched tkinter widget classes that returns a fresh
@@ -117,9 +114,6 @@ def button_call(display, text: str):
     )
 
 
-###############################################################################
-###                  InventoryAppDisplay -> Test Fixture                    ###
-###############################################################################
 @pytest.fixture
 def display(request):
     """
@@ -251,9 +245,6 @@ def display(request):
         )
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> __init__()                  ###
-###############################################################################
 def test_init_applies_the_window_properties(display):
     """
     Tests that the title and resolution passed by the controller are applied to
@@ -390,9 +381,6 @@ def test_init_starts_with_only_the_always_included_column_checked(display):
             assert display.display.column_vars[key].get() is False
 
 
-###############################################################################
-###          Tests InventoryAppDisplay -> __init__() Settings Restore       ###
-###############################################################################
 @pytest.mark.parametrize(
     "display",
     [
@@ -546,9 +534,6 @@ def test_init_keeps_an_always_included_column_checked(display):
     assert display.display.column_vars["Part"].get() is True
 
 
-###############################################################################
-###              Tests InventoryAppDisplay -> build_widgets()               ###
-###############################################################################
 def test_build_widgets_creates_a_checkbutton_for_every_selectable_column(display):
     """
     Tests that the checkbox grid is built from the canonical column list, so the
@@ -967,9 +952,6 @@ def test_build_widgets_styles_the_tooltips_with_the_theme_and_font(display):
         assert made_call.kwargs["font_size"] == DEFAULT_FONT_SIZE
 
 
-###############################################################################
-###           Tests InventoryAppDisplay -> handle_browse_button()           ###
-###############################################################################
 def test_handle_browse_button_stores_the_chosen_file(display):
     """
     Tests that choosing a file in the dialog records it as the selected file, and
@@ -1016,9 +998,6 @@ def test_handle_browse_button_leaves_the_selection_alone_when_cancelled(display)
     assert display.display.selected_file.get() == "C:/Inventory/Already Chosen.pdf"
 
 
-###############################################################################
-###           Tests InventoryAppDisplay -> get_selected_columns()           ###
-###############################################################################
 def test_get_selected_columns_reports_every_column(display):
     """
     Tests that the returned dict holds every key the spreadsheet writers look up,
@@ -1055,9 +1034,6 @@ def test_get_selected_columns_reflects_the_checkbox_state_as_real_booleans(displ
     assert selected["tAvg QOH"] is False
 
 
-###############################################################################
-###         Tests InventoryAppDisplay -> handle_process_inventory()         ###
-###############################################################################
 def test_handle_process_inventory_forwards_the_file_and_columns(display):
     """
     Tests that pressing the process button hands the chosen file and the current
@@ -1099,9 +1075,6 @@ def test_handle_process_inventory_with_no_file_warns_and_does_not_process(displa
     display.process_callback.assert_not_called()
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> write_output()              ###
-###############################################################################
 def test_write_output_appends_the_message_and_scrolls_to_it(display):
     """
     Tests that a status message is appended to the output box on its own line,
@@ -1122,9 +1095,6 @@ def test_write_output_appends_the_message_and_scrolls_to_it(display):
     display.display.output_box.update_idletasks.assert_called_once_with()
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> clear_output()              ###
-###############################################################################
 def test_clear_output_empties_the_output_box(display):
     """
     Tests that clearing the output removes everything currently in the box
@@ -1139,9 +1109,6 @@ def test_clear_output_empties_the_output_box(display):
     display.display.output_box.delete.assert_called_once_with(1.0, tk.END)
 
 
-###############################################################################
-###                 Tests InventoryAppDisplay -> show_popup()               ###
-###############################################################################
 def test_show_popup_opens_a_themed_message_window(display):
     """
     Tests that an error or notice is shown in a themed popup carrying the
@@ -1164,9 +1131,6 @@ def test_show_popup_opens_a_themed_message_window(display):
     )
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> handle_clear()              ###
-###############################################################################
 def test_handle_clear_resets_the_selected_file_and_output(display):
     """
     Tests that "Clear" resets the selected file path and empties the output box
@@ -1184,9 +1148,6 @@ def test_handle_clear_resets_the_selected_file_and_output(display):
     display.display.output_box.delete.assert_called_once_with(1.0, tk.END)
 
 
-###############################################################################
-###             Tests InventoryAppDisplay -> handle_results_log()           ###
-###############################################################################
 def test_handle_results_log_opens_a_read_only_viewer_when_present(display):
     """
     Tests that "Results Log" opens a read-only viewer window populated from the
@@ -1228,9 +1189,6 @@ def test_handle_results_log_shows_an_error_when_missing(display):
         display.file_editor_window_cls.assert_not_called()
 
 
-###############################################################################
-###  Tests InventoryAppDisplay -> handle_open_inventories()/(turnover/xlsx) ###
-###############################################################################
 def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(display):
     """
     Tests that "Inventories" opens a browse-only file dialog rooted at the
@@ -1295,9 +1253,6 @@ def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
     assert dialog_kwargs["filetypes"] == [("Excel files", "*.xlsx")]
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> handle_about()              ###
-###############################################################################
 def test_handle_about_opens_the_about_window(display):
     """
     Tests that "About" opens the About window showing this application's name
@@ -1322,9 +1277,6 @@ def test_handle_about_opens_the_about_window(display):
     )
 
 
-###############################################################################
-###         Tests InventoryAppDisplay -> handle_check_for_updates()         ###
-###############################################################################
 def test_handle_check_for_updates_invokes_the_callback(display):
     """
     Tests that "Check for Updates" asks the controller to run an on-demand update
@@ -1340,9 +1292,6 @@ def test_handle_check_for_updates_invokes_the_callback(display):
     display.check_for_updates_callback.assert_called_once_with()
 
 
-###############################################################################
-###          Tests InventoryAppDisplay -> handle_view_patch_notes()         ###
-###############################################################################
 def test_handle_view_patch_notes_invokes_the_callback(display):
     """
     Tests that "What's New" asks the controller for the patch notes, rather than
@@ -1358,9 +1307,6 @@ def test_handle_view_patch_notes_invokes_the_callback(display):
     display.view_patch_notes_callback.assert_called_once_with()
 
 
-###############################################################################
-###             Tests InventoryAppDisplay -> show_patch_notes()             ###
-###############################################################################
 def test_show_patch_notes_opens_the_patch_notes_window(display):
     """
     Tests that the patch notes are shown in the shared window, styled with the
@@ -1386,9 +1332,6 @@ def test_show_patch_notes_opens_the_patch_notes_window(display):
     )
 
 
-###############################################################################
-###           Tests InventoryAppDisplay -> show_update_available()          ###
-###############################################################################
 def test_show_update_available_opens_the_update_window(display):
     """
     Tests that a newer release opens the update window showing that version, with
@@ -1446,9 +1389,6 @@ def test_show_update_available_forwards_the_install_callback(display):
     assert made_call.kwargs["start_install_callback"] is start_install
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> apply_theme()               ###
-###############################################################################
 def test_apply_theme_updates_state_and_restyles_every_widget(display):
     """
     Tests that apply_theme stores the new theme and reconfigures the window and
@@ -1500,9 +1440,6 @@ def test_apply_theme_persists_the_choice(display):
     display.save_settings_callback.assert_called_once_with("theme", FOREST.name)
 
 
-###############################################################################
-###             Tests InventoryAppDisplay -> apply_font_family()            ###
-###############################################################################
 def test_apply_font_family_updates_state_and_restyles_every_widget(display):
     """
     Tests that apply_font_family stores the chosen family and applies the new
@@ -1542,9 +1479,6 @@ def test_apply_font_family_persists_the_choice(display):
     display.save_settings_callback.assert_called_once_with("font_family", "Arial")
 
 
-###############################################################################
-###              Tests InventoryAppDisplay -> apply_font_size()             ###
-###############################################################################
 def test_apply_font_size_updates_state_and_restyles_every_widget(display):
     """
     Tests that apply_font_size stores the chosen size and applies the new font
@@ -1588,9 +1522,6 @@ def test_apply_font_size_persists_the_choice_as_text(display):
     display.save_settings_callback.assert_called_once_with("font_size", "20")
 
 
-###############################################################################
-###          Tests InventoryAppDisplay -> handle_column_toggled()           ###
-###############################################################################
 def test_handle_column_toggled_persists_a_checked_column(display):
     """
     Tests that checking a column persists it as included, so the same columns are
@@ -1653,9 +1584,6 @@ def test_build_widgets_wires_each_checkbutton_to_persist_its_own_column(display)
         )
 
 
-###############################################################################
-###                Tests InventoryAppDisplay -> handle_exit()               ###
-###############################################################################
 def test_handle_exit_persists_the_geometry_then_closes_the_window(display):
     """
     Tests that closing the application saves the window's current size and

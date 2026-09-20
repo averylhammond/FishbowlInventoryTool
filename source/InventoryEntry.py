@@ -24,9 +24,6 @@ class InventoryEntry:
     short: int | float           = 0   # TODO: Is this like being in the negative?
     # fmt:on
 
-    ###########################################################################
-    ###               InventoryEntry -> to_formatted_string()               ###
-    ###########################################################################
     def to_formatted_string(self) -> str:
         """
         Returns a formatted string of the attributes of a given InventoryEntry object

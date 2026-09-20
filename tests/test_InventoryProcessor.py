@@ -10,9 +10,6 @@ from source.InventoryEntry import InventoryEntry
 from source.InventoryProcessor import InventoryProcessor
 
 
-###############################################################################
-###                  InventoryProcessor -> Test Fixture                     ###
-###############################################################################
 @pytest.fixture
 def processor():
     """
@@ -38,9 +35,6 @@ def processor():
         )
 
 
-###############################################################################
-###                 Tests InventoryProcessor -> __init__()                  ###
-###############################################################################
 def test_init_holds_the_injected_file_io_and_builds_the_parser(processor):
     """
     Tests that the processor works through the file I/O controller it was handed
@@ -57,9 +51,6 @@ def test_init_holds_the_injected_file_io_and_builds_the_parser(processor):
     assert processor.processor.parser is processor.parser
 
 
-###############################################################################
-###           Tests InventoryProcessor -> process_inventory_file()          ###
-###############################################################################
 def test_process_inventory_file_parses_every_page_before_building_entries(processor):
     """
     Tests that each page is fed to the parser with the rows parsed so far, since a
@@ -117,9 +108,6 @@ def test_process_inventory_file_logs_the_bare_filename(processor):
     assert "Number of Pages in Inventory: 1" in logged
 
 
-###############################################################################
-###            Tests InventoryProcessor -> process_turnover_file()          ###
-###############################################################################
 def test_process_turnover_file_writes_each_entry_to_the_results_file(processor):
     """
     Tests that every turnover entry parsed out of the report is recorded in the
@@ -148,9 +136,6 @@ def test_process_turnover_file_writes_each_entry_to_the_results_file(processor):
         assert entry.to_formatted_string() in logged
 
 
-###############################################################################
-###              Tests InventoryProcessor -> process_inventory()            ###
-###############################################################################
 def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor):
     """
     Tests the successful path end to end: the inventory is written to a new

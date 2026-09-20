@@ -24,7 +24,6 @@ def processor():
     """
 
     with patch("source.InventoryProcessor.PdfTableParser") as mock_parser_cls:
-
         mock_file_io = MagicMock(spec=InventoryAppFileIO)
 
         yield SimpleNamespace(
@@ -96,14 +95,9 @@ def test_process_inventory_file_logs_the_bare_filename(processor):
     processor.file_io.read_pdf.return_value = ["page one"]
     processor.parser.parse_inventory_page.return_value = []
 
-    processor.processor.process_inventory_file(
-        "C:/Some/Absolute/Path/Inventory 01222024.pdf"
-    )
+    processor.processor.process_inventory_file("C:/Some/Absolute/Path/Inventory 01222024.pdf")
 
-    logged = [
-        written.args[0]
-        for written in processor.file_io.write_to_results_file.call_args_list
-    ]
+    logged = [written.args[0] for written in processor.file_io.write_to_results_file.call_args_list]
     assert "Processing inventory file: Inventory 01222024.pdf" in logged
     assert "Number of Pages in Inventory: 1" in logged
 
@@ -128,10 +122,7 @@ def test_process_turnover_file_writes_each_entry_to_the_results_file(processor):
 
     assert [entry.part_description for entry in turnover] == ["PART-A", "PART-B"]
 
-    logged = [
-        written.args[0]
-        for written in processor.file_io.write_to_results_file.call_args_list
-    ]
+    logged = [written.args[0] for written in processor.file_io.write_to_results_file.call_args_list]
     for entry in turnover:
         assert entry.to_formatted_string() in logged
 
@@ -157,9 +148,7 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
     report_status = MagicMock()
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
         patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
@@ -167,9 +156,7 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
         writer.write_inventory.return_value = 11
         writer.append_turnover_report.side_effect = [16, 21]
 
-        result = processor.processor.process_inventory(
-            "Inventory 01222024.pdf", all_columns_selected(), report_status
-        )
+        result = processor.processor.process_inventory("Inventory 01222024.pdf", all_columns_selected(), report_status)
 
     assert result is True
     mock_writer_cls.assert_called_once_with(workbook)
@@ -188,9 +175,7 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
 # A report is between one and five columns wide, depending on which turnover
 # columns the user checked, so no fixed stride can be correct for all of them.
 @pytest.mark.parametrize("width", [1, 3, 5])
-def test_process_inventory_starts_each_turnover_report_after_the_last(
-    width, processor
-):
+def test_process_inventory_starts_each_turnover_report_after_the_last(width, processor):
     """
     Tests that each turnover report is written starting at the column the previous
     report reported as free, so several reports sit side by side instead of the
@@ -223,20 +208,14 @@ def test_process_inventory_starts_each_turnover_report_after_the_last(
 
         # Stands in for the real writer, which fills one column per checked
         # turnover column and reports back the first free one
-        writer.append_turnover_report.side_effect = (
-            lambda turnover, inventory, col, checkboxes, report: col + width
-        )
+        writer.append_turnover_report.side_effect = lambda turnover, inventory, col, checkboxes, report: col + width
 
-        processor.processor.process_inventory(
-            "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
-        )
+        processor.processor.process_inventory("Inventory 01222024.pdf", all_columns_selected(), MagicMock())
 
     # No report starts inside the columns of the one before it. The header and the
     # data are no longer separately addressable, so there is no second column for
     # them to disagree on: one call writes both.
-    assert [
-        made.args[2] for made in writer.append_turnover_report.call_args_list
-    ] == [11, 11 + width, 11 + 2 * width]
+    assert [made.args[2] for made in writer.append_turnover_report.call_args_list] == [11, 11 + width, 11 + 2 * width]
 
 
 def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor):
@@ -250,27 +229,21 @@ def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor
             file I/O controller and parser mocked
     """
 
-    processor.file_io.list_turnover_files.return_value = [
-        Path("TurnoverReports/January.pdf")
-    ]
+    processor.file_io.list_turnover_files.return_value = [Path("TurnoverReports/January.pdf")]
     processor.file_io.save_workbook.return_value = True
 
     # An inventory long enough that a hardcoded row limit would be visible
     inventory = [InventoryEntry(part=f"PART-{index}") for index in range(700)]
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=inventory
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=inventory),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
         patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
         writer = mock_writer_cls.return_value
         writer.write_inventory.return_value = 11
 
-        processor.processor.process_inventory(
-            "Inventory 01222024.pdf", all_columns_selected(), MagicMock()
-        )
+        processor.processor.process_inventory("Inventory 01222024.pdf", all_columns_selected(), MagicMock())
 
     # The entries handed over are the ones actually written, so the pre-fill is
     # sized from the rows themselves
@@ -292,9 +265,7 @@ def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
     processor.file_io.save_workbook.return_value = True
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
         processor.processor.process_inventory(
@@ -318,14 +289,10 @@ def test_process_inventory_falls_back_to_a_generic_output_name(processor):
     processor.file_io.save_workbook.return_value = True
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
-        processor.processor.process_inventory(
-            "Inventory Availability", all_columns_selected(), MagicMock()
-        )
+        processor.processor.process_inventory("Inventory Availability", all_columns_selected(), MagicMock())
 
     processor.file_io.create_workbook.assert_called_once_with("InventoryReport")
 
@@ -342,18 +309,12 @@ def test_process_inventory_reports_and_returns_false_on_an_unreadable_pdf(proces
 
     report_status = MagicMock()
 
-    with patch.object(
-        processor.processor, "process_inventory_file", return_value=[]
-    ):
-        result = processor.processor.process_inventory(
-            "Inventory.pdf", all_columns_selected(), report_status
-        )
+    with patch.object(processor.processor, "process_inventory_file", return_value=[]):
+        result = processor.processor.process_inventory("Inventory.pdf", all_columns_selected(), report_status)
 
     assert result is False
     processor.file_io.create_workbook.assert_not_called()
-    report_status.assert_called_with(
-        "Could not read the selected Inventory PDF. See log for details."
-    )
+    report_status.assert_called_with("Could not read the selected Inventory PDF. See log for details.")
 
 
 def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
@@ -373,20 +334,14 @@ def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
     report_status = MagicMock()
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
     ):
-        result = processor.processor.process_inventory(
-            "Inventory.pdf", all_columns_selected(), report_status
-        )
+        result = processor.processor.process_inventory("Inventory.pdf", all_columns_selected(), report_status)
 
     assert result is False
     mock_writer_cls.assert_not_called()
-    report_status.assert_called_with(
-        "Could not create the output spreadsheet. See log for details."
-    )
+    report_status.assert_called_with("Could not create the output spreadsheet. See log for details.")
 
 
 def test_process_inventory_reports_and_returns_false_when_the_save_fails(processor):
@@ -404,16 +359,10 @@ def test_process_inventory_reports_and_returns_false_when_the_save_fails(process
     report_status = MagicMock()
 
     with (
-        patch.object(
-            processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]
-        ),
+        patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch("source.InventoryProcessor.SpreadsheetWriter"),
     ):
-        result = processor.processor.process_inventory(
-            "Inventory.pdf", all_columns_selected(), report_status
-        )
+        result = processor.processor.process_inventory("Inventory.pdf", all_columns_selected(), report_status)
 
     assert result is False
-    report_status.assert_called_with(
-        "Could not save the output spreadsheet. See log for details."
-    )
+    report_status.assert_called_with("Could not save the output spreadsheet. See log for details.")

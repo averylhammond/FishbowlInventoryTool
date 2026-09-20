@@ -9,10 +9,7 @@ from source.constants import INVENTORY_DIR, OUTPUT_DIR, RESULTS_FILE, TURNOVER_D
 
 # InventoryAppFileIO class to handle all file input/output operations
 class InventoryAppFileIO:
-
-    def __init__(
-        self, report_error: Callable[[str, str], None] = lambda *_: None
-    ) -> None:
+    def __init__(self, report_error: Callable[[str, str], None] = lambda *_: None) -> None:
         """
         Initializes the InventoryAppFileIO object
 

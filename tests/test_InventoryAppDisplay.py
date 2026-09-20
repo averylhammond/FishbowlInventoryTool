@@ -87,10 +87,7 @@ def tooltip_texts_by_widget(display):
         dict: A mapping of widget to the tooltip text attached to it
     """
 
-    return {
-        made_call.kwargs["widget"]: made_call.kwargs["text"]
-        for made_call in display.tooltip_cls.call_args_list
-    }
+    return {made_call.kwargs["widget"]: made_call.kwargs["text"] for made_call in display.tooltip_cls.call_args_list}
 
 
 def button_call(display, text: str):
@@ -107,11 +104,7 @@ def button_call(display, text: str):
         unittest.mock.call: The call that constructed that button
     """
 
-    return next(
-        made_call
-        for made_call in display.button_cls.call_args_list
-        if made_call.kwargs.get("text") == text
-    )
+    return next(made_call for made_call in display.button_cls.call_args_list if made_call.kwargs.get("text") == text)
 
 
 @pytest.fixture
@@ -162,19 +155,13 @@ def display(request):
             destroy=DEFAULT,
             winfo_geometry=DEFAULT,
         ) as tk_methods,
-        patch(
-            "source.gui.InventoryAppDisplay.tk.StringVar", side_effect=_FakeStringVar
-        ),
-        patch(
-            "source.gui.InventoryAppDisplay.tk.BooleanVar", side_effect=_FakeBooleanVar
-        ),
+        patch("source.gui.InventoryAppDisplay.tk.StringVar", side_effect=_FakeStringVar),
+        patch("source.gui.InventoryAppDisplay.tk.BooleanVar", side_effect=_FakeBooleanVar),
         patch("source.gui.InventoryAppDisplay.tk.Menu", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Frame", side_effect=_distinct_widget),
         patch("source.gui.InventoryAppDisplay.tk.Entry", side_effect=_distinct_widget),
-        patch(
-            "source.gui.InventoryAppDisplay.tk.Button", side_effect=_distinct_widget
-        ) as mock_button_cls,
+        patch("source.gui.InventoryAppDisplay.tk.Button", side_effect=_distinct_widget) as mock_button_cls,
         patch(
             "source.gui.InventoryAppDisplay.tk.Checkbutton",
             side_effect=_distinct_widget,
@@ -185,18 +172,11 @@ def display(request):
         ),
         patch("source.gui.InventoryAppDisplay.MessageWindow") as mock_message_window_cls,
         patch("source.gui.InventoryAppDisplay.AboutWindow") as mock_about_window_cls,
-        patch(
-            "source.gui.InventoryAppDisplay.FileEditorWindow"
-        ) as mock_file_editor_window_cls,
+        patch("source.gui.InventoryAppDisplay.FileEditorWindow") as mock_file_editor_window_cls,
         patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
-        patch(
-            "source.gui.InventoryAppDisplay.PatchNotesWindow"
-        ) as mock_patch_notes_window_cls,
-        patch(
-            "source.gui.InventoryAppDisplay.Tooltip", side_effect=_distinct_widget
-        ) as mock_tooltip_cls,
+        patch("source.gui.InventoryAppDisplay.PatchNotesWindow") as mock_patch_notes_window_cls,
+        patch("source.gui.InventoryAppDisplay.Tooltip", side_effect=_distinct_widget) as mock_tooltip_cls,
     ):
-
         # The geometry handle_exit() persists, in the format Tk reports it in
         tk_methods["winfo_geometry"].return_value = "780x820+320+180"
 
@@ -296,9 +276,7 @@ def test_init_stores_the_check_for_updates_callback(display):
             fully mocked out
     """
 
-    assert (
-        display.display.check_for_updates_callback is display.check_for_updates_callback
-    )
+    assert display.display.check_for_updates_callback is display.check_for_updates_callback
 
 
 def test_init_stores_the_view_patch_notes_callback(display):
@@ -311,9 +289,7 @@ def test_init_stores_the_view_patch_notes_callback(display):
             fully mocked out
     """
 
-    assert (
-        display.display.view_patch_notes_callback is display.view_patch_notes_callback
-    )
+    assert display.display.view_patch_notes_callback is display.view_patch_notes_callback
 
 
 def test_init_defaults_to_the_dark_theme_and_default_font(display):
@@ -517,9 +493,7 @@ def test_init_restores_the_persisted_column_selections(display):
     assert display.display.column_vars["Committed"].get() is False
 
 
-@pytest.mark.parametrize(
-    "display", [{"settings": {"column_Part": "False"}}], indirect=True
-)
+@pytest.mark.parametrize("display", [{"settings": {"column_Part": "False"}}], indirect=True)
 def test_init_keeps_an_always_included_column_checked(display):
     """
     Tests that a column marked always stays checked even when the settings hold a
@@ -549,10 +523,7 @@ def test_build_widgets_creates_a_checkbutton_for_every_selectable_column(display
     assert display.checkbutton_cls.call_count == len(selectable)
 
     # Every selectable column is offered, under its own label
-    built_labels = [
-        made_call.kwargs["text"]
-        for made_call in display.checkbutton_cls.call_args_list
-    ]
+    built_labels = [made_call.kwargs["text"] for made_call in display.checkbutton_cls.call_args_list]
     assert built_labels == [column.label for column in selectable]
 
 
@@ -648,10 +619,7 @@ def test_build_widgets_wires_the_process_button_to_its_handler(display):
             fully mocked out
     """
 
-    assert (
-        button_call(display, "Process This Inventory").kwargs["command"]
-        == display.display.handle_process_inventory
-    )
+    assert button_call(display, "Process This Inventory").kwargs["command"] == display.display.handle_process_inventory
 
 
 def test_build_widgets_wires_the_exit_button_to_handle_exit(display):
@@ -665,9 +633,7 @@ def test_build_widgets_wires_the_exit_button_to_handle_exit(display):
             fully mocked out
     """
 
-    assert button_call(display, "Exit").kwargs["command"] == (
-        display.display.handle_exit
-    )
+    assert button_call(display, "Exit").kwargs["command"] == (display.display.handle_exit)
 
 
 def test_build_widgets_styles_the_buttons_with_the_theme_and_font(display):
@@ -808,16 +774,12 @@ def test_build_widgets_theme_submenu_offers_every_theme_and_applies_it(display):
     """
 
     cascade_call = next(
-        c
-        for c in display.display.preferences_menu.add_cascade.call_args_list
-        if c.kwargs["label"] == "Theme"
+        c for c in display.display.preferences_menu.add_cascade.call_args_list if c.kwargs["label"] == "Theme"
     )
     theme_menu = cascade_call.kwargs["menu"]
     theme_commands = theme_menu.add_command.call_args_list
 
-    assert [c.kwargs["label"] for c in theme_commands] == [
-        theme.name for theme in ALL_THEMES
-    ]
+    assert [c.kwargs["label"] for c in theme_commands] == [theme.name for theme in ALL_THEMES]
 
     for theme_option, made_call in zip(ALL_THEMES, theme_commands):
         made_call.kwargs["command"]()
@@ -835,9 +797,7 @@ def test_build_widgets_font_submenu_offers_every_family_and_applies_it(display):
     """
 
     cascade_call = next(
-        c
-        for c in display.display.preferences_menu.add_cascade.call_args_list
-        if c.kwargs["label"] == "Font"
+        c for c in display.display.preferences_menu.add_cascade.call_args_list if c.kwargs["label"] == "Font"
     )
     font_menu = cascade_call.kwargs["menu"]
     font_commands = font_menu.add_command.call_args_list
@@ -860,16 +820,12 @@ def test_build_widgets_font_size_submenu_offers_every_size_and_applies_it(displa
     """
 
     cascade_call = next(
-        c
-        for c in display.display.preferences_menu.add_cascade.call_args_list
-        if c.kwargs["label"] == "Font Size"
+        c for c in display.display.preferences_menu.add_cascade.call_args_list if c.kwargs["label"] == "Font Size"
     )
     font_size_menu = cascade_call.kwargs["menu"]
     font_size_commands = font_size_menu.add_command.call_args_list
 
-    assert [c.kwargs["label"] for c in font_size_commands] == [
-        str(size) for size in FONT_SIZES
-    ]
+    assert [c.kwargs["label"] for c in font_size_commands] == [str(size) for size in FONT_SIZES]
 
     for size, made_call in zip(FONT_SIZES, font_size_commands):
         made_call.kwargs["command"]()
@@ -911,7 +867,6 @@ def test_build_widgets_gives_each_checkbutton_its_own_columns_tooltip(display):
     tooltip_texts = tooltip_texts_by_widget(display)
 
     for column in ALL_COLUMNS:
-
         # A column that is always included has no checkbutton to hover
         if column.always:
             continue
@@ -968,9 +923,7 @@ def test_handle_browse_button_stores_the_chosen_file(display):
     ) as mock_dialog:
         display.display.handle_browse_button()
 
-    assert (
-        display.display.selected_file.get() == "C:/Inventory/Inventory 01222024.pdf"
-    )
+    assert display.display.selected_file.get() == "C:/Inventory/Inventory 01222024.pdf"
 
     dialog_kwargs = mock_dialog.call_args.kwargs
     assert dialog_kwargs["initialdir"] == str(INVENTORY_DIR)
@@ -1088,9 +1041,7 @@ def test_write_output_appends_the_message_and_scrolls_to_it(display):
 
     display.display.write_output("Processing Inventory... Please wait.")
 
-    display.display.output_box.insert.assert_called_once_with(
-        tk.END, "Processing Inventory... Please wait.\n"
-    )
+    display.display.output_box.insert.assert_called_once_with(tk.END, "Processing Inventory... Please wait.\n")
     display.display.output_box.see.assert_called_once_with(tk.END)
     display.display.output_box.update_idletasks.assert_called_once_with()
 
@@ -1199,9 +1150,7 @@ def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(disp
             fully mocked out
     """
 
-    with patch(
-        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
-    ) as mock_dialog:
+    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_inventories()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
@@ -1221,9 +1170,7 @@ def test_handle_open_turnover_reports_opens_a_dialog_rooted_at_the_turnover_dir(
             fully mocked out
     """
 
-    with patch(
-        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
-    ) as mock_dialog:
+    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_turnover_reports()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
@@ -1243,9 +1190,7 @@ def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
             fully mocked out
     """
 
-    with patch(
-        "source.gui.InventoryAppDisplay.filedialog.askopenfilename"
-    ) as mock_dialog:
+    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_spreadsheets()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
@@ -1420,9 +1365,7 @@ def test_apply_theme_updates_state_and_restyles_every_widget(display):
 
     # The hover tooltips are restyled to the new theme
     for tooltip in display.display.tooltips:
-        tooltip.update_style.assert_called_once_with(
-            FOREST, DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE
-        )
+        tooltip.update_style.assert_called_once_with(FOREST, DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE)
 
 
 def test_apply_theme_persists_the_choice(display):
@@ -1454,14 +1397,10 @@ def test_apply_font_family_updates_state_and_restyles_every_widget(display):
     display.display.apply_font_family("Arial")
 
     assert display.display.current_font_family == "Arial"
-    display.display.title_label.configure.assert_called_once_with(
-        font=("Arial", DEFAULT_FONT_SIZE, "bold")
-    )
+    display.display.title_label.configure.assert_called_once_with(font=("Arial", DEFAULT_FONT_SIZE, "bold"))
 
     for checkbutton in display.display.column_checkbuttons.values():
-        checkbutton.configure.assert_called_once_with(
-            font=("Arial", DEFAULT_FONT_SIZE)
-        )
+        checkbutton.configure.assert_called_once_with(font=("Arial", DEFAULT_FONT_SIZE))
 
 
 def test_apply_font_family_persists_the_choice(display):
@@ -1493,14 +1432,10 @@ def test_apply_font_size_updates_state_and_restyles_every_widget(display):
     display.display.apply_font_size(20)
 
     assert display.display.current_font_size == 20
-    display.display.output_box.configure.assert_called_once_with(
-        font=(DEFAULT_FONT_FAMILY, 20, "bold")
-    )
+    display.display.output_box.configure.assert_called_once_with(font=(DEFAULT_FONT_FAMILY, 20, "bold"))
 
     for checkbutton in display.display.column_checkbuttons.values():
-        checkbutton.configure.assert_called_once_with(
-            font=(DEFAULT_FONT_FAMILY, 20)
-        )
+        checkbutton.configure.assert_called_once_with(font=(DEFAULT_FONT_FAMILY, 20))
 
     # The hover tooltips are restyled to the new font
     for tooltip in display.display.tooltips:
@@ -1575,13 +1510,9 @@ def test_build_widgets_wires_each_checkbutton_to_persist_its_own_column(display)
         # The variable this checkbutton was bound to is the one that got persisted
         variable = made_call.kwargs["variable"]
         key = next(
-            column_key
-            for column_key, column_var in display.display.column_vars.items()
-            if column_var is variable
+            column_key for column_key, column_var in display.display.column_vars.items() if column_var is variable
         )
-        display.save_settings_callback.assert_called_once_with(
-            "column_" + key, str(variable.get())
-        )
+        display.save_settings_callback.assert_called_once_with("column_" + key, str(variable.get()))
 
 
 def test_handle_exit_persists_the_geometry_then_closes_the_window(display):
@@ -1596,9 +1527,7 @@ def test_handle_exit_persists_the_geometry_then_closes_the_window(display):
 
     display.display.handle_exit()
 
-    display.save_settings_callback.assert_called_once_with(
-        "window_geometry", "780x820+320+180"
-    )
+    display.save_settings_callback.assert_called_once_with("window_geometry", "780x820+320+180")
     display.destroy.assert_called_once_with()
 
 
@@ -1612,6 +1541,4 @@ def test_build_widgets_routes_the_window_close_box_through_handle_exit(display):
             fully mocked out
     """
 
-    display.protocol.assert_called_once_with(
-        "WM_DELETE_WINDOW", display.display.handle_exit
-    )
+    display.protocol.assert_called_once_with("WM_DELETE_WINDOW", display.display.handle_exit)

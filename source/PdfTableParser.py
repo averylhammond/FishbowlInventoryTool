@@ -50,7 +50,6 @@ ParsedRow = list[str | int | float | None]
 # PdfTableParser class to turn layout-extracted PDF page text into the positional
 # field lists the entry data classes are constructed from
 class PdfTableParser:
-
     def parse_inventory_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
         """
         Parses one inventory availability page onto the running list of rows. A row
@@ -87,7 +86,6 @@ class PdfTableParser:
         trailing_columns = INVENTORY_NUMERIC_COLUMNS + (1 if has_uom_column else 0)
 
         for line in lines[header_index + 1 :]:
-
             # The date/page stamp closes the table, and blank lines pad up to it
             if PAGE_FOOTER.search(line):
                 break
@@ -98,11 +96,7 @@ class PdfTableParser:
             # the gap between them keeps a part number that itself contains a run of
             # spaces ('3/4"  BLANK HINGE') in one piece
             part = line[:description_column].strip()
-            fields = [
-                field
-                for field in COLUMN_GAP.split(line[description_column:].strip())
-                if field
-            ]
+            fields = [field for field in COLUMN_GAP.split(line[description_column:].strip()) if field]
 
             # A full row carries a description plus every trailing column; a
             # continuation line carries only a fragment of the wrapped text
@@ -119,10 +113,7 @@ class PdfTableParser:
 
                 # UOM is a label; everything after it is a quantity
                 uom, *numbers = trailing
-                rows.append(
-                    [part, description, uom]
-                    + [self.to_number(number) for number in numbers]
-                )
+                rows.append([part, description, uom] + [self.to_number(number) for number in numbers])
 
             elif rows:
                 if part:
@@ -149,19 +140,14 @@ class PdfTableParser:
 
         lines = page.splitlines()
 
-        header = next(
-            (line for line in lines if TURNOVER_HEADER.search(line)), None
-        )
+        header = next((line for line in lines if TURNOVER_HEADER.search(line)), None)
         if header is None:
             return rows
 
-        column_ends = [
-            header.index(label) + len(label) for label in TURNOVER_COLUMN_LABELS
-        ]
+        column_ends = [header.index(label) + len(label) for label in TURNOVER_COLUMN_LABELS]
         numbers_column = header.index(TURNOVER_COLUMN_LABELS[0])
 
         for index, line in enumerate(lines):
-
             match = TOTALS_ROW.match(line)
             if match is None:
                 continue
@@ -171,18 +157,14 @@ class PdfTableParser:
                 continue
 
             numbers = match.group("numbers")
-            values = self.align_to_columns(
-                numbers, column_ends, len(line) - len(numbers)
-            )
+            values = self.align_to_columns(numbers, column_ends, len(line) - len(numbers))
 
             # A part name long enough to wrap pushes "Totals:" onto a line of its
             # own, leaving the values on the line above alongside the first half of
             # the name
             if not any(values) and index > 0:
                 wrapped = lines[index - 1]
-                values = self.align_to_columns(
-                    wrapped[numbers_column:], column_ends, numbers_column
-                )
+                values = self.align_to_columns(wrapped[numbers_column:], column_ends, numbers_column)
                 label = f"{wrapped[:numbers_column].strip()} {label}".strip()
 
             # Convert only once the wrapped-row check above is done, since that check

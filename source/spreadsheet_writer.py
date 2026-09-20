@@ -58,7 +58,6 @@ def _match_key(part: str) -> str:
 # the column tuples in source/columns.py, so a column added there is emitted here
 # without this module being touched.
 class SpreadsheetWriter:
-
     def __init__(self, workbook: xlsxwriter.Workbook) -> None:
         """
         Initializes the SpreadsheetWriter object, opening the single worksheet the
@@ -80,9 +79,7 @@ class SpreadsheetWriter:
         self.even_format = workbook.add_format(EVEN_ROW_FORMAT)
         self.odd_format = workbook.add_format(ODD_ROW_FORMAT)
 
-    def write_inventory(
-        self, inventory: list[InventoryEntry], checkbox_dict: dict[str, bool]
-    ) -> int:
+    def write_inventory(self, inventory: list[InventoryEntry], checkbox_dict: dict[str, bool]) -> int:
         """
         Writes the inventory section: a header for every checked inventory column,
         then one row per entry below it
@@ -154,9 +151,7 @@ class SpreadsheetWriter:
 
         return start_col + len(columns)
 
-    def _checked_columns(
-        self, columns: tuple[Column, ...], checkbox_dict: dict[str, bool]
-    ) -> tuple[Column, ...]:
+    def _checked_columns(self, columns: tuple[Column, ...], checkbox_dict: dict[str, bool]) -> tuple[Column, ...]:
         """
         Filters one section's columns down to the ones the user checked, in
         spreadsheet order. The header writer and the row writer are then handed the
@@ -172,9 +167,7 @@ class SpreadsheetWriter:
 
         return tuple(column for column in columns if checkbox_dict[column.key])
 
-    def _write_header(
-        self, columns: tuple[Column, ...], start_col: int, suffix: str = ""
-    ) -> None:
+    def _write_header(self, columns: tuple[Column, ...], start_col: int, suffix: str = "") -> None:
         """
         Writes the header row for one section. The inventory section takes no
         suffix; a turnover report takes its own name, since several reports sit side
@@ -187,9 +180,7 @@ class SpreadsheetWriter:
         """
 
         for col, column in enumerate(columns, start=start_col):
-            self.worksheet.write(
-                HEADER_ROW, col, f"{column.label}{suffix}", self.header_format
-            )
+            self.worksheet.write(HEADER_ROW, col, f"{column.label}{suffix}", self.header_format)
 
     def _write_entry_row(
         self,
@@ -214,9 +205,7 @@ class SpreadsheetWriter:
         for col, column in enumerate(columns, start=start_col):
             self.worksheet.write(row, col, getattr(entry, column.field), row_format)
 
-    def _prefill(
-        self, columns: tuple[Column, ...], start_col: int, row_count: int
-    ) -> None:
+    def _prefill(self, columns: tuple[Column, ...], start_col: int, row_count: int) -> None:
         """
         Fills every data row of a turnover report's columns with the placeholder,
         before the report's own rows are written over the ones it mentions

@@ -90,10 +90,7 @@ def final_cells(worksheet: MagicMock) -> dict:
         dict: The value each written (row, column) ends up holding
     """
 
-    return {
-        (write.args[0], write.args[1]): write.args[2]
-        for write in worksheet.write.call_args_list
-    }
+    return {(write.args[0], write.args[1]): write.args[2] for write in worksheet.write.call_args_list}
 
 
 def cells_in_row(worksheet: MagicMock, row: int) -> list:
@@ -109,9 +106,7 @@ def cells_in_row(worksheet: MagicMock, row: int) -> list:
     """
 
     cells = final_cells(worksheet)
-    return sorted(
-        (col, value) for (written_row, col), value in cells.items() if written_row == row
-    )
+    return sorted((col, value) for (written_row, col), value in cells.items() if written_row == row)
 
 
 def written_formats(worksheet: MagicMock) -> list:
@@ -233,9 +228,7 @@ def test_write_inventory_skips_unchecked_columns(writer, worksheet):
     """
 
     # The user clears two columns from the middle of the report
-    writer.write_inventory(
-        [build_inventory_entry()], checkboxes({"UOM": False, "DropShip": False})
-    )
+    writer.write_inventory([build_inventory_entry()], checkboxes({"UOM": False, "DropShip": False}))
 
     # The remaining columns stay contiguous, each shifting left past the gap
     assert cells_in_row(worksheet, 0) == [
@@ -275,9 +268,7 @@ def test_write_inventory_writes_nothing_when_nothing_is_checked(writer, workshee
     """
 
     # No column is checked
-    next_col = writer.write_inventory(
-        [build_inventory_entry()], checkboxes(default=False)
-    )
+    next_col = writer.write_inventory([build_inventory_entry()], checkboxes(default=False))
 
     # Not a single cell is written, and no column is claimed
     worksheet.write.assert_not_called()
@@ -302,9 +293,7 @@ def test_write_inventory_styles_the_header_row(writer, worksheet):
     assert header_format["bold"] is True
     assert header_format["align"] == "center"
     assert header_format["font_size"] == 16
-    assert all(
-        cell_format == header_format for cell_format in written_formats(worksheet)
-    )
+    assert all(cell_format == header_format for cell_format in written_formats(worksheet))
 
 
 def test_write_inventory_writes_every_field_of_each_entry(writer, worksheet):
@@ -396,9 +385,7 @@ def test_write_inventory_alternates_the_row_fill_colors(writer, worksheet):
         ({key: False for key in COLUMN_KEYS if key not in ("Part", "Short")}, 2),
     ],
 )
-def test_write_inventory_returns_the_first_free_column(
-    unchecked, width, writer, worksheet
-):
+def test_write_inventory_returns_the_first_free_column(unchecked, width, writer, worksheet):
     """
     Tests that the column reported back is the one past the last inventory column,
     which is where the caller starts appending the first turnover report
@@ -411,9 +398,7 @@ def test_write_inventory_returns_the_first_free_column(
     """
 
     # The inventory is written with part of the report unchecked
-    next_col = writer.write_inventory(
-        [build_inventory_entry()], checkboxes(unchecked)
-    )
+    next_col = writer.write_inventory([build_inventory_entry()], checkboxes(unchecked))
 
     # The columns run contiguously from zero, and the value handed back is the
     # first one past them
@@ -530,9 +515,7 @@ def test_append_turnover_report_writes_every_checked_field(writer, worksheet):
     """
 
     # A turnover entry is written onto the row its inventory part occupies
-    writer.append_turnover_report(
-        [build_turnover_entry()], [build_inventory_entry()], 11, checkboxes(), "Q1"
-    )
+    writer.append_turnover_report([build_turnover_entry()], [build_inventory_entry()], 11, checkboxes(), "Q1")
 
     # Every field lands in the column its title was written to
     assert cells_in_row(worksheet, FIRST_DATA_ROW) == [
@@ -544,9 +527,7 @@ def test_append_turnover_report_writes_every_checked_field(writer, worksheet):
     ]
 
 
-def test_append_turnover_report_writes_an_undefined_average_as_a_blank(
-    writer, worksheet
-):
+def test_append_turnover_report_writes_an_undefined_average_as_a_blank(writer, worksheet):
     """
     Tests that the averages the report left blank reach the sheet as blanks rather
     than as zeros, since a part with no turnover has no average rather than an
@@ -598,9 +579,7 @@ def test_append_turnover_report_prefills_every_data_row(row_count, writer, works
 
     # Every row below the header holds the placeholder, down to the last one
     cells = final_cells(worksheet)
-    assert [
-        cells[(row, 11)] for row in range(FIRST_DATA_ROW, FIRST_DATA_ROW + row_count)
-    ] == ["N/A"] * row_count
+    assert [cells[(row, 11)] for row in range(FIRST_DATA_ROW, FIRST_DATA_ROW + row_count)] == ["N/A"] * row_count
 
     # And the pre-fill stops there rather than running past the last entry
     assert (FIRST_DATA_ROW + row_count, 11) not in cells
@@ -638,9 +617,7 @@ def test_append_turnover_report_alternates_the_prefill_fill_colors(writer, works
 
     # Two data rows are pre-filled with a single turnover column checked
     inventory = [build_inventory_entry("PART-A"), build_inventory_entry("PART-B")]
-    writer.append_turnover_report(
-        [], inventory, 11, checkboxes({"tDescription": True}, default=False), "Q1"
-    )
+    writer.append_turnover_report([], inventory, 11, checkboxes({"tDescription": True}, default=False), "Q1")
 
     # The header aside, the odd row and the even row carry the alternating fills
     formats = written_formats(worksheet)
@@ -666,9 +643,7 @@ def test_append_turnover_report_alternates_the_prefill_fill_colors(writer, works
         ),
     ],
 )
-def test_append_turnover_report_returns_the_first_free_column(
-    unchecked, width, writer, worksheet
-):
+def test_append_turnover_report_returns_the_first_free_column(unchecked, width, writer, worksheet):
     """
     Tests that a report reports back the column after the last one it filled,
     however many turnover columns the user checked. The caller has no other way to
@@ -683,15 +658,11 @@ def test_append_turnover_report_returns_the_first_free_column(
     """
 
     # A turnover report is appended after the eleven inventory columns
-    next_col = writer.append_turnover_report(
-        [], [], 11, checkboxes(unchecked), "Turnover_Jan2024"
-    )
+    next_col = writer.append_turnover_report([], [], 11, checkboxes(unchecked), "Turnover_Jan2024")
 
     # The columns run contiguously from the first free one, and the value handed
     # back is the next one along
-    assert [col for col, _value in cells_in_row(worksheet, 0)] == list(
-        range(11, 11 + width)
-    )
+    assert [col for col, _value in cells_in_row(worksheet, 0)] == list(range(11, 11 + width))
     assert next_col == 11 + width
 
 
@@ -708,9 +679,7 @@ def test_append_turnover_report_places_two_reports_side_by_side(writer, workshee
     """
 
     # The second report starts wherever the first one reported that it ended
-    next_col = writer.append_turnover_report(
-        [], [], 11, checkboxes(), "Turnover_Q3-2023"
-    )
+    next_col = writer.append_turnover_report([], [], 11, checkboxes(), "Turnover_Q3-2023")
     writer.append_turnover_report([], [], next_col, checkboxes(), "Turnover_Q1-2024")
 
     # Both reports keep a complete set of columns, and none is written to twice
@@ -728,9 +697,7 @@ def test_append_turnover_report_places_two_reports_side_by_side(writer, workshee
     ]
 
 
-def test_append_turnover_report_returns_its_starting_column_when_nothing_is_checked(
-    writer, worksheet
-):
+def test_append_turnover_report_returns_its_starting_column_when_nothing_is_checked(writer, worksheet):
     """
     Tests that a report with no turnover column checked leaves the cursor where it
     found it, so the columns after it are not pushed across by an empty report
@@ -753,9 +720,7 @@ def test_append_turnover_report_returns_its_starting_column_when_nothing_is_chec
     assert next_col == 11
 
 
-def test_append_turnover_report_writes_each_entry_to_its_matching_inventory_row(
-    writer, worksheet
-):
+def test_append_turnover_report_writes_each_entry_to_its_matching_inventory_row(writer, worksheet):
     """
     Tests that each turnover entry is looked up by part and written to the row that
     part already occupies, rather than to the row it holds in the turnover report,
@@ -810,9 +775,7 @@ def test_append_turnover_report_matches_parts_ignoring_spaces(writer, worksheet)
     assert cells_in_row(worksheet, FIRST_DATA_ROW) == [(11, 42)]
 
 
-def test_append_turnover_report_writes_a_repeated_part_to_every_row_it_occupies(
-    writer, worksheet
-):
+def test_append_turnover_report_writes_a_repeated_part_to_every_row_it_occupies(writer, worksheet):
     """
     Tests that a part the inventory lists twice gets this report's data on both of
     its rows. The join is an index rather than a scan of the whole inventory per
@@ -845,9 +808,7 @@ def test_append_turnover_report_writes_a_repeated_part_to_every_row_it_occupies(
     assert cells_in_row(worksheet, FIRST_DATA_ROW + 2) == [(11, 42)]
 
 
-def test_append_turnover_report_leaves_an_unmatched_part_reading_as_missing(
-    writer, worksheet
-):
+def test_append_turnover_report_leaves_an_unmatched_part_reading_as_missing(writer, worksheet):
     """
     Tests that a part the turnover report sold but the inventory report never listed
     is dropped, since there is no row to write it to, and that the inventory rows it
@@ -893,9 +854,7 @@ def test_append_turnover_report_never_writes_over_the_header_row(writer, workshe
     turnover = [build_turnover_entry("PART-A"), build_turnover_entry("PART-B")]
 
     next_col = writer.write_inventory(inventory, checkbox_dict)
-    writer.append_turnover_report(
-        turnover, inventory, next_col, checkbox_dict, "Q1-2024"
-    )
+    writer.append_turnover_report(turnover, inventory, next_col, checkbox_dict, "Q1-2024")
 
     # Row zero still holds nothing but the turnover headers
     assert cells_in_row(worksheet, 0) == [

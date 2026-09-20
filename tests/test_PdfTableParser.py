@@ -37,9 +37,7 @@ TURNOVER_HEADER_BLOCK = [
 ]
 
 # The date/page stamp closing every page
-FOOTER_LINE = (
-    "January 22, 2024 1:07:23 PM CST                                        Page 1 of 25"
-)
+FOOTER_LINE = "January 22, 2024 1:07:23 PM CST                                        Page 1 of 25"
 
 
 def build_page(header_block: list, *lines: str) -> str:
@@ -85,9 +83,7 @@ def test_parse_inventory_page_parses_a_full_row(parser):
     )
 
     # Every column lands in its own field, in the order the entry class expects
-    assert parser.parse_inventory_page(page, []) == [
-        ["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    assert parser.parse_inventory_page(page, []) == [["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]]
 
 
 def test_parse_inventory_page_inserts_a_blank_uom_when_the_report_omits_it(parser):
@@ -107,9 +103,7 @@ def test_parse_inventory_page_inserts_a_blank_uom_when_the_report_omits_it(parse
     )
 
     # An empty UOM holds the numeric columns in place
-    assert parser.parse_inventory_page(page, []) == [
-        ["PART-A", "WIDGET ONE", "", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    assert parser.parse_inventory_page(page, []) == [["PART-A", "WIDGET ONE", "", 100, 0, 0, 0, 100, 0, 0, 0]]
 
 
 def test_parse_inventory_page_returns_the_rows_unchanged_with_no_header(parser):
@@ -125,9 +119,7 @@ def test_parse_inventory_page_returns_the_rows_unchanged_with_no_header(parser):
     page = "Example Company Inc.\nInventory Availability"
 
     # The rows parsed so far come back untouched
-    assert parser.parse_inventory_page(page, [["PART-A", "WIDGET ONE"]]) == [
-        ["PART-A", "WIDGET ONE"]
-    ]
+    assert parser.parse_inventory_page(page, [["PART-A", "WIDGET ONE"]]) == [["PART-A", "WIDGET ONE"]]
 
 
 def test_parse_inventory_page_stops_at_the_page_footer(parser):
@@ -148,9 +140,7 @@ def test_parse_inventory_page_stops_at_the_page_footer(parser):
     )
 
     # Only the row above the footer is parsed
-    assert parser.parse_inventory_page(page, []) == [
-        ["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    assert parser.parse_inventory_page(page, []) == [["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]]
 
 
 def test_parse_inventory_page_skips_blank_lines(parser):
@@ -213,9 +203,7 @@ def test_parse_inventory_page_rejoins_a_description_containing_spaces(parser):
     )
 
     # The description comes back as one field, with its fragments joined by a space
-    assert parser.parse_inventory_page(page, []) == [
-        ["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    assert parser.parse_inventory_page(page, []) == [["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]]
 
 
 def test_parse_inventory_page_folds_a_continuation_line_into_the_previous_row(parser):
@@ -265,9 +253,7 @@ def test_parse_inventory_page_folds_a_continuation_into_a_row_from_a_prior_page(
     """
 
     # The row was parsed off the bottom of the previous page
-    rows = [
-        ["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    rows = [["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]]
 
     # This page opens with the rest of that row's part and description
     page = build_page(INVENTORY_HEADER_BLOCK, "AND MORE      CONTINUED")
@@ -322,9 +308,7 @@ def test_parse_inventory_page_rereads_the_column_offsets_from_each_page(parser):
     )
 
     # The row parses identically to one laid out under the unshifted header
-    assert parser.parse_inventory_page(page, []) == [
-        ["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]
-    ]
+    assert parser.parse_inventory_page(page, []) == [["PART-A", "WIDGET ONE", "ea", 100, 0, 0, 0, 100, 0, 0, 0]]
 
 
 def test_parse_turnover_page_parses_a_totals_row(parser):
@@ -343,9 +327,7 @@ def test_parse_turnover_page_parses_a_totals_row(parser):
     )
 
     # The label and every numeric column land in their own field
-    assert parser.parse_turnover_page(page, []) == [
-        ["PART-A", 12, 800, 1234.50, 0.02500]
-    ]
+    assert parser.parse_turnover_page(page, []) == [["PART-A", 12, 800, 1234.50, 0.02500]]
 
 
 def test_parse_turnover_page_returns_the_rows_unchanged_with_no_header(parser):
@@ -361,9 +343,7 @@ def test_parse_turnover_page_returns_the_rows_unchanged_with_no_header(parser):
     page = "Example Company Inc.\nTurnover Report"
 
     # The rows parsed so far come back untouched
-    assert parser.parse_turnover_page(page, [["PART-A", 12, 800, 0, 0]]) == [
-        ["PART-A", 12, 800, 0, 0]
-    ]
+    assert parser.parse_turnover_page(page, [["PART-A", 12, 800, 0, 0]]) == [["PART-A", 12, 800, 0, 0]]
 
 
 def test_parse_turnover_page_ignores_the_detail_lines(parser):
@@ -384,9 +364,7 @@ def test_parse_turnover_page_ignores_the_detail_lines(parser):
     )
 
     # Only the totals line becomes a row
-    assert parser.parse_turnover_page(page, []) == [
-        ["PART-A", 12, 800, 1234.50, 0.02500]
-    ]
+    assert parser.parse_turnover_page(page, []) == [["PART-A", 12, 800, 1234.50, 0.02500]]
 
 
 def test_parse_turnover_page_skips_the_company_grand_total(parser):
@@ -406,9 +384,7 @@ def test_parse_turnover_page_skips_the_company_grand_total(parser):
     )
 
     # Only the part's totals become a row
-    assert parser.parse_turnover_page(page, []) == [
-        ["PART-A", 12, 800, 1234.50, 0.02500]
-    ]
+    assert parser.parse_turnover_page(page, []) == [["PART-A", 12, 800, 1234.50, 0.02500]]
 
 
 def test_parse_turnover_page_binds_a_label_containing_spaces_to_the_last_totals(
@@ -452,9 +428,7 @@ def test_parse_turnover_page_takes_the_values_from_above_when_the_name_wraps(par
     )
 
     # The label is rejoined and the values come from the line above
-    assert parser.parse_turnover_page(page, []) == [
-        ["A VERY LONG PART NAME - WRAPPED", 5, 200.75, 1500, 0.04000]
-    ]
+    assert parser.parse_turnover_page(page, []) == [["A VERY LONG PART NAME - WRAPPED", 5, 200.75, 1500, 0.04000]]
 
 
 def test_parse_turnover_page_returns_empty_values_for_a_wrapped_totals_at_the_top(
@@ -526,9 +500,7 @@ def test_align_to_columns_leaves_a_column_the_report_skipped_blank(parser):
     """
 
     # The middle column is empty
-    assert parser.align_to_columns(
-        "       1,234                78", [12, 22, 30], 0
-    ) == ["1,234", "", "78"]
+    assert parser.align_to_columns("       1,234                78", [12, 22, 30], 0) == ["1,234", "", "78"]
 
 
 def test_align_to_columns_matches_values_with_separators_and_signs(parser):

@@ -12,7 +12,6 @@ from source.TurnoverEntry import TurnoverEntry
 # InventoryProcessor class to parse inventory and turnover report PDFs and write
 # the resulting data out to a spreadsheet.
 class InventoryProcessor:
-
     def __init__(self, file_io: InventoryAppFileIO) -> None:
         """
         Initializes the InventoryProcessor object.
@@ -45,12 +44,8 @@ class InventoryProcessor:
 
         # Log the bare filename, not the path, so the results file reads the same
         # regardless of the platform or how the file was selected
-        self.file_io.write_to_results_file(
-            f"Processing inventory file: {Path(filepath).name}"
-        )
-        self.file_io.write_to_results_file(
-            f"Number of Pages in Inventory: {len(pages)}"
-        )
+        self.file_io.write_to_results_file(f"Processing inventory file: {Path(filepath).name}")
+        self.file_io.write_to_results_file(f"Number of Pages in Inventory: {len(pages)}")
 
         # Parse every page before building entries, since a row's part or
         # description may wrap from the bottom of one page onto the top of the next
@@ -79,12 +74,8 @@ class InventoryProcessor:
         # Read pdf data
         pages = self.file_io.read_pdf(filepath)
 
-        self.file_io.write_to_results_file(
-            f"Processing turnover file: {Path(filepath).name}"
-        )
-        self.file_io.write_to_results_file(
-            f"Number of Pages in turnover report: {len(pages)}"
-        )
+        self.file_io.write_to_results_file(f"Processing turnover file: {Path(filepath).name}")
+        self.file_io.write_to_results_file(f"Number of Pages in turnover report: {len(pages)}")
 
         rows = []
         for page in pages:
@@ -127,24 +118,18 @@ class InventoryProcessor:
         # Bail gracefully if the inventory PDF could not be read (the file I/O
         # controller has already surfaced the underlying error)
         if not inventory:
-            report_status(
-                "Could not read the selected Inventory PDF. See log for details."
-            )
+            report_status("Could not read the selected Inventory PDF. See log for details.")
             return False
 
         # Get the date of the inventory file from the name. This will be the name of
         # the excel file. Fall back to a generic name if the path has no digit/.pdf.
         match = re.search(r"(\d*)\.pdf", inventory_pdf_path)
-        filename = (
-            match.group().replace(".pdf", "") if match else "InventoryReport"
-        )
+        filename = match.group().replace(".pdf", "") if match else "InventoryReport"
 
         # Spreadsheet Workbook definition
         workbook = self.file_io.create_workbook(filename)
         if workbook is None:
-            report_status(
-                "Could not create the output spreadsheet. See log for details."
-            )
+            report_status("Could not create the output spreadsheet. See log for details.")
             return False
 
         # Writer for this workbook, holding its worksheet and its cell formats
@@ -162,16 +147,12 @@ class InventoryProcessor:
 
             # Each report reports back the first column past the ones it filled, so
             # the next report starts after it rather than over it
-            next_col = writer.append_turnover_report(
-                turnover, inventory, next_col, checkbox_dict, file.stem
-            )
+            next_col = writer.append_turnover_report(turnover, inventory, next_col, checkbox_dict, file.stem)
 
         # Save and close the spreadsheet
         if self.file_io.save_workbook(workbook):
             report_status("Successfully processed Inventory Availability!")
             return True
 
-        report_status(
-            "Could not save the output spreadsheet. See log for details."
-        )
+        report_status("Could not save the output spreadsheet. See log for details.")
         return False

@@ -9,7 +9,6 @@ from dataclasses import dataclass
 # different keys.
 @dataclass(frozen=True)
 class Column:
-
     # fmt:off
     key:     str            # Key the spreadsheet writer looks up in the checkbox dict
     label:   str            # Text shown on this column's GUI checkbox and sheet header

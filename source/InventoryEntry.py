@@ -9,7 +9,6 @@ from dataclasses import dataclass
 # default, so InventoryEntry() default-constructs.
 @dataclass
 class InventoryEntry:
-
     # fmt:off
     part: str                    = ""  # Part number
     description: str             = ""  # Part description

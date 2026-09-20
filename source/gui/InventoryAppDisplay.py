@@ -52,7 +52,6 @@ GEOMETRY_PATTERN = re.compile(r"^\d+x\d+([+-]\d+[+-]\d+)?$")
 # availability PDF, choosing which columns the report includes, and processing it.
 # This implementation uses tkinter for the GUI.
 class InventoryAppDisplay(tk.Tk):
-
     def __init__(
         self,
         process_callback: Callable[[str, dict[str, bool]], bool],
@@ -106,9 +105,7 @@ class InventoryAppDisplay(tk.Tk):
 
         # Resolution of the application window, restored to the size and position
         # the user last left it at
-        self.geometry(
-            self._parse_geometry(settings.get(SETTING_KEY_GEOMETRY), window_resolution)
-        )
+        self.geometry(self._parse_geometry(settings.get(SETTING_KEY_GEOMETRY), window_resolution))
 
         # Allow user to resize window in x and y direction
         self.resizable(True, True)
@@ -133,9 +130,7 @@ class InventoryAppDisplay(tk.Tk):
         # created already themed, rather than being restyled after the fact.
         self.current_theme = THEME_BY_NAME.get(settings.get(SETTING_KEY_THEME), theme)
         self.current_font_family = settings.get(SETTING_KEY_FONT_FAMILY, font_family)
-        self.current_font_size = self._parse_font_size(
-            settings.get(SETTING_KEY_FONT_SIZE), font_size
-        )
+        self.current_font_size = self._parse_font_size(settings.get(SETTING_KEY_FONT_SIZE), font_size)
 
         # Holds the last selected inventory availability filepath
         self.selected_file = tk.StringVar()
@@ -145,8 +140,7 @@ class InventoryAppDisplay(tk.Tk):
         # spreadsheet does not know about, or miss one that it does. Each starts
         # at whatever the user last selected it as.
         self.column_vars: dict[str, tk.BooleanVar] = {
-            column.key: tk.BooleanVar(value=self._restore_column(column, settings))
-            for column in ALL_COLUMNS
+            column.key: tk.BooleanVar(value=self._restore_column(column, settings)) for column in ALL_COLUMNS
         }
 
         # Tkinter Widgets
@@ -244,9 +238,7 @@ class InventoryAppDisplay(tk.Tk):
         # Settings are stored as text, so the persisted flag is compared rather
         # than converted: bool("False") is True, which would check every box. A
         # column with nothing persisted for it falls back to its own default.
-        stored = settings.get(
-            SETTING_KEY_COLUMN_PREFIX + column.key, str(column.always)
-        )
+        stored = settings.get(SETTING_KEY_COLUMN_PREFIX + column.key, str(column.always))
         return stored == str(True)
 
     def build_widgets(self) -> None:
@@ -281,18 +273,10 @@ class InventoryAppDisplay(tk.Tk):
         #  -> Turnover Reports option to browse the turnover report PDFs
         #  -> Spreadsheets option to browse the generated .xlsx reports
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.view_menu.add_command(
-            label="Results Log", command=self.handle_results_log
-        )
-        self.view_menu.add_command(
-            label="Inventories", command=self.handle_open_inventories
-        )
-        self.view_menu.add_command(
-            label="Turnover Reports", command=self.handle_open_turnover_reports
-        )
-        self.view_menu.add_command(
-            label="Spreadsheets", command=self.handle_open_spreadsheets
-        )
+        self.view_menu.add_command(label="Results Log", command=self.handle_results_log)
+        self.view_menu.add_command(label="Inventories", command=self.handle_open_inventories)
+        self.view_menu.add_command(label="Turnover Reports", command=self.handle_open_turnover_reports)
+        self.view_menu.add_command(label="Spreadsheets", command=self.handle_open_spreadsheets)
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         # Preferences dropdown
@@ -333,12 +317,8 @@ class InventoryAppDisplay(tk.Tk):
         #  -> What's New option to re-read the patch notes at any time
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="About", command=self.handle_about)
-        self.help_menu.add_command(
-            label="Check for Updates", command=self.handle_check_for_updates
-        )
-        self.help_menu.add_command(
-            label="What's New", command=self.handle_view_patch_notes
-        )
+        self.help_menu.add_command(label="Check for Updates", command=self.handle_check_for_updates)
+        self.help_menu.add_command(label="What's New", command=self.handle_view_patch_notes)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         self.config(menu=self.menu_bar)
@@ -394,9 +374,7 @@ class InventoryAppDisplay(tk.Tk):
 
         self.inventory_frame = tk.Frame(self, bg=self.current_theme.bg_main)
         self.inventory_frame.pack(anchor="w", padx=20, fill="x")
-        self._build_checkbox_grid(
-            self.inventory_frame, INVENTORY_COLUMNS, INVENTORY_CHECKBOXES_PER_ROW
-        )
+        self._build_checkbox_grid(self.inventory_frame, INVENTORY_COLUMNS, INVENTORY_CHECKBOXES_PER_ROW)
 
         # Turnover column selection
         self.turnover_label = tk.Label(
@@ -410,9 +388,7 @@ class InventoryAppDisplay(tk.Tk):
 
         self.turnover_frame = tk.Frame(self, bg=self.current_theme.bg_main)
         self.turnover_frame.pack(anchor="w", padx=20, fill="x")
-        self._build_checkbox_grid(
-            self.turnover_frame, TURNOVER_COLUMNS, TURNOVER_CHECKBOXES_PER_ROW
-        )
+        self._build_checkbox_grid(self.turnover_frame, TURNOVER_COLUMNS, TURNOVER_CHECKBOXES_PER_ROW)
 
         self.button_frame = tk.Frame(self, bg=self.current_theme.bg_main)
         self.button_frame.pack(pady=20)
@@ -511,9 +487,7 @@ class InventoryAppDisplay(tk.Tk):
                 self.current_font_size,
             )
 
-    def _build_checkbox_grid(
-        self, parent: tk.Frame, columns: tuple[Column, ...], per_row: int
-    ) -> None:
+    def _build_checkbox_grid(self, parent: tk.Frame, columns: tuple[Column, ...], per_row: int) -> None:
         """
         Fills a frame with one checkbutton per selectable column, wrapping onto a
         new row every per_row columns
@@ -529,7 +503,6 @@ class InventoryAppDisplay(tk.Tk):
         position = 0
 
         for column in columns:
-
             # A column that is always included has no checkbox to toggle
             if column.always:
                 continue
@@ -617,9 +590,7 @@ class InventoryAppDisplay(tk.Tk):
 
         # Tk runs this after updating the variable, so this reads the new state.
         # Settings are stored as text, so the flag is converted on the way out.
-        self.save_settings_callback(
-            SETTING_KEY_COLUMN_PREFIX + key, str(bool(self.column_vars[key].get()))
-        )
+        self.save_settings_callback(SETTING_KEY_COLUMN_PREFIX + key, str(bool(self.column_vars[key].get())))
 
     def handle_exit(self) -> None:
         """
@@ -712,9 +683,7 @@ class InventoryAppDisplay(tk.Tk):
             font_size=self.current_font_size,
         )
 
-    def _open_readonly_file_viewer(
-        self, file_path: Path, title: str, missing_message: str
-    ) -> None:
+    def _open_readonly_file_viewer(self, file_path: Path, title: str, missing_message: str) -> None:
         """
         Opens a native, read-only window showing the given text file if it
         exists. Shows an error popup with the provided message if the file is
@@ -849,9 +818,7 @@ class InventoryAppDisplay(tk.Tk):
     def show_update_available(
         self,
         result: UpdateCheckResult,
-        start_install: (
-            Callable[[Callable[[int, int], None], Callable[[bool], None]], None] | None
-        ) = None,
+        start_install: (Callable[[Callable[[int, int], None], Callable[[bool], None]], None] | None) = None,
     ) -> None:
         """
         Notifies the user that a newer release is available by opening a themed
@@ -896,9 +863,7 @@ class InventoryAppDisplay(tk.Tk):
         self.configure(bg=theme.bg_main)
         self.title_label.configure(bg=theme.bg_main, fg=theme.label_fg)
         self.file_frame.configure(bg=theme.bg_main)
-        self.file_entry.configure(
-            bg=theme.bg_entry, fg=theme.bg_main, insertbackground=theme.fg_text
-        )
+        self.file_entry.configure(bg=theme.bg_entry, fg=theme.bg_main, insertbackground=theme.fg_text)
         self.browse_button.configure(
             bg=theme.button_bg,
             fg=theme.button_fg,
@@ -932,9 +897,7 @@ class InventoryAppDisplay(tk.Tk):
             activeforeground=theme.fg_text,
         )
         self.output_label.configure(bg=theme.bg_main, fg=theme.label_fg)
-        self.output_box.configure(
-            bg=theme.bg_entry, fg=theme.fg_text, insertbackground=theme.fg_text
-        )
+        self.output_box.configure(bg=theme.bg_entry, fg=theme.fg_text, insertbackground=theme.fg_text)
 
         # Keep the hover tooltips consistent with the new theme
         self._refresh_tooltips()

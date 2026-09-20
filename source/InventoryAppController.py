@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 # InventoryAppController class to drive logic for processing inventory and
 # turnover report PDFs.
 class InventoryAppController:
-
     def __init__(self) -> None:
         """
         Initializes the InventoryAppController object.
@@ -45,9 +44,7 @@ class InventoryAppController:
         self.processor = InventoryProcessor(file_io=self.file_io)
 
         # Argument provider to check for integration test (headless) mode
-        self.argument_provider = ArgumentProvider(
-            description="Fishbowl inventory availability report generator"
-        )
+        self.argument_provider = ArgumentProvider(description="Fishbowl inventory availability report generator")
 
         # The GUI, constructed in start_application() rather than here so that a
         # headless run never builds a window it has no display for
@@ -132,9 +129,7 @@ class InventoryAppController:
         # until the root window has been mapped
         self.display.after(0, self.display.show_patch_notes, APP_NAME, VERSION, notes)
 
-    def handle_process_inventory(
-        self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]
-    ) -> bool:
+    def handle_process_inventory(self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]) -> bool:
         """
         Processes the inventory PDF the user chose in the GUI, routing status
         messages to the GUI's output box. Wired into the display as its process
@@ -148,9 +143,7 @@ class InventoryAppController:
             True if the spreadsheet was saved, False if any step failed
         """
 
-        return self.processor.process_inventory(
-            inventory_pdf_path, checkbox_dict, self.display.write_output
-        )
+        return self.processor.process_inventory(inventory_pdf_path, checkbox_dict, self.display.write_output)
 
     def handle_save_setting(self, key: str, value: str) -> None:
         """
@@ -172,9 +165,7 @@ class InventoryAppController:
         """
 
         # Surface I/O failures to stdout since there is no GUI output line here
-        self.file_io.report_error = lambda title, message: print(
-            f"{title}: {message}"
-        )
+        self.file_io.report_error = lambda title, message: print(f"{title}: {message}")
 
         # Include every column. The keys come from source/columns.py, the single
         # source of truth the GUI's checkbox grid is also built from.

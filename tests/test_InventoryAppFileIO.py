@@ -8,9 +8,6 @@ import xlsxwriter
 from source.InventoryAppFileIO import InventoryAppFileIO
 
 
-###############################################################################
-###                    InventoryAppFileIO -> Test Fixture                   ###
-###############################################################################
 @pytest.fixture
 def file_io():
     """
@@ -22,9 +19,6 @@ def file_io():
     return InventoryAppFileIO(report_error=MagicMock())
 
 
-###############################################################################
-###                Tests InventoryAppFileIO -> __init__()                   ###
-###############################################################################
 def test_init_default_report_error_is_a_noop():
     """
     Tests that an InventoryAppFileIO built without an error reporter still has a
@@ -54,9 +48,6 @@ def test_init_stores_the_injected_report_error(file_io):
     file_io.report_error.assert_called_once_with("File Error", "some message")
 
 
-###############################################################################
-###           Tests InventoryAppFileIO -> reset_results_file()              ###
-###############################################################################
 @patch("source.InventoryAppFileIO.RESULTS_FILE")
 def test_reset_results_file_deletes_an_existing_file(mock_results_file, file_io):
     """
@@ -128,9 +119,6 @@ def test_reset_results_file_reports_on_error(mock_results_file, file_io):
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###          Tests InventoryAppFileIO -> write_to_results_file()            ###
-###############################################################################
 @patch("builtins.open", new_callable=mock_open)
 @patch("source.InventoryAppFileIO.RESULTS_FILE")
 def test_write_to_results_file_appends_with_newline(
@@ -178,9 +166,6 @@ def test_write_to_results_file_reports_on_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###             Tests InventoryAppFileIO -> read_text_file()                ###
-###############################################################################
 @patch("builtins.open", new_callable=mock_open, read_data="log contents")
 def test_read_text_file_returns_contents(mock_file, file_io):
     """
@@ -215,9 +200,6 @@ def test_read_text_file_reports_and_returns_empty_string_on_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###                Tests InventoryAppFileIO -> read_pdf()                   ###
-###############################################################################
 @patch("source.InventoryAppFileIO.pypdf.PdfReader")
 def test_read_pdf_extracts_each_page_in_layout_mode(mock_pdf_reader, file_io):
     """
@@ -309,9 +291,6 @@ def test_read_pdf_reports_and_returns_empty_on_pdf_read_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###           Tests InventoryAppFileIO -> list_inventory_files()            ###
-###############################################################################
 @patch("source.InventoryAppFileIO.INVENTORY_DIR")
 def test_list_inventory_files_returns_only_pdfs(mock_inventory_dir, file_io):
     """
@@ -409,9 +388,6 @@ def test_list_inventory_files_reports_and_returns_empty_on_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###            Tests InventoryAppFileIO -> list_turnover_files()            ###
-###############################################################################
 @patch("source.InventoryAppFileIO.TURNOVER_DIR")
 def test_list_turnover_files_returns_only_pdfs(mock_turnover_dir, file_io):
     """
@@ -503,9 +479,6 @@ def test_list_turnover_files_reports_and_returns_empty_on_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###             Tests InventoryAppFileIO -> create_workbook()               ###
-###############################################################################
 @patch("source.InventoryAppFileIO.xlsxwriter.Workbook")
 @patch("source.InventoryAppFileIO.OUTPUT_DIR")
 def test_create_workbook_appends_xlsx_extension(
@@ -574,9 +547,6 @@ def test_create_workbook_reports_and_returns_none_on_xlsxwriter_error(
     file_io.report_error.assert_called_once()
 
 
-###############################################################################
-###              Tests InventoryAppFileIO -> save_workbook()                ###
-###############################################################################
 def test_save_workbook_closes_and_returns_true(file_io):
     """
     Tests that save_workbook() closes the workbook, which is where xlsxwriter

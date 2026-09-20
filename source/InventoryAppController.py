@@ -32,9 +32,6 @@ if TYPE_CHECKING:
 # turnover report PDFs.
 class InventoryAppController:
 
-    ###########################################################################
-    ###                InventoryAppController -> __init__()                 ###
-    ###########################################################################
     def __init__(self) -> None:
         """
         Initializes the InventoryAppController object.
@@ -71,9 +68,6 @@ class InventoryAppController:
         # Start each run with a clean results file
         self.file_io.reset_results_file()
 
-    ###########################################################################
-    ###          InventoryAppController -> handle_check_for_updates()       ###
-    ###########################################################################
     def handle_check_for_updates(self) -> None:
         """
         Runs an on-demand update check, triggered by the Help menu's
@@ -83,9 +77,6 @@ class InventoryAppController:
 
         self.update_coordinator.start(manual=True)
 
-    ###########################################################################
-    ###          InventoryAppController -> handle_view_patch_notes()        ###
-    ###########################################################################
     def handle_view_patch_notes(self) -> None:
         """
         Shows the patch notes on demand, triggered by the Help menu's "What's New"
@@ -106,9 +97,6 @@ class InventoryAppController:
                 message=f"No patch notes found at: {PATCH_NOTES_PATH}.",
             )
 
-    ###########################################################################
-    ###        InventoryAppController -> show_patch_notes_if_updated()      ###
-    ###########################################################################
     def show_patch_notes_if_updated(self, saved_settings: dict[str, str]) -> None:
         """
         Shows the user what changed when this launch is the first one after an
@@ -144,9 +132,6 @@ class InventoryAppController:
         # until the root window has been mapped
         self.display.after(0, self.display.show_patch_notes, APP_NAME, VERSION, notes)
 
-    ###########################################################################
-    ###         InventoryAppController -> handle_process_inventory()        ###
-    ###########################################################################
     def handle_process_inventory(
         self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]
     ) -> bool:
@@ -167,9 +152,6 @@ class InventoryAppController:
             inventory_pdf_path, checkbox_dict, self.display.write_output
         )
 
-    ###########################################################################
-    ###           InventoryAppController -> handle_save_setting()           ###
-    ###########################################################################
     def handle_save_setting(self, key: str, value: str) -> None:
         """
         Persists a single user setting so it is restored on the next launch. Wired
@@ -182,9 +164,6 @@ class InventoryAppController:
 
         self.settings_repository.save_setting(key=key, value=value)
 
-    ###########################################################################
-    ###           InventoryAppController -> run_integration_test()          ###
-    ###########################################################################
     def run_integration_test(self) -> None:
         """
         Runs the application headless (no GUI): every inventory/turnover column is
@@ -205,9 +184,6 @@ class InventoryAppController:
         for path in self.file_io.list_inventory_files():
             self.processor.process_inventory(str(path), checkbox_dict, print)
 
-    ###########################################################################
-    ###            InventoryAppController -> start_application()            ###
-    ###########################################################################
     def start_application(self) -> None:
         """
         Starts the application by building the GUI and running the tkinter main

@@ -38,9 +38,6 @@ ODD_ROW_FORMAT = {
 }
 
 
-###############################################################################
-###                   spreadsheet_writer -> _match_key()                    ###
-###############################################################################
 def _match_key(part: str) -> str:
     """
     Normalizes a part name into the form the two reports are matched on, since the
@@ -62,9 +59,6 @@ def _match_key(part: str) -> str:
 # without this module being touched.
 class SpreadsheetWriter:
 
-    ###########################################################################
-    ###                   SpreadsheetWriter -> __init__()                   ###
-    ###########################################################################
     def __init__(self, workbook: xlsxwriter.Workbook) -> None:
         """
         Initializes the SpreadsheetWriter object, opening the single worksheet the
@@ -86,9 +80,6 @@ class SpreadsheetWriter:
         self.even_format = workbook.add_format(EVEN_ROW_FORMAT)
         self.odd_format = workbook.add_format(ODD_ROW_FORMAT)
 
-    ###########################################################################
-    ###               SpreadsheetWriter -> write_inventory()                ###
-    ###########################################################################
     def write_inventory(
         self, inventory: list[InventoryEntry], checkbox_dict: dict[str, bool]
     ) -> int:
@@ -118,9 +109,6 @@ class SpreadsheetWriter:
         # written, so an empty inventory still reports the width the headers occupy
         return len(columns)
 
-    ###########################################################################
-    ###            SpreadsheetWriter -> append_turnover_report()            ###
-    ###########################################################################
     def append_turnover_report(
         self,
         turnover: list[TurnoverEntry],
@@ -166,9 +154,6 @@ class SpreadsheetWriter:
 
         return start_col + len(columns)
 
-    ###########################################################################
-    ###               SpreadsheetWriter -> _checked_columns()               ###
-    ###########################################################################
     def _checked_columns(
         self, columns: tuple[Column, ...], checkbox_dict: dict[str, bool]
     ) -> tuple[Column, ...]:
@@ -187,9 +172,6 @@ class SpreadsheetWriter:
 
         return tuple(column for column in columns if checkbox_dict[column.key])
 
-    ###########################################################################
-    ###                SpreadsheetWriter -> _write_header()                 ###
-    ###########################################################################
     def _write_header(
         self, columns: tuple[Column, ...], start_col: int, suffix: str = ""
     ) -> None:
@@ -209,9 +191,6 @@ class SpreadsheetWriter:
                 HEADER_ROW, col, f"{column.label}{suffix}", self.header_format
             )
 
-    ###########################################################################
-    ###               SpreadsheetWriter -> _write_entry_row()               ###
-    ###########################################################################
     def _write_entry_row(
         self,
         row: int,
@@ -235,9 +214,6 @@ class SpreadsheetWriter:
         for col, column in enumerate(columns, start=start_col):
             self.worksheet.write(row, col, getattr(entry, column.field), row_format)
 
-    ###########################################################################
-    ###                   SpreadsheetWriter -> _prefill()                   ###
-    ###########################################################################
     def _prefill(
         self, columns: tuple[Column, ...], start_col: int, row_count: int
     ) -> None:
@@ -257,9 +233,6 @@ class SpreadsheetWriter:
             for col in range(start_col, start_col + len(columns)):
                 self.worksheet.write(row, col, MISSING_TURNOVER_VALUE, row_format)
 
-    ###########################################################################
-    ###                 SpreadsheetWriter -> _row_format()                  ###
-    ###########################################################################
     def _row_format(self, row: int) -> xlsxwriter.format.Format:
         """
         Picks the fill one data row carries, so the banding that makes a wide report

@@ -13,9 +13,6 @@ from source.TurnoverEntry import TurnoverEntry
 # the resulting data out to a spreadsheet.
 class InventoryProcessor:
 
-    ###########################################################################
-    ###                  InventoryProcessor -> __init__()                   ###
-    ###########################################################################
     def __init__(self, file_io: InventoryAppFileIO) -> None:
         """
         Initializes the InventoryProcessor object.
@@ -31,9 +28,6 @@ class InventoryProcessor:
         # Parser that turns page text into the rows the entry classes are built from
         self.parser = PdfTableParser()
 
-    ###########################################################################
-    ###            InventoryProcessor -> process_inventory_file()           ###
-    ###########################################################################
     def process_inventory_file(self, filepath: str) -> list[InventoryEntry]:
         """
         Processes an inventory PDF by parsing every page into rows, then converting
@@ -70,9 +64,6 @@ class InventoryProcessor:
 
         return inventory_table
 
-    ###########################################################################
-    ###            InventoryProcessor -> process_turnover_file()            ###
-    ###########################################################################
     def process_turnover_file(self, filepath: Path) -> list[TurnoverEntry]:
         """
         Processes a turnover report PDF by parsing every page into rows, then
@@ -107,9 +98,6 @@ class InventoryProcessor:
 
         return turnover_table
 
-    ###########################################################################
-    ###               InventoryProcessor -> process_inventory()             ###
-    ###########################################################################
     def process_inventory(
         self,
         inventory_pdf_path: str,

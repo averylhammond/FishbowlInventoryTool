@@ -53,9 +53,6 @@ GEOMETRY_PATTERN = re.compile(r"^\d+x\d+([+-]\d+[+-]\d+)?$")
 # This implementation uses tkinter for the GUI.
 class InventoryAppDisplay(tk.Tk):
 
-    ###########################################################################
-    ###                 InventoryAppDisplay -> __init__()                   ###
-    ###########################################################################
     def __init__(
         self,
         process_callback: Callable[[str, dict[str, bool]], bool],
@@ -185,9 +182,6 @@ class InventoryAppDisplay(tk.Tk):
         # Build the GUI
         self.build_widgets()
 
-    ###########################################################################
-    ###              InventoryAppDisplay -> _parse_geometry()               ###
-    ###########################################################################
     def _parse_geometry(self, value: str | None, default: str) -> str:
         """
         Converts a persisted window geometry into one safe to hand to geometry(),
@@ -207,9 +201,6 @@ class InventoryAppDisplay(tk.Tk):
             return value
         return default
 
-    ###########################################################################
-    ###             InventoryAppDisplay -> _parse_font_size()               ###
-    ###########################################################################
     def _parse_font_size(self, value: str | None, default: int) -> int:
         """
         Converts a persisted font size into an int, falling back to the default
@@ -229,9 +220,6 @@ class InventoryAppDisplay(tk.Tk):
         except (TypeError, ValueError):
             return default
 
-    ###########################################################################
-    ###             InventoryAppDisplay -> _restore_column()                ###
-    ###########################################################################
     def _restore_column(self, column: Column, settings: dict[str, str]) -> bool:
         """
         Decides whether a column's checkbox starts checked, restoring the state the
@@ -261,9 +249,6 @@ class InventoryAppDisplay(tk.Tk):
         )
         return stored == str(True)
 
-    ###########################################################################
-    ###               InventoryAppDisplay -> build_widgets()                ###
-    ###########################################################################
     def build_widgets(self) -> None:
         """
         Creates the GUI widgets for the application. This includes a title label,
@@ -493,9 +478,6 @@ class InventoryAppDisplay(tk.Tk):
         )
         self._attach_tooltip(self.exit_button, "Close the application")
 
-    ###########################################################################
-    ###             InventoryAppDisplay -> _attach_tooltip()                ###
-    ###########################################################################
     def _attach_tooltip(self, widget: tk.Widget, text: str) -> None:
         """
         Attaches a hover tooltip to a widget, styled with the active theme/font,
@@ -516,9 +498,6 @@ class InventoryAppDisplay(tk.Tk):
             )
         )
 
-    ###########################################################################
-    ###            InventoryAppDisplay -> _refresh_tooltips()               ###
-    ###########################################################################
     def _refresh_tooltips(self) -> None:
         """
         Restyles every attached tooltip with the current theme and font so the
@@ -532,9 +511,6 @@ class InventoryAppDisplay(tk.Tk):
                 self.current_font_size,
             )
 
-    ###########################################################################
-    ###            InventoryAppDisplay -> _build_checkbox_grid()             ###
-    ###########################################################################
     def _build_checkbox_grid(
         self, parent: tk.Frame, columns: tuple[Column, ...], per_row: int
     ) -> None:
@@ -568,9 +544,6 @@ class InventoryAppDisplay(tk.Tk):
                 position = 0
                 row += 1
 
-    ###########################################################################
-    ###             InventoryAppDisplay -> _build_checkbutton()              ###
-    ###########################################################################
     def _build_checkbutton(self, parent: tk.Frame, column: Column) -> tk.Checkbutton:
         """
         Creates one themed checkbutton bound to its column's state variable
@@ -606,9 +579,6 @@ class InventoryAppDisplay(tk.Tk):
             font=(self.current_font_family, self.current_font_size),
         )
 
-    ###########################################################################
-    ###           InventoryAppDisplay -> handle_browse_button()              ###
-    ###########################################################################
     def handle_browse_button(self) -> None:
         """
         On "Browse" button press, opens a file dialog to select an inventory
@@ -627,9 +597,6 @@ class InventoryAppDisplay(tk.Tk):
         if file_path:
             self.selected_file.set(file_path)
 
-    ###########################################################################
-    ###                InventoryAppDisplay -> handle_clear()                ###
-    ###########################################################################
     def handle_clear(self) -> None:
         """
         On "Clear" menu press, resets the selected file path and empties the
@@ -639,9 +606,6 @@ class InventoryAppDisplay(tk.Tk):
         self.selected_file.set("")
         self.clear_output()
 
-    ###########################################################################
-    ###          InventoryAppDisplay -> handle_column_toggled()              ###
-    ###########################################################################
     def handle_column_toggled(self, key: str) -> None:
         """
         On a column checkbox press, persists that column's new state so the same
@@ -657,9 +621,6 @@ class InventoryAppDisplay(tk.Tk):
             SETTING_KEY_COLUMN_PREFIX + key, str(bool(self.column_vars[key].get()))
         )
 
-    ###########################################################################
-    ###                InventoryAppDisplay -> handle_exit()                 ###
-    ###########################################################################
     def handle_exit(self) -> None:
         """
         On any request to close the application, persists the window's current size
@@ -673,9 +634,6 @@ class InventoryAppDisplay(tk.Tk):
         self.save_settings_callback(SETTING_KEY_GEOMETRY, self.winfo_geometry())
         self.destroy()
 
-    ###########################################################################
-    ###           InventoryAppDisplay -> get_selected_columns()              ###
-    ###########################################################################
     def get_selected_columns(self) -> dict[str, bool]:
         """
         Snapshots the checkbox state into the dict the spreadsheet writers read to
@@ -690,9 +648,6 @@ class InventoryAppDisplay(tk.Tk):
         # persisted as its repr rather than as True or False
         return {key: bool(var.get()) for key, var in self.column_vars.items()}
 
-    ###########################################################################
-    ###          InventoryAppDisplay -> handle_process_inventory()           ###
-    ###########################################################################
     def handle_process_inventory(self) -> None:
         """
         On "Process This Inventory" button press, hands the selected file and the
@@ -713,9 +668,6 @@ class InventoryAppDisplay(tk.Tk):
         self.clear_output()
         self.process_callback(file_path, self.get_selected_columns())
 
-    ###########################################################################
-    ###                InventoryAppDisplay -> write_output()                ###
-    ###########################################################################
     def write_output(self, message: str) -> None:
         """
         Appends a status message to the output box and scrolls it into view
@@ -732,9 +684,6 @@ class InventoryAppDisplay(tk.Tk):
         # work it announces has already finished
         self.output_box.update_idletasks()
 
-    ###########################################################################
-    ###                InventoryAppDisplay -> clear_output()                ###
-    ###########################################################################
     def clear_output(self) -> None:
         """
         Empties the output box, so each run starts from a clean slate
@@ -742,9 +691,6 @@ class InventoryAppDisplay(tk.Tk):
 
         self.output_box.delete(1.0, tk.END)
 
-    ###########################################################################
-    ###                 InventoryAppDisplay -> show_popup()                 ###
-    ###########################################################################
     def show_popup(self, title: str, message: str) -> None:
         """
         Shows the user a short message in a themed popup window
@@ -766,9 +712,6 @@ class InventoryAppDisplay(tk.Tk):
             font_size=self.current_font_size,
         )
 
-    ###########################################################################
-    ###         InventoryAppDisplay -> _open_readonly_file_viewer()         ###
-    ###########################################################################
     def _open_readonly_file_viewer(
         self, file_path: Path, title: str, missing_message: str
     ) -> None:
@@ -797,9 +740,6 @@ class InventoryAppDisplay(tk.Tk):
         else:
             self.show_popup(title="File Not Found", message=missing_message)
 
-    ###########################################################################
-    ###            InventoryAppDisplay -> handle_results_log()              ###
-    ###########################################################################
     def handle_results_log(self) -> None:
         """
         On "Results Log" menu press, opens the results log file in a native
@@ -813,9 +753,6 @@ class InventoryAppDisplay(tk.Tk):
             f"Log not found at: {RESULTS_FILE}. Process an inventory to generate the log.",
         )
 
-    ###########################################################################
-    ###           InventoryAppDisplay -> handle_open_inventories()          ###
-    ###########################################################################
     def handle_open_inventories(self) -> None:
         """
         On "Inventories" menu press, opens a file dialog rooted at the
@@ -828,9 +765,6 @@ class InventoryAppDisplay(tk.Tk):
             filetypes=[("PDF files", "*.pdf")],
         )
 
-    ###########################################################################
-    ###        InventoryAppDisplay -> handle_open_turnover_reports()        ###
-    ###########################################################################
     def handle_open_turnover_reports(self) -> None:
         """
         On "Turnover Reports" menu press, opens a file dialog rooted at the
@@ -843,9 +777,6 @@ class InventoryAppDisplay(tk.Tk):
             filetypes=[("PDF files", "*.pdf")],
         )
 
-    ###########################################################################
-    ###          InventoryAppDisplay -> handle_open_spreadsheets()          ###
-    ###########################################################################
     def handle_open_spreadsheets(self) -> None:
         """
         On "Spreadsheets" menu press, opens a file dialog rooted at the
@@ -859,9 +790,6 @@ class InventoryAppDisplay(tk.Tk):
             filetypes=[("Excel files", "*.xlsx")],
         )
 
-    ###########################################################################
-    ###                InventoryAppDisplay -> handle_about()                ###
-    ###########################################################################
     def handle_about(self) -> None:
         """
         On "About" menu press, opens the About window showing the current
@@ -878,9 +806,6 @@ class InventoryAppDisplay(tk.Tk):
             font_size=self.current_font_size,
         )
 
-    ###########################################################################
-    ###          InventoryAppDisplay -> handle_check_for_updates()          ###
-    ###########################################################################
     def handle_check_for_updates(self) -> None:
         """
         On "Check for Updates" menu press, asks the controller to run an on-demand
@@ -890,9 +815,6 @@ class InventoryAppDisplay(tk.Tk):
 
         self.check_for_updates_callback()
 
-    ###########################################################################
-    ###          InventoryAppDisplay -> handle_view_patch_notes()           ###
-    ###########################################################################
     def handle_view_patch_notes(self) -> None:
         """
         On "What's New" menu press, asks the controller for the patch notes. The
@@ -902,9 +824,6 @@ class InventoryAppDisplay(tk.Tk):
 
         self.view_patch_notes_callback()
 
-    ###########################################################################
-    ###             InventoryAppDisplay -> show_patch_notes()               ###
-    ###########################################################################
     def show_patch_notes(self, app_name: str, version: str, notes: str) -> None:
         """
         Shows the user what changed, in a themed window matching the rest of the
@@ -927,9 +846,6 @@ class InventoryAppDisplay(tk.Tk):
             font_size=self.current_font_size,
         )
 
-    ###########################################################################
-    ###            InventoryAppDisplay -> show_update_available()           ###
-    ###########################################################################
     def show_update_available(
         self,
         result: UpdateCheckResult,
@@ -967,9 +883,6 @@ class InventoryAppDisplay(tk.Tk):
             start_install_callback=start_install,
         )
 
-    ###########################################################################
-    ###                 InventoryAppDisplay -> apply_theme()                ###
-    ###########################################################################
     def apply_theme(self, theme: Theme) -> None:
         """
         Applies a color theme to every widget in the application
@@ -1030,9 +943,6 @@ class InventoryAppDisplay(tk.Tk):
         # is stored rather than the theme itself, since settings hold only text.
         self.save_settings_callback(SETTING_KEY_THEME, theme.name)
 
-    ###########################################################################
-    ###              InventoryAppDisplay -> apply_font_family()             ###
-    ###########################################################################
     def apply_font_family(self, family: str) -> None:
         """
         Applies a font family to all text on screen
@@ -1047,9 +957,6 @@ class InventoryAppDisplay(tk.Tk):
         # Persist the choice so it is restored on the next launch
         self.save_settings_callback(SETTING_KEY_FONT_FAMILY, family)
 
-    ###########################################################################
-    ###               InventoryAppDisplay -> apply_font_size()              ###
-    ###########################################################################
     def apply_font_size(self, size: int) -> None:
         """
         Applies a font size to all text on screen
@@ -1065,9 +972,6 @@ class InventoryAppDisplay(tk.Tk):
         # stored as text, so the size is converted on the way out.
         self.save_settings_callback(SETTING_KEY_FONT_SIZE, str(size))
 
-    ###########################################################################
-    ###                 InventoryAppDisplay -> _apply_font()                ###
-    ###########################################################################
     def _apply_font(self) -> None:
         """
         Applies the current font family and size to every widget in the

@@ -9,9 +9,7 @@ from source.InventoryEntry import InventoryEntry
 from source.spreadsheet_writer import FIRST_DATA_ROW, SpreadsheetWriter
 from source.TurnoverEntry import TurnoverEntry
 
-###############################################################################
-###                   spreadsheet_writer -> Test Fixtures                   ###
-###############################################################################
+
 def checkboxes(overrides: dict = None, default: bool = True) -> dict:
     """
     Builds the checkbox state dictionary the writer reads, with every column
@@ -175,9 +173,6 @@ def writer(workbook):
     return SpreadsheetWriter(workbook)
 
 
-###############################################################################
-###                  Tests SpreadsheetWriter -> __init__()                  ###
-###############################################################################
 def test_init_opens_one_worksheet_and_builds_each_format_once(workbook, writer):
     """
     Tests that the writer opens the single worksheet the report occupies and builds
@@ -196,9 +191,6 @@ def test_init_opens_one_worksheet_and_builds_each_format_once(workbook, writer):
     assert writer.odd_format["bg_color"] == "#E6F0FF"
 
 
-###############################################################################
-###              Tests SpreadsheetWriter -> write_inventory()               ###
-###############################################################################
 def test_write_inventory_titles_every_checked_column(writer, worksheet):
     """
     Tests that every inventory column is titled in the header row, in the order the
@@ -469,9 +461,6 @@ def test_write_inventory_reuses_the_cached_formats(workbook, writer):
     assert workbook.add_format.call_count == 3
 
 
-###############################################################################
-###           Tests SpreadsheetWriter -> append_turnover_report()           ###
-###############################################################################
 def test_append_turnover_report_labels_each_column_with_the_report(writer, worksheet):
     """
     Tests that each turnover column is titled from the first free column onward,

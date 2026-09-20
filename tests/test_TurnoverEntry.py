@@ -2,9 +2,7 @@ import pytest
 
 from source.TurnoverEntry import TurnoverEntry
 
-###############################################################################
-###                     TurnoverEntry -> Row Fixture                        ###
-###############################################################################
+
 # One turnover "Totals:" row as PdfTableParser hands it over: the part label as a
 # string, the four numeric columns already converted. Units sold is whole while the
 # averages are fractional, which is why each cell is typed by what it says rather
@@ -12,9 +10,6 @@ from source.TurnoverEntry import TurnoverEntry
 PARSED_ROW = ["PART-A", 12, 800, 1234.50, 0.02500]
 
 
-###############################################################################
-###                    Tests TurnoverEntry -> Constructor                   ###
-###############################################################################
 def test_turnover_entry_initialization():
     """
     Tests that the default initialization of the TurnoverEntry() object will
@@ -87,9 +82,6 @@ def test_turnover_entry_holds_a_blank_column_as_none():
     assert entry.avg_qoh == 0
 
 
-###############################################################################
-###               Tests TurnoverEntry -> to_formatted_string()              ###
-###############################################################################
 def test_turnover_entry_to_formatted_string_default():
     """
     Tests that to_formatted_string() will correctly print default values when the

@@ -174,8 +174,10 @@ Three responsibilities worth knowing before touching them:
   groups and each group sorted case-insensitively. `fishbowl_common` is third party — it installs
   from a pinned git tag — so it never sits among the `source.*` imports. This is what ruff's isort
   defaults produce, so adopting the linter (#65) will reorder nothing.
-- A `###`-bordered banner sits above every method, in `source/` and `tests/` alike. The sibling
-  has since dropped its banners; this repo has not, so match what the file already does.
+- **No banner comments above definitions.** `source/` and `tests/` carried a `###`-bordered
+  banner above every method until they were removed for parity with the sibling, which had
+  already dropped its own. A definition is introduced by its docstring; do not reintroduce a
+  banner, section divider or repeated-name header above one.
 - Keep comments concise: a comment should explain only what the immediately adjacent code does.
   Do not document the behavior of other objects, functions or modules from within a comment —
   describe those where they are defined, not at the call site.

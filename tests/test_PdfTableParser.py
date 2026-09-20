@@ -6,9 +6,7 @@ from source.PdfTableParser import (
     PdfTableParser,
 )
 
-###############################################################################
-###                    PdfTableParser -> Page Fixtures                      ###
-###############################################################################
+
 # Synthetic page text, structurally identical to a Fishbowl report but at reduced
 # column widths so the lines stay readable. Column positions are load-bearing, so
 # each page is built by joining explicit line literals rather than by dedenting a
@@ -60,9 +58,6 @@ def build_page(header_block: list, *lines: str) -> str:
     return "\n".join(header_block + list(lines))
 
 
-###############################################################################
-###                     PdfTableParser -> Test Fixture                      ###
-###############################################################################
 @pytest.fixture
 def parser():
     """
@@ -74,9 +69,6 @@ def parser():
     return PdfTableParser()
 
 
-###############################################################################
-###             Tests PdfTableParser -> parse_inventory_page()              ###
-###############################################################################
 def test_parse_inventory_page_parses_a_full_row(parser):
     """
     Tests that a complete inventory line becomes one row of part, description, UOM
@@ -335,9 +327,6 @@ def test_parse_inventory_page_rereads_the_column_offsets_from_each_page(parser):
     ]
 
 
-###############################################################################
-###             Tests PdfTableParser -> parse_turnover_page()               ###
-###############################################################################
 def test_parse_turnover_page_parses_a_totals_row(parser):
     """
     Tests that a part's "Totals:" line becomes one row of the part label and its
@@ -511,9 +500,6 @@ def test_parse_turnover_page_appends_to_the_rows_from_the_previous_page(parser):
     ]
 
 
-###############################################################################
-###               Tests PdfTableParser -> align_to_columns()                ###
-###############################################################################
 def test_align_to_columns_assigns_each_value_to_its_nearest_column_edge(parser):
     """
     Tests that each value is assigned to the column whose header right edge it lines
@@ -588,9 +574,6 @@ def test_align_to_columns_shifts_the_comparison_by_the_offset(parser):
     assert parser.align_to_columns("5", [1, 11], 10) == ["", "5"]
 
 
-###############################################################################
-###                  Tests PdfTableParser -> to_number()                    ###
-###############################################################################
 def test_to_number_drops_the_thousands_separators(parser):
     """
     Tests that a cell with no decimal point becomes an int, with the separators the

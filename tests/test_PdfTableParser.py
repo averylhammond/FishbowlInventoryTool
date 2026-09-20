@@ -9,10 +9,12 @@ from source.PdfTableParser import (
 # Synthetic page text, structurally identical to a Fishbowl report but at reduced
 # column widths so the lines stay readable. Column positions are load-bearing, so
 # each page is built by joining explicit line literals rather than by dedenting a
-# block that an editor could reflow.
+# block that an editor could reflow. The widest of them run past the 120-column
+# limit and carry a noqa for it: the column offsets are what align_to_columns() is
+# being tested against, so the line cannot be split or wrapped to satisfy E501.
 INVENTORY_HEADER_BLOCK = [
     "                                            On                     Not   Drop                 On",
-    "Part          Description             UOM  Hand  Allocated  Available   Ship  Available    Order  Committed  Short",
+    "Part          Description             UOM  Hand  Allocated  Available   Ship  Available    Order  Committed  Short",  # noqa: E501
 ]
 
 # The same header from a report that omits the UOM column
@@ -25,7 +27,7 @@ NO_UOM_HEADER_BLOCK = [
 # offsets drift from page to page
 SHIFTED_HEADER_BLOCK = [
     "                                               On                     Not   Drop                 On",
-    "Part             Description             UOM  Hand  Allocated  Available   Ship  Available    Order  Committed  Short",
+    "Part             Description             UOM  Hand  Allocated  Available   Ship  Available    Order  Committed  Short",  # noqa: E501
 ]
 
 # "Avg. TO" wraps onto the line above "Days", so only "Days" sits on the line the
@@ -78,7 +80,7 @@ def test_parse_inventory_page_parses_a_full_row(parser):
     # A page holding a single complete row
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",
+        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",  # noqa: E501
     )
 
     # Every column lands in its own field, in the order the entry class expects
@@ -133,9 +135,9 @@ def test_parse_inventory_page_stops_at_the_page_footer(parser):
     # A row is printed below the footer that closes the table
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",
+        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",  # noqa: E501
         FOOTER_LINE,
-        "PART-Z        AFTER THE FOOTER         ea     1          0          0      0          1        0          0      0",
+        "PART-Z        AFTER THE FOOTER         ea     1          0          0      0          1        0          0      0",  # noqa: E501
     )
 
     # Only the row above the footer is parsed
@@ -154,9 +156,9 @@ def test_parse_inventory_page_skips_blank_lines(parser):
     # A blank line separates two rows
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",
+        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",  # noqa: E501
         "",
-        "PART-B        WIDGET TWO               ea    50          5          0      0         45        0          0      0",
+        "PART-B        WIDGET TWO               ea    50          5          0      0         45        0          0      0",  # noqa: E501
     )
 
     # Both rows are parsed and the blank line is dropped
@@ -179,7 +181,7 @@ def test_parse_inventory_page_keeps_a_part_containing_spaces_in_one_piece(parser
     # The part number itself contains a run of spaces
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART  B       WIDGET TWO               ea    50          5          0      0         45        0          0      0",
+        "PART  B       WIDGET TWO               ea    50          5          0      0         45        0          0      0",  # noqa: E501
     )
 
     # The part is not split at its internal gap
@@ -198,7 +200,7 @@ def test_parse_inventory_page_rejoins_a_description_containing_spaces(parser):
     # The description itself contains a run of spaces
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART-A        WIDGET  ONE              ea   100          0          0      0        100        0          0      0",
+        "PART-A        WIDGET  ONE              ea   100          0          0      0        100        0          0      0",  # noqa: E501
     )
 
     # The description comes back as one field, with its fragments joined by a space
@@ -217,7 +219,7 @@ def test_parse_inventory_page_folds_a_continuation_line_into_the_previous_row(pa
     # The part and description both wrap onto the line below
     page = build_page(
         INVENTORY_HEADER_BLOCK,
-        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",
+        "PART-A        WIDGET ONE               ea   100          0          0      0        100        0          0      0",  # noqa: E501
         "AND MORE      CONTINUED",
     )
 
@@ -303,7 +305,7 @@ def test_parse_inventory_page_rereads_the_column_offsets_from_each_page(parser):
     # The same row laid out under a header shifted three characters right
     page = build_page(
         SHIFTED_HEADER_BLOCK,
-        "PART-A           WIDGET ONE               ea   100          0          0      0        100        0          0      0",
+        "PART-A           WIDGET ONE               ea   100          0          0      0        100        0          0      0",  # noqa: E501
     )
 
     # The row parses identically to one laid out under the unshifted header
@@ -442,7 +444,7 @@ def test_parse_turnover_page_returns_empty_values_for_a_wrapped_totals_at_the_to
     """
 
     # The valueless totals line opens the page, with the header below it
-    page = "\n".join(["PART-A Totals:"] + TURNOVER_HEADER_BLOCK)
+    page = "\n".join(["PART-A Totals:", *TURNOVER_HEADER_BLOCK])
 
     # The row is produced with no values rather than borrowed ones
     assert parser.parse_turnover_page(page, []) == [["PART-A", None, None, None, None]]

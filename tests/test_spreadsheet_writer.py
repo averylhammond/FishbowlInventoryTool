@@ -10,7 +10,7 @@ from source.spreadsheet_writer import FIRST_DATA_ROW, SpreadsheetWriter
 from source.TurnoverEntry import TurnoverEntry
 
 
-def checkboxes(overrides: dict = None, default: bool = True) -> dict:
+def checkboxes(overrides: dict | None = None, default: bool = True) -> dict:
     """
     Builds the checkbox state dictionary the writer reads, with every column
     checked unless a test says otherwise. The keys come from source/columns.py,
@@ -150,7 +150,7 @@ def workbook(worksheet):
     """
 
     workbook = MagicMock(spec=xlsxwriter.Workbook)
-    workbook.add_format.side_effect = lambda spec: dict(spec)
+    workbook.add_format.side_effect = dict
     workbook.add_worksheet.return_value = worksheet
 
     return workbook

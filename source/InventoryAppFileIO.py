@@ -112,14 +112,15 @@ class InventoryAppFileIO:
             for page in pdf.pages:
                 pages.append(page.extract_text(extraction_mode="layout"))
 
-            return pages
-
         except (OSError, pypdf.errors.PdfReadError) as error:
             self.report_error(
                 "File Error",
                 f"Could not read the PDF at {filepath}: {error}",
             )
             return []
+
+        else:
+            return pages
 
     def list_inventory_files(self) -> list[Path]:
         """
@@ -212,7 +213,6 @@ class InventoryAppFileIO:
         try:
             # close() is where xlsxwriter flushes the spreadsheet to disk
             workbook.close()
-            return True
 
         except (OSError, xlsxwriter.exceptions.XlsxWriterException) as error:
             self.report_error(
@@ -220,3 +220,6 @@ class InventoryAppFileIO:
                 f"Could not save the output spreadsheet: {error}",
             )
             return False
+
+        else:
+            return True

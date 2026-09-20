@@ -192,7 +192,7 @@ class InventoryAppController:
         # Imported here, after the check above, rather than at module scope so a
         # headless run never loads tkinter. Keep it here: the integration test
         # runs on a machine with no display attached.
-        from source.gui.InventoryAppDisplay import InventoryAppDisplay
+        from source.gui.InventoryAppDisplay import InventoryAppDisplay  # noqa: PLC0415
 
         # Load the settings the user last chose so the GUI can start out of the box
         # the way they left it. Built here rather than in __init__ for the same

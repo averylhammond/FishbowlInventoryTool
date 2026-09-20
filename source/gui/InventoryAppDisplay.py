@@ -241,7 +241,11 @@ class InventoryAppDisplay(tk.Tk):
         stored = settings.get(SETTING_KEY_COLUMN_PREFIX + column.key, str(column.always))
         return stored == str(True)
 
-    def build_widgets(self) -> None:
+    # PLR0915 is suppressed rather than satisfied: this is a flat run of tk.Widget(...)
+    # calls, one statement per widget, in the order they appear in the window. It is over
+    # the 50-statement default only because the window holds that many widgets, and
+    # splitting it on a statement count would scatter the layout without simplifying it.
+    def build_widgets(self) -> None:  # noqa: PLR0915
         """
         Creates the GUI widgets for the application. This includes a title label,
         the file selection entry and browse button, a checkbox grid for each of

@@ -554,7 +554,7 @@ def test_build_widgets_binds_each_checkbutton_to_its_own_column_variable(display
 
     selectable = [column for column in ALL_COLUMNS if not column.always]
 
-    for column, made_call in zip(selectable, display.checkbutton_cls.call_args_list):
+    for column, made_call in zip(selectable, display.checkbutton_cls.call_args_list, strict=True):
         assert made_call.kwargs["variable"] is display.display.column_vars[column.key]
 
 
@@ -780,7 +780,7 @@ def test_build_widgets_theme_submenu_offers_every_theme_and_applies_it(display):
 
     assert [c.kwargs["label"] for c in theme_commands] == [theme.name for theme in ALL_THEMES]
 
-    for theme_option, made_call in zip(ALL_THEMES, theme_commands):
+    for theme_option, made_call in zip(ALL_THEMES, theme_commands, strict=True):
         made_call.kwargs["command"]()
         assert display.display.current_theme is theme_option
 
@@ -803,7 +803,7 @@ def test_build_widgets_font_submenu_offers_every_family_and_applies_it(display):
 
     assert [c.kwargs["label"] for c in font_commands] == FONT_FAMILIES
 
-    for family, made_call in zip(FONT_FAMILIES, font_commands):
+    for family, made_call in zip(FONT_FAMILIES, font_commands, strict=True):
         made_call.kwargs["command"]()
         assert display.display.current_font_family == family
 
@@ -826,7 +826,7 @@ def test_build_widgets_font_size_submenu_offers_every_size_and_applies_it(displa
 
     assert [c.kwargs["label"] for c in font_size_commands] == [str(size) for size in FONT_SIZES]
 
-    for size, made_call in zip(FONT_SIZES, font_size_commands):
+    for size, made_call in zip(FONT_SIZES, font_size_commands, strict=True):
         made_call.kwargs["command"]()
         assert display.display.current_font_size == size
 

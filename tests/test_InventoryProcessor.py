@@ -208,7 +208,7 @@ def test_process_inventory_starts_each_turnover_report_after_the_last(width, pro
 
         # Stands in for the real writer, which fills one column per checked
         # turnover column and reports back the first free one
-        writer.append_turnover_report.side_effect = lambda turnover, inventory, col, checkboxes, report: col + width
+        writer.append_turnover_report.side_effect = lambda _turnover, _inventory, col, _checkboxes, _report: col + width
 
         processor.processor.process_inventory("Inventory 01222024.pdf", all_columns_selected(), MagicMock())
 

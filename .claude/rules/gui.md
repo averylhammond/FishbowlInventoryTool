@@ -155,6 +155,18 @@ Their font is deliberately not bold: fifteen bold labels crowd the two grids.
 block, so nothing can observe one unset and no method needs to guard against `None`. A new widget
 goes in that block *and* in `build_widgets()`.
 
+**`# fmt:off` stops the formatter, not the linter.** `ruff format` honors it, including this
+repo's no-space spelling, so the aligned declaration block survives untouched — but `ruff check`
+still reads every line inside one. No aligned line here exceeds the 120-column limit today, so
+none carries a directive; one added later that does would need an explicit `# noqa: E501`.
+
+**`build_widgets()` carries `# noqa: PLR0915`.** It is a flat run of `tk.Widget(...)` calls, one
+statement per widget, in the order they appear in the window, and it is over the 50-statement
+default only because the window holds that many widgets. Splitting it on a statement count would
+scatter the layout without simplifying anything. The reason sits at the site rather than in
+`pyproject.toml` because `RUF100` polices an inline directive that stops applying; nothing
+reports an unused entry in the config's ignore list.
+
 **A window opened from a startup path goes through `display.after(0, …)`, never inline.**
 `ThemedSubwindow._center_over_parent()` reads the parent's geometry, which is `1x1+0+0` until the
 root window has been mapped, so an inline call lands the window in the corner of the screen

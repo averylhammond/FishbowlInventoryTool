@@ -1,0 +1,53 @@
+name: Lint Workflow
+
+# Run the linter and formatter check on pull requests to main
+on:
+  pull_request:
+    branches: [ main ]
+
+# Allow for the job to be ran manually from the GitHub Actions UI
+  workflow_dispatch:
+
+# Read-only access is all this job needs: it reads the tree and reports through
+# the check annotations that --output-format=github emits.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+
+    # Give the job a name to link into the Github Rules UI
+    name: Lint CI Check
+    runs-on: ubuntu-latest
+
+    # Checkout repo. The private submodule holding the test data is deliberately
+    # not checked out and no PAT is needed: extend-exclude skips it in any case,
+    # and linting it would put customer-data paths into this log.
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    # Set up Python environment
+    - name: Set up Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11.9"
+        cache: 'pip'
+        cache-dependency-path: requirements/dev.txt
+
+    # Deliberately not `pip install -r requirements/dev.txt` like the other workflows:
+    # linting needs neither pypdf, openpyxl nor fishbowl-common, and installing the last
+    # clones a git dependency on every run. The version is still single-sourced from
+    # dev.txt, so it cannot drift from what a developer runs locally.
+    - name: Install ruff
+      run: pip install "$(grep '^ruff==' requirements/dev.txt)"
+
+    # Lint. --output-format=github turns each finding into an inline PR annotation.
+    - name: Run ruff check
+      run: ruff check --output-format=github .
+
+    # Formatting is a separate step so a formatting-only failure is obvious in the job log
+    # rather than buried among lint findings. Always runs, even when the check above fails.
+    - name: Run ruff format --check
+      if: always()
+      run: ruff format --check .

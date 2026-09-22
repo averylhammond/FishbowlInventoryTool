@@ -1,6 +1,6 @@
 ---
 paths:
-  - "source/InventoryAppController.py"
+  - "source/inventory_app_controller.py"
   - "source/constants.py"
   - "requirements/**"
 ---
@@ -50,7 +50,7 @@ return.** That placement is the one deliberate divergence from the sibling, whic
 collaborators in `__init__` — **do not "fix" it to match.** A headless CI run must perform no
 database I/O, leave no `data/` directory behind and make no network call, and building these here
 gets that structurally rather than by a flag check.
-`tests/test_InventoryAppController.py` guards it: `mock_display_cls`, `mock_settings_cls`,
+`tests/test_inventory_app_controller.py` guards it: `mock_display_cls`, `mock_settings_cls`,
 `mock_coordinator_cls` and `mock_patch_notes_cls` all `assert_not_called()` in integration-test
 mode.
 

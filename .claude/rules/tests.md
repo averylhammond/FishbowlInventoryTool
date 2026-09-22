@@ -14,7 +14,7 @@ invoke it as `pytest tests/` with no glob.
 `tests/__init__.py`, `source/__init__.py` and `source/gui/__init__.py` are empty but
 **load-bearing**: with `tests/__init__.py` present, pytest's prepend import mode walks up past
 `tests/` and puts the repo root on `sys.path`, which is what makes
-`from source.InventoryAppFileIO import InventoryAppFileIO` resolve. There is deliberately no
+`from source.inventory_app_file_io import InventoryAppFileIO` resolve. There is deliberately no
 `conftest.py`; pytest and coverage configuration lives in `pyproject.toml`, whose
 `[tool.coverage.run]` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
 `tests/`, the virtualenv and the empty `__init__.py` files; nothing else is omitted, since the
@@ -25,12 +25,12 @@ inert styling data that used to be excluded now lives upstream in `fishbowl_comm
 
 Mirror these (and the sibling's `tests/` suite) rather than inventing new patterns:
 
-- **`tests/test_InventoryAppFileIO.py`** — a class with collaborators and I/O. Follow it for the
+- **`tests/test_inventory_app_file_io.py`** — a class with collaborators and I/O. Follow it for the
   mocking and error-path conventions below.
-- **`tests/test_PdfTableParser.py`** — pure logic with no collaborators, so nothing is mocked and
+- **`tests/test_pdf_table_parser.py`** — pure logic with no collaborators, so nothing is mocked and
   the fixture just constructs the object. Follow it for parser-style tests, including the
   synthetic-fixture rule below.
-- **`tests/test_InventoryEntry.py` / `tests/test_TurnoverEntry.py`** — dataclasses, so there is no
+- **`tests/test_inventory_entry.py` / `tests/test_turnover_entry.py`** — dataclasses, so there is no
   fixture at all: each test constructs the object it needs. Cover the defaults, a subset of
   keyword arguments, positional construction from a `PARSED_ROW` module constant shaped like the
   parser's output, and `to_formatted_string()` asserted against the report's labels rather than
@@ -56,26 +56,26 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
   a column moves. Real `InventoryEntry`/`TurnoverEntry` objects are used rather than mocks — they
   are inert data holders with no I/O — but each is given a distinct value per field so a
   column/data desync fails loudly instead of matching by coincidence.
-- **`tests/test_InventoryProcessor.py`** — a class whose collaborator is injected rather than
+- **`tests/test_inventory_processor.py`** — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to the
   constructor while the `PdfTableParser` the processor builds itself is patched at
-  `source.InventoryProcessor.PdfTableParser`. The `spec=` is safe only because the processor never
+  `source.inventory_processor.PdfTableParser`. The `spec=` is safe only because the processor never
   touches `report_error`, which is an instance attribute a spec'd mock would reject. The
-  spreadsheet writer is imported by name, so `source.InventoryProcessor.SpreadsheetWriter` is
+  spreadsheet writer is imported by name, so `source.inventory_processor.SpreadsheetWriter` is
   the point of use; a test drives the mocked class's `return_value` to stand in for the writer
   the processor builds. `process_inventory()` is tested with its own parsing helpers
   replaced via `patch.object` on the instance, so each test exercises one method.
-- **`tests/test_InventoryAppController.py`** — the wiring, with `ArgumentProvider`,
-  `InventoryAppFileIO` and `InventoryProcessor` patched at `source.InventoryAppController.<name>`
+- **`tests/test_inventory_app_controller.py`** — the wiring, with `ArgumentProvider`,
+  `InventoryAppFileIO` and `InventoryProcessor` patched at `source.inventory_app_controller.<name>`
   as usual. Because the processor is mocked there, the GUI and headless paths are asserted against
   `processor.process_inventory` directly rather than by patching a method onto the controller.
   **The display is the one exception to the patch-at-the-point-of-use rule:**
   `start_application()` imports it inside the function, so the name never exists at module scope
   and the target is its definition site,
-  `patch("source.gui.InventoryAppDisplay.InventoryAppDisplay")`. A function-local
+  `patch("source.gui.inventory_app_display.InventoryAppDisplay")`. A function-local
   `from X import Y` resolves `Y` as an attribute of module `X` at call time, which is why patching
   there works. Every test reaching `start_application()` must patch
-  `source.InventoryAppController.UpdateCoordinator`, or a real daemon thread would call GitHub
+  `source.inventory_app_controller.UpdateCoordinator`, or a real daemon thread would call GitHub
   during the run; this repo asserts only that the coordinator is built with this app's
   `VERSION`/`GITHUB_REPO`/display and started. **`SettingsRepository` and `PatchNotes` are
   deliberately absent from the `controller` fixture** — both are built in `start_application()`,
@@ -84,7 +84,7 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
   directory in the working tree, breaking the "no new artifacts after a run" rule below. The
   patch-notes decision table is covered by calling `show_patch_notes_if_updated()` directly on a
   controller with its display, settings repository and reader replaced, one test per row.
-- **`tests/test_InventoryAppDisplay.py`** — a tkinter GUI class; see the next section.
+- **`tests/test_inventory_app_display.py`** — a tkinter GUI class; see the next section.
 
 **There are no tests here for anything owned by `fishbowl-common`.** `ThemedSubwindow`,
 `MessageWindow`, `AboutWindow`, `FileEditorWindow`, `PatchNotesWindow`, `UpdateWindow`, `Tooltip`,
@@ -99,7 +99,7 @@ coverage is a change to make in that repo.
 It neutralizes `tk.Tk.__init__`, mocks the inherited Tk methods the display calls
 (title/geometry/resizable/configure/config/protocol/destroy/winfo_geometry), and replaces every
 widget class at its point of use
-(`patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget)`), so no real
+(`patch("source.gui.inventory_app_display.tk.Label", side_effect=_distinct_widget)`), so no real
 window is created and each widget attribute is a distinct assertable mock. It `yield`s a
 `SimpleNamespace` **from inside** the `with` block so the patches stay live for the whole test.
 Per-test constructor arguments come from indirect parametrization
@@ -126,7 +126,7 @@ arrive the same way, as a `{"settings": {...}}` override.
   default-argument capture rather than just asserting the menu was built. The checkbutton
   `command`s are tested the same way, each resolved back to its column through the `variable` it
   was built with, so a late-binding regression fails rather than passing by coincidence.
-- **`Tooltip` is patched at `source.gui.InventoryAppDisplay.Tooltip`** with the same
+- **`Tooltip` is patched at `source.gui.inventory_app_display.Tooltip`** with the same
   `_distinct_widget` side effect the widget classes use, so every attached tooltip is its own
   assertable mock, exposed on the fixture namespace as `tooltip_cls`. The attachment tests read
   `call.kwargs["widget"]` / `["text"]`, so `_attach_tooltip()` must keep passing those by keyword.
@@ -151,7 +151,7 @@ real filesystem, a real PDF, or the GUI.
   the title/message text is never asserted.
 - **Patch module-level names at the point of use, not their definition site.**
   `InventoryAppFileIO` does `from source.constants import INVENTORY_DIR, RESULTS_FILE,
-  TURNOVER_DIR`, so the patch target is `source.InventoryAppFileIO.RESULTS_FILE` — never
+  TURNOVER_DIR`, so the patch target is `source.inventory_app_file_io.RESULTS_FILE` — never
   `source.constants.RESULTS_FILE`.
 - **Patch `pypdf.PdfReader` and `xlsxwriter.Workbook`, never the whole module.** The methods under
   test catch `pypdf.errors.PdfReadError` and `xlsxwriter.exceptions.XlsxWriterException`;
@@ -188,7 +188,7 @@ real filesystem, a real PDF, or the GUI.
   parenthesized across lines once they no longer fit on one — `ruff check --fix` does that for
   you, so run it rather than arranging them by hand. There is no star import left under
   `source/` either — #57 removed the last one, in `InventoryProcessor`.
-- **`test_PdfTableParser.py`'s synthetic page fixtures carry `# noqa: E501`.** Their column
+- **`test_pdf_table_parser.py`'s synthetic page fixtures carry `# noqa: E501`.** Their column
   offsets are what `align_to_columns()` is tested against, so the eleven over-length lines
   cannot be split or wrapped to satisfy the 120-column limit.
 - **A loop pairing a fixture against a captured `call_args_list` uses `zip(..., strict=True)`**,
@@ -198,7 +198,7 @@ real filesystem, a real PDF, or the GUI.
   needs a differently-constructed object its arguments through indirect parametrization rather
   than a `_build_window(...)`-style helper function. The helper form left this repo with the
   shared subwindow classes; do not reintroduce it. The exception is a module with no object to
-  build: `test_InventoryEntry.py`, `test_TurnoverEntry.py` and `test_columns.py` have no fixture
+  build: `test_inventory_entry.py`, `test_turnover_entry.py` and `test_columns.py` have no fixture
   at all.
 - Keep the tests for one method together and in the order the methods appear in the module —
   the grouping the `###`-bordered banners used to mark before they were removed — and give
@@ -217,5 +217,5 @@ real filesystem, a real PDF, or the GUI.
   the report's *geometry* — header offsets, column gaps, the wrapped `Avg. TO` label, the page
   footer — under invented part numbers and descriptions, at reduced column widths so the lines
   stay readable. Because those column positions are load-bearing, build a page by joining
-  explicit line literals (`build_page()` in `test_PdfTableParser.py`) rather than dedenting a
+  explicit line literals (`build_page()` in `test_pdf_table_parser.py`) rather than dedenting a
   triple-quoted block an editor could reflow.

@@ -1,4 +1,4 @@
-from source.InventoryAppController import InventoryAppController
+from source.inventory_app_controller import InventoryAppController
 
 # Entry Point
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ from source.constants import (
     SETTINGS_DB_PATH,
     VERSION,
 )
-from source.InventoryAppController import InventoryAppController
+from source.inventory_app_controller import InventoryAppController
 
 
 @pytest.fixture
@@ -33,9 +33,9 @@ def controller():
     """
 
     with (
-        patch("source.InventoryAppController.ArgumentProvider") as mock_arg_cls,
-        patch("source.InventoryAppController.InventoryAppFileIO") as mock_file_io_cls,
-        patch("source.InventoryAppController.InventoryProcessor") as mock_processor_cls,
+        patch("source.inventory_app_controller.ArgumentProvider") as mock_arg_cls,
+        patch("source.inventory_app_controller.InventoryAppFileIO") as mock_file_io_cls,
+        patch("source.inventory_app_controller.InventoryProcessor") as mock_processor_cls,
     ):
         mock_arg_provider = mock_arg_cls.return_value
         mock_arg_provider.integration_test_mode = False
@@ -148,10 +148,10 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
-        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch("source.InventoryAppController.UpdateCoordinator"),
-        patch("source.InventoryAppController.PatchNotes"),
+        patch("source.gui.inventory_app_display.InventoryAppDisplay") as mock_display_cls,
+        patch("source.inventory_app_controller.SettingsRepository") as mock_settings_cls,
+        patch("source.inventory_app_controller.UpdateCoordinator"),
+        patch("source.inventory_app_controller.PatchNotes"),
     ):
         mock_settings_cls.return_value.get_all_settings.return_value = {"theme": "Ocean"}
         controller.controller.start_application()
@@ -181,10 +181,10 @@ def test_start_application_loads_the_persisted_settings(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
-        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch("source.InventoryAppController.UpdateCoordinator"),
-        patch("source.InventoryAppController.PatchNotes"),
+        patch("source.gui.inventory_app_display.InventoryAppDisplay"),
+        patch("source.inventory_app_controller.SettingsRepository") as mock_settings_cls,
+        patch("source.inventory_app_controller.UpdateCoordinator"),
+        patch("source.inventory_app_controller.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -203,10 +203,10 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
-        patch("source.InventoryAppController.SettingsRepository"),
-        patch("source.InventoryAppController.UpdateCoordinator"),
-        patch("source.InventoryAppController.PatchNotes"),
+        patch("source.gui.inventory_app_display.InventoryAppDisplay") as mock_display_cls,
+        patch("source.inventory_app_controller.SettingsRepository"),
+        patch("source.inventory_app_controller.UpdateCoordinator"),
+        patch("source.inventory_app_controller.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -224,10 +224,10 @@ def test_start_application_wires_the_gui_popup_into_the_settings_repository(cont
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
-        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch("source.InventoryAppController.UpdateCoordinator"),
-        patch("source.InventoryAppController.PatchNotes"),
+        patch("source.gui.inventory_app_display.InventoryAppDisplay") as mock_display_cls,
+        patch("source.inventory_app_controller.SettingsRepository") as mock_settings_cls,
+        patch("source.inventory_app_controller.UpdateCoordinator"),
+        patch("source.inventory_app_controller.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -249,10 +249,10 @@ def test_start_application_starts_a_background_update_check(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
-        patch("source.InventoryAppController.SettingsRepository"),
-        patch("source.InventoryAppController.UpdateCoordinator") as mock_coordinator_cls,
-        patch("source.InventoryAppController.PatchNotes"),
+        patch("source.gui.inventory_app_display.InventoryAppDisplay") as mock_display_cls,
+        patch("source.inventory_app_controller.SettingsRepository"),
+        patch("source.inventory_app_controller.UpdateCoordinator") as mock_coordinator_cls,
+        patch("source.inventory_app_controller.PatchNotes"),
     ):
         controller.controller.start_application()
 
@@ -280,11 +280,11 @@ def test_start_application_in_integration_test_mode_never_builds_the_gui(control
     controller.arg_provider.integration_test_mode = True
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay") as mock_display_cls,
-        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
+        patch("source.gui.inventory_app_display.InventoryAppDisplay") as mock_display_cls,
+        patch("source.inventory_app_controller.SettingsRepository") as mock_settings_cls,
         patch.object(controller.controller, "run_integration_test") as mock_headless,
-        patch("source.InventoryAppController.UpdateCoordinator") as mock_coordinator_cls,
-        patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
+        patch("source.inventory_app_controller.UpdateCoordinator") as mock_coordinator_cls,
+        patch("source.inventory_app_controller.PatchNotes") as mock_patch_notes_cls,
     ):
         controller.controller.start_application()
 
@@ -311,10 +311,10 @@ def test_start_application_builds_the_patch_notes_reader(controller):
     """
 
     with (
-        patch("source.gui.InventoryAppDisplay.InventoryAppDisplay"),
-        patch("source.InventoryAppController.SettingsRepository") as mock_settings_cls,
-        patch("source.InventoryAppController.UpdateCoordinator"),
-        patch("source.InventoryAppController.PatchNotes") as mock_patch_notes_cls,
+        patch("source.gui.inventory_app_display.InventoryAppDisplay"),
+        patch("source.inventory_app_controller.SettingsRepository") as mock_settings_cls,
+        patch("source.inventory_app_controller.UpdateCoordinator"),
+        patch("source.inventory_app_controller.PatchNotes") as mock_patch_notes_cls,
         patch.object(controller.controller, "show_patch_notes_if_updated") as mock_show,
     ):
         mock_settings_cls.return_value.get_all_settings.return_value = {"last_seen_version": "2.1.0"}

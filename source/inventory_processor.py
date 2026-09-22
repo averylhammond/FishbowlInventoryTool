@@ -2,11 +2,11 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from source.InventoryAppFileIO import InventoryAppFileIO
-from source.InventoryEntry import InventoryEntry
-from source.PdfTableParser import PdfTableParser
+from source.inventory_app_file_io import InventoryAppFileIO
+from source.inventory_entry import InventoryEntry
+from source.pdf_table_parser import PdfTableParser
 from source.spreadsheet_writer import SpreadsheetWriter
-from source.TurnoverEntry import TurnoverEntry
+from source.turnover_entry import TurnoverEntry
 
 
 # InventoryProcessor class to parse inventory and turnover report PDFs and write

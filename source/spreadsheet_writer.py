@@ -1,8 +1,8 @@
 import xlsxwriter
 
 from source.columns import INVENTORY_COLUMNS, TURNOVER_COLUMNS, Column
-from source.InventoryEntry import InventoryEntry
-from source.TurnoverEntry import TurnoverEntry
+from source.inventory_entry import InventoryEntry
+from source.turnover_entry import TurnoverEntry
 
 # Row 0 of the worksheet holds the column headers, so the inventory data starts on
 # the row below it. Every writer that addresses a data row measures from here.

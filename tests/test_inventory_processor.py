@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from source.columns import all_columns_selected
-from source.InventoryAppFileIO import InventoryAppFileIO
-from source.InventoryEntry import InventoryEntry
-from source.InventoryProcessor import InventoryProcessor
+from source.inventory_app_file_io import InventoryAppFileIO
+from source.inventory_entry import InventoryEntry
+from source.inventory_processor import InventoryProcessor
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def processor():
             with its patched class as `parser_cls`)
     """
 
-    with patch("source.InventoryProcessor.PdfTableParser") as mock_parser_cls:
+    with patch("source.inventory_processor.PdfTableParser") as mock_parser_cls:
         mock_file_io = MagicMock(spec=InventoryAppFileIO)
 
         yield SimpleNamespace(
@@ -150,7 +150,7 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
+        patch("source.inventory_processor.SpreadsheetWriter") as mock_writer_cls,
     ):
         writer = mock_writer_cls.return_value
         writer.write_inventory.return_value = 11
@@ -201,7 +201,7 @@ def test_process_inventory_starts_each_turnover_report_after_the_last(width, pro
             return_value=[InventoryEntry(part="PART-A")],
         ),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
+        patch("source.inventory_processor.SpreadsheetWriter") as mock_writer_cls,
     ):
         writer = mock_writer_cls.return_value
         writer.write_inventory.return_value = 11
@@ -238,7 +238,7 @@ def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=inventory),
         patch.object(processor.processor, "process_turnover_file", return_value=[]),
-        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
+        patch("source.inventory_processor.SpreadsheetWriter") as mock_writer_cls,
     ):
         writer = mock_writer_cls.return_value
         writer.write_inventory.return_value = 11
@@ -266,7 +266,7 @@ def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
 
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
-        patch("source.InventoryProcessor.SpreadsheetWriter"),
+        patch("source.inventory_processor.SpreadsheetWriter"),
     ):
         processor.processor.process_inventory(
             "Inventory Availability 01222024.pdf", all_columns_selected(), MagicMock()
@@ -290,7 +290,7 @@ def test_process_inventory_falls_back_to_a_generic_output_name(processor):
 
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
-        patch("source.InventoryProcessor.SpreadsheetWriter"),
+        patch("source.inventory_processor.SpreadsheetWriter"),
     ):
         processor.processor.process_inventory("Inventory Availability", all_columns_selected(), MagicMock())
 
@@ -335,7 +335,7 @@ def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
 
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
-        patch("source.InventoryProcessor.SpreadsheetWriter") as mock_writer_cls,
+        patch("source.inventory_processor.SpreadsheetWriter") as mock_writer_cls,
     ):
         result = processor.processor.process_inventory("Inventory.pdf", all_columns_selected(), report_status)
 
@@ -360,7 +360,7 @@ def test_process_inventory_reports_and_returns_false_when_the_save_fails(process
 
     with (
         patch.object(processor.processor, "process_inventory_file", return_value=[InventoryEntry(part="PART-A")]),
-        patch("source.InventoryProcessor.SpreadsheetWriter"),
+        patch("source.inventory_processor.SpreadsheetWriter"),
     ):
         result = processor.processor.process_inventory("Inventory.pdf", all_columns_selected(), report_status)
 

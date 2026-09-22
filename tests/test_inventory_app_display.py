@@ -23,7 +23,7 @@ from source.constants import (
     TURNOVER_DIR,
     VERSION,
 )
-from source.gui.InventoryAppDisplay import InventoryAppDisplay
+from source.gui.inventory_app_display import InventoryAppDisplay
 
 
 def _distinct_widget(*_args, **_kwargs):
@@ -154,27 +154,27 @@ def display(request):
             destroy=DEFAULT,
             winfo_geometry=DEFAULT,
         ) as tk_methods,
-        patch("source.gui.InventoryAppDisplay.tk.StringVar", side_effect=_FakeStringVar),
-        patch("source.gui.InventoryAppDisplay.tk.BooleanVar", side_effect=_FakeBooleanVar),
-        patch("source.gui.InventoryAppDisplay.tk.Menu", side_effect=_distinct_widget),
-        patch("source.gui.InventoryAppDisplay.tk.Label", side_effect=_distinct_widget),
-        patch("source.gui.InventoryAppDisplay.tk.Frame", side_effect=_distinct_widget),
-        patch("source.gui.InventoryAppDisplay.tk.Entry", side_effect=_distinct_widget),
-        patch("source.gui.InventoryAppDisplay.tk.Button", side_effect=_distinct_widget) as mock_button_cls,
+        patch("source.gui.inventory_app_display.tk.StringVar", side_effect=_FakeStringVar),
+        patch("source.gui.inventory_app_display.tk.BooleanVar", side_effect=_FakeBooleanVar),
+        patch("source.gui.inventory_app_display.tk.Menu", side_effect=_distinct_widget),
+        patch("source.gui.inventory_app_display.tk.Label", side_effect=_distinct_widget),
+        patch("source.gui.inventory_app_display.tk.Frame", side_effect=_distinct_widget),
+        patch("source.gui.inventory_app_display.tk.Entry", side_effect=_distinct_widget),
+        patch("source.gui.inventory_app_display.tk.Button", side_effect=_distinct_widget) as mock_button_cls,
         patch(
-            "source.gui.InventoryAppDisplay.tk.Checkbutton",
+            "source.gui.inventory_app_display.tk.Checkbutton",
             side_effect=_distinct_widget,
         ) as mock_checkbutton_cls,
         patch(
-            "source.gui.InventoryAppDisplay.scrolledtext.ScrolledText",
+            "source.gui.inventory_app_display.scrolledtext.ScrolledText",
             side_effect=_distinct_widget,
         ),
-        patch("source.gui.InventoryAppDisplay.MessageWindow") as mock_message_window_cls,
-        patch("source.gui.InventoryAppDisplay.AboutWindow") as mock_about_window_cls,
-        patch("source.gui.InventoryAppDisplay.FileEditorWindow") as mock_file_editor_window_cls,
-        patch("source.gui.InventoryAppDisplay.UpdateWindow") as mock_update_window_cls,
-        patch("source.gui.InventoryAppDisplay.PatchNotesWindow") as mock_patch_notes_window_cls,
-        patch("source.gui.InventoryAppDisplay.Tooltip", side_effect=_distinct_widget) as mock_tooltip_cls,
+        patch("source.gui.inventory_app_display.MessageWindow") as mock_message_window_cls,
+        patch("source.gui.inventory_app_display.AboutWindow") as mock_about_window_cls,
+        patch("source.gui.inventory_app_display.FileEditorWindow") as mock_file_editor_window_cls,
+        patch("source.gui.inventory_app_display.UpdateWindow") as mock_update_window_cls,
+        patch("source.gui.inventory_app_display.PatchNotesWindow") as mock_patch_notes_window_cls,
+        patch("source.gui.inventory_app_display.Tooltip", side_effect=_distinct_widget) as mock_tooltip_cls,
     ):
         # The geometry handle_exit() persists, in the format Tk reports it in
         tk_methods["winfo_geometry"].return_value = "780x820+320+180"
@@ -917,7 +917,7 @@ def test_handle_browse_button_stores_the_chosen_file(display):
     """
 
     with patch(
-        "source.gui.InventoryAppDisplay.filedialog.askopenfilename",
+        "source.gui.inventory_app_display.filedialog.askopenfilename",
         return_value="C:/Inventory/Inventory 01222024.pdf",
     ) as mock_dialog:
         display.display.handle_browse_button()
@@ -942,7 +942,7 @@ def test_handle_browse_button_leaves_the_selection_alone_when_cancelled(display)
     display.display.selected_file.set("C:/Inventory/Already Chosen.pdf")
 
     with patch(
-        "source.gui.InventoryAppDisplay.filedialog.askopenfilename",
+        "source.gui.inventory_app_display.filedialog.askopenfilename",
         return_value="",
     ):
         display.display.handle_browse_button()
@@ -1108,7 +1108,7 @@ def test_handle_results_log_opens_a_read_only_viewer_when_present(display):
             fully mocked out
     """
 
-    with patch("source.gui.InventoryAppDisplay.RESULTS_FILE") as mock_results_file:
+    with patch("source.gui.inventory_app_display.RESULTS_FILE") as mock_results_file:
         mock_results_file.exists.return_value = True
 
         display.display.handle_results_log()
@@ -1130,7 +1130,7 @@ def test_handle_results_log_shows_an_error_when_missing(display):
             fully mocked out
     """
 
-    with patch("source.gui.InventoryAppDisplay.RESULTS_FILE") as mock_results_file:
+    with patch("source.gui.inventory_app_display.RESULTS_FILE") as mock_results_file:
         mock_results_file.exists.return_value = False
 
         display.display.handle_results_log()
@@ -1149,7 +1149,7 @@ def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(disp
             fully mocked out
     """
 
-    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
+    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_inventories()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
@@ -1169,7 +1169,7 @@ def test_handle_open_turnover_reports_opens_a_dialog_rooted_at_the_turnover_dir(
             fully mocked out
     """
 
-    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
+    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_turnover_reports()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
@@ -1189,7 +1189,7 @@ def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
             fully mocked out
     """
 
-    with patch("source.gui.InventoryAppDisplay.filedialog.askopenfilename") as mock_dialog:
+    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
         display.display.handle_open_spreadsheets()
 
     dialog_kwargs = mock_dialog.call_args.kwargs

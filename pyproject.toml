@@ -66,10 +66,6 @@ ignore = [
     "E111",
     "E114",
     "E117",
-    # Modules under source/ are PascalCase, named after the class they hold, so N999 fires
-    # on every one of them. #92 renames them to snake_case and deletes this entry --
-    # FishbowlInvoiceTool carried the same suppression until its own rename landed.
-    "N999",
 ]
 
 [tool.ruff.lint.per-file-ignores]

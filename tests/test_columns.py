@@ -7,8 +7,8 @@ from source.columns import (
     TURNOVER_COLUMNS,
     all_columns_selected,
 )
-from source.InventoryEntry import InventoryEntry
-from source.TurnoverEntry import TurnoverEntry
+from source.inventory_entry import InventoryEntry
+from source.turnover_entry import TurnoverEntry
 
 
 def test_column_keys_are_in_spreadsheet_order():

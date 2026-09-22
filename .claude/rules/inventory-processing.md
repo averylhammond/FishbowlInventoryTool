@@ -1,10 +1,10 @@
 ---
 paths:
-  - "source/InventoryProcessor.py"
-  - "source/PdfTableParser.py"
-  - "source/InventoryAppFileIO.py"
-  - "source/InventoryEntry.py"
-  - "source/TurnoverEntry.py"
+  - "source/inventory_processor.py"
+  - "source/pdf_table_parser.py"
+  - "source/inventory_app_file_io.py"
+  - "source/inventory_entry.py"
+  - "source/turnover_entry.py"
 ---
 
 # Inventory parsing and file I/O

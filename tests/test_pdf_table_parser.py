@@ -1,6 +1,6 @@
 import pytest
 
-from source.PdfTableParser import (
+from source.pdf_table_parser import (
     CONTINUATION_SEPARATOR,
     GRAND_TOTAL_LABEL,
     PdfTableParser,

@@ -5,9 +5,9 @@ import xlsxwriter
 from xlsxwriter.worksheet import Worksheet
 
 from source.columns import COLUMN_KEYS
-from source.InventoryEntry import InventoryEntry
+from source.inventory_entry import InventoryEntry
 from source.spreadsheet_writer import FIRST_DATA_ROW, SpreadsheetWriter
-from source.TurnoverEntry import TurnoverEntry
+from source.turnover_entry import TurnoverEntry
 
 
 def checkboxes(overrides: dict | None = None, default: bool = True) -> dict:

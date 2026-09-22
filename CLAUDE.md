@@ -54,9 +54,9 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Dump the generated workbooks on their own: `python scripts/dump_workbooks.py` (writes
   `logs/spreadsheet_dump.txt`; needs `openpyxl` from `requirements/dev.txt`)
 - Run all unit tests: `pytest tests/`
-- Run a single test file: `pytest tests/test_InventoryAppFileIO.py`
+- Run a single test file: `pytest tests/test_inventory_app_file_io.py`
 - Run a single test:
-  `pytest tests/test_InventoryAppFileIO.py::test_read_pdf_extracts_each_page_in_layout_mode`
+  `pytest tests/test_inventory_app_file_io.py::test_read_pdf_extracts_each_page_in_layout_mode`
 - Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/` — the 90% gate is
   `fail_under` in `pyproject.toml`, so it applies locally too
 - Lint: `ruff check .` (add `--fix` to apply the safe fixes, `--statistics` for a summary)
@@ -103,15 +103,15 @@ matching `vX.Y.Z` tag.** Details in `.claude/rules/ci.md`.
 | Module | Owns |
 | --- | --- |
 | `main.py` | Thin entry point: constructs the controller and calls `start_application()`. No application logic, no argument parsing |
-| `source/InventoryAppController.py` | Entry-point glue: builds the collaborators, gates the GUI half behind the headless check, owns `handle_process_inventory()` and `run_integration_test()`, and the patch-notes feature |
-| `source/InventoryAppFileIO.py` | All file I/O: inventory/turnover PDFs via pypdf (one string per page), text files for the View menu, listing input files, the workbook lifecycle, and the `logs/` results file |
-| `source/InventoryProcessor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report |
-| `source/PdfTableParser.py` | Parsing only: layout-extracted page text → positional field lists (`align_to_columns`, `to_number`) |
-| `source/InventoryEntry.py` / `source/TurnoverEntry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
+| `source/inventory_app_controller.py` | Entry-point glue: builds the collaborators, gates the GUI half behind the headless check, owns `handle_process_inventory()` and `run_integration_test()`, and the patch-notes feature |
+| `source/inventory_app_file_io.py` | All file I/O: inventory/turnover PDFs via pypdf (one string per page), text files for the View menu, listing input files, the workbook lifecycle, and the `logs/` results file |
+| `source/inventory_processor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report |
+| `source/pdf_table_parser.py` | Parsing only: layout-extracted page text → positional field lists (`align_to_columns`, `to_number`) |
+| `source/inventory_entry.py` / `source/turnover_entry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
 | `source/columns.py` | The `(key, label, field, always, tooltip)` record for every selectable column, and `all_columns_selected()` |
 | `source/spreadsheet_writer.py` | All `xlsxwriter` output: the `SpreadsheetWriter` class, built once around the open workbook |
 | `source/constants.py` | Paths, `APP_NAME`/`VERSION`/`GITHUB_REPO`/`INSTALLER_ASSET_PATTERN`, setting keys |
-| `source/gui/InventoryAppDisplay.py` | The `tk.Tk` root: main window, the two checkbox grids and the File/View/Preferences/Help menu bar |
+| `source/gui/inventory_app_display.py` | The `tk.Tk` root: main window, the two checkbox grids and the File/View/Preferences/Help menu bar |
 
 **Everything else is `fishbowl-common`, taken as a pinned git tag.** From the headless half:
 `ArgumentProvider`, `SettingsRepository`, `UpdateCoordinator`, `PatchNotes`, `compare_versions()`.
@@ -156,12 +156,10 @@ Three responsibilities worth knowing before touching them:
   the controller. Avoid god objects in constructors.
 - New logic goes in the class that owns that concern, not bolted onto `InventoryAppController`. If
   a method is doing two distinct jobs (parsing *and* formatting), split it.
-- **Modules are `PascalCase` today** (`source/InventoryAppFileIO.py`), matching the class inside,
-  and `tests/` mirrors the module name. `N999` is ignored in `pyproject.toml` because of it;
-  #92 renames them to `snake_case` and deletes that entry. Until it lands, follow the existing
-  names rather than introducing a mixed convention. The exceptions are `columns.py`,
-  `constants.py` and `spreadsheet_writer.py`, the last renamed by #57 because that module was
-  rewritten wholesale — so #92 covers seven modules, not eight.
+- **Modules are `snake_case`; the classes inside them stay `PascalCase`.** `N999` enforces the
+  filename, so `InventoryProcessor` lives in `source/inventory_processor.py` and is imported as
+  `from source.inventory_processor import InventoryProcessor`. `tests/` mirrors the module name —
+  see `.claude/rules/tests.md`.
 - **Every `def` under `source/` is fully annotated**, `-> None` included. `ANN` enforces that
   they are present, and is off for `tests/**`; the rest is on you. Container types are spelled
   out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a bare `list` tells a
@@ -210,10 +208,10 @@ matching file is opened. Put new detail in the matching rule file rather than gr
 
 | File | Loads when you touch | Carries |
 | --- | --- | --- |
-| `rules/inventory-processing.md` | `InventoryProcessor.py`, `PdfTableParser.py`, `InventoryAppFileIO.py`, the two entry classes | The parse pipeline, layout mode, the error-reporting contract, the results file as a CI fixture |
+| `rules/inventory-processing.md` | `inventory_processor.py`, `pdf_table_parser.py`, `inventory_app_file_io.py`, the two entry classes | The parse pipeline, layout mode, the error-reporting contract, the results file as a CI fixture |
 | `rules/spreadsheet.md` | `spreadsheet_writer.py`, `columns.py` | `SpreadsheetWriter`, the column scheme, `FIRST_DATA_ROW`, the turnover stride and join |
 | `rules/gui.md` | `source/gui/**` | The display, its menu bar, what comes from `fishbowl_common.gui`, theme/font reconfiguration, the styling recipes, the `after(0, …)` rule |
-| `rules/shared-package.md` | `InventoryAppController.py`, `constants.py`, `requirements/**` | What each shared class takes by injection, construction order and headless gating, patch-notes logic, `constants.py`'s catalogue |
+| `rules/shared-package.md` | `inventory_app_controller.py`, `constants.py`, `requirements/**` | What each shared class takes by injection, construction order and headless gating, patch-notes logic, `constants.py`'s catalogue |
 | `rules/tests.md` | `tests/**` | Per-file reference implementations, the `display` fixture, isolation rules, FIRST, conventions |
 | `rules/ci.md` | `.github/workflows/**`, `requirements/**` | Workflow internals, the coverage gate, the two canonical fixtures and `dump_workbooks.py`, the two release gates, submodule handling |
 | `rules/packaging.md` | `scripts/**` | `package_release.sh`, the load-bearing `installer.iss` details the in-app updater depends on, and which scripts are not packaging |

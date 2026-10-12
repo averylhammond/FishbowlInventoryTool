@@ -35,6 +35,7 @@ from source.constants import (
     SETTING_KEY_GEOMETRY,
     SETTING_KEY_THEME,
     TURNOVER_DIR,
+    USER_GUIDE_PATH,
     VERSION,
 )
 
@@ -318,10 +319,12 @@ class InventoryAppDisplay(tk.Tk):
         # Help dropdown
         #  -> About option to show the current application version
         #  -> Check for Updates option to manually check for a newer release
+        #  -> Open User Guide option to view the bundled USER_GUIDE.txt in-app
         #  -> What's New option to re-read the patch notes at any time
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="About", command=self.handle_about)
         self.help_menu.add_command(label="Check for Updates", command=self.handle_check_for_updates)
+        self.help_menu.add_command(label="Open User Guide", command=self.handle_open_user_guide)
         self.help_menu.add_command(label="What's New", command=self.handle_view_patch_notes)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
@@ -687,7 +690,14 @@ class InventoryAppDisplay(tk.Tk):
             font_size=self.current_font_size,
         )
 
-    def _open_readonly_file_viewer(self, file_path: Path, title: str, missing_message: str) -> None:
+    def _open_readonly_file_viewer(
+        self,
+        file_path: Path,
+        title: str,
+        missing_message: str,
+        text_width: int | None = None,
+        text_height: int | None = None,
+    ) -> None:
         """
         Opens a native, read-only window showing the given text file if it
         exists. Shows an error popup with the provided message if the file is
@@ -697,6 +707,10 @@ class InventoryAppDisplay(tk.Tk):
             file_path: The text file to open for viewing
             title: The title to display on the viewer window
             missing_message: The popup message shown when the file does not exist
+            text_width: Width of the text box in character cells, or None to use
+                the default size
+            text_height: Height of the text box in character cells, or None to
+                use the default size
         """
 
         if file_path.exists():
@@ -709,6 +723,8 @@ class InventoryAppDisplay(tk.Tk):
                 font_family=self.current_font_family,
                 font_size=self.current_font_size,
                 editable=False,
+                text_width=text_width,
+                text_height=text_height,
             )
         else:
             self.show_popup(title="File Not Found", message=missing_message)
@@ -787,6 +803,22 @@ class InventoryAppDisplay(tk.Tk):
         """
 
         self.check_for_updates_callback()
+
+    def handle_open_user_guide(self) -> None:
+        """
+        On "Open User Guide" menu press, opens the bundled user guide in a native
+        read-only viewer window if it exists. Shows an error popup if the file is
+        missing.
+        """
+
+        # The guide is longer than the results log, so open a larger viewer
+        self._open_readonly_file_viewer(
+            USER_GUIDE_PATH,
+            "User Guide",
+            f"User guide not found at: {USER_GUIDE_PATH}.",
+            text_width=100,
+            text_height=35,
+        )
 
     def handle_view_patch_notes(self) -> None:
         """

@@ -736,8 +736,8 @@ def test_build_widgets_wires_the_view_menu(display):
 
 def test_build_widgets_wires_the_help_menu(display):
     """
-    Tests that the Help menu offers About, Check for Updates and What's New, each
-    wired to its handler
+    Tests that the Help menu offers About, Check for Updates, Open User Guide and
+    What's New, each wired to its handler
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -754,6 +754,10 @@ def test_build_widgets_wires_the_help_menu(display):
         "command": display.display.handle_check_for_updates,
     }
     assert calls[2].kwargs == {
+        "label": "Open User Guide",
+        "command": display.display.handle_open_user_guide,
+    }
+    assert calls[3].kwargs == {
         "label": "What's New",
         "command": display.display.handle_view_patch_notes,
     }
@@ -1118,6 +1122,8 @@ def test_handle_results_log_opens_a_read_only_viewer_when_present(display):
         assert window_kwargs["file_path"] is mock_results_file
         assert window_kwargs["editable"] is False
         assert window_kwargs["initial_text"] is display.read_file_callback.return_value
+        assert window_kwargs["text_width"] is None
+        assert window_kwargs["text_height"] is None
 
 
 def test_handle_results_log_shows_an_error_when_missing(display):
@@ -1234,6 +1240,50 @@ def test_handle_check_for_updates_invokes_the_callback(display):
     display.display.handle_check_for_updates()
 
     display.check_for_updates_callback.assert_called_once_with()
+
+
+def test_handle_open_user_guide_opens_a_read_only_viewer_when_present(display):
+    """
+    Tests that "Open User Guide" opens an enlarged read-only viewer window
+    populated from the read callback when the user guide exists
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch("source.gui.inventory_app_display.USER_GUIDE_PATH") as mock_guide_path:
+        mock_guide_path.exists.return_value = True
+
+        display.display.handle_open_user_guide()
+
+        display.read_file_callback.assert_called_once_with(mock_guide_path)
+        window_kwargs = display.file_editor_window_cls.call_args.kwargs
+        assert window_kwargs["file_path"] is mock_guide_path
+        assert window_kwargs["title"] == "User Guide"
+        assert window_kwargs["editable"] is False
+        assert window_kwargs["initial_text"] is display.read_file_callback.return_value
+        assert window_kwargs["text_width"] == 100
+        assert window_kwargs["text_height"] == 35
+
+
+def test_handle_open_user_guide_shows_an_error_when_missing(display):
+    """
+    Tests that "Open User Guide" shows a popup and opens no viewer when the user
+    guide is missing
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with patch("source.gui.inventory_app_display.USER_GUIDE_PATH") as mock_guide_path:
+        mock_guide_path.exists.return_value = False
+
+        display.display.handle_open_user_guide()
+
+        display.message_window_cls.assert_called_once()
+        display.file_editor_window_cls.assert_not_called()
 
 
 def test_handle_view_patch_notes_invokes_the_callback(display):

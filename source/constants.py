@@ -25,6 +25,9 @@ INSTALLER_ASSET_PATTERN = "FishbowlInventoryTool_Setup.exe"
 # launch after an update needs no network.
 PATCH_NOTES_PATH = Path("PATCH_NOTES.md")
 
+# User guide shipped alongside the executable; opened in-app from Help -> Open User Guide.
+USER_GUIDE_PATH = Path("USER_GUIDE.txt")
+
 # Base directories. The specific file paths below are composed from these.
 INVENTORY_DIR = Path("InventoryAvailability")
 TURNOVER_DIR = Path("TurnoverReports")

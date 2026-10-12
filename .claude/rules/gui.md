@@ -98,10 +98,13 @@ Built inline in `build_widgets()`, with no separate `MenuBar` class (matching th
   `ALL_THEMES` / `FONT_FAMILIES` / `FONT_SIZES`, each `command` a
   `lambda x=option: self.apply_x(x)` to avoid a late-binding closure bug.
 - **Help** — About opens `AboutWindow` with `APP_NAME` and `VERSION` from `constants.py`; Check
-  for Updates just calls `check_for_updates_callback`; What's New just calls
-  `view_patch_notes_callback`. The display never touches the network and reads no file: the
-  controller reports back through `show_update_available()` / `show_popup()` /
-  `show_patch_notes()`.
+  for Updates just calls `check_for_updates_callback`; Open User Guide opens `USER_GUIDE_PATH`
+  through `_open_readonly_file_viewer()` exactly as Results Log does, but enlarged to
+  `text_width=100, text_height=35` (the helper's two optional size arguments, forwarded to
+  `FileEditorWindow`; `None` keeps its default size); What's New just calls
+  `view_patch_notes_callback`. The display never touches the network, and reads a file only
+  through `read_file_callback`: the controller reports back through `show_update_available()` /
+  `show_popup()` / `show_patch_notes()`.
 
 ### Reconfiguration, toggling and exit
 

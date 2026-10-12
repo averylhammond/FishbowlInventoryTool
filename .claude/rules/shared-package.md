@@ -147,8 +147,9 @@ One module, every app-specific value the rest of the app and the shared classes 
   (`INVENTORY_DIR`, `TURNOVER_DIR`), the generated spreadsheets (`OUTPUT_DIR`, the application
   root — shared by `create_workbook()` and the display's View -> Spreadsheets browser so the two
   cannot point at different folders), the diagnostics log (`LOGS_DIR`, `RESULTS_FILE`), the
-  settings database (`DATA_DIR`, `SETTINGS_DB_PATH`) and the packaged patch notes
-  (`PATCH_NOTES_PATH`).
+  settings database (`DATA_DIR`, `SETTINGS_DB_PATH`), the packaged patch notes
+  (`PATCH_NOTES_PATH`) and the packaged user guide Help -> Open User Guide shows
+  (`USER_GUIDE_PATH`).
 - The keys user settings are persisted under — `SETTING_KEY_THEME`, `SETTING_KEY_FONT_FAMILY`,
   `SETTING_KEY_FONT_SIZE`, `SETTING_KEY_GEOMETRY`, `SETTING_KEY_LAST_SEEN_VERSION` and the
   `SETTING_KEY_COLUMN_PREFIX` each column's key is appended to — shared between the display that

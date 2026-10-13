@@ -9,6 +9,14 @@ back at any time.
 - **Patch notes.** After an update, the application now opens with a summary of what
   changed. Skip a release or two and you will see everything you missed, not just the
   most recent version. Help -> What's New shows these notes whenever you want them.
+- **User guide.** Help -> Open User Guide shows the guide inside the application.
+- View -> Inventories and View -> Turnover Reports now open those folders in your file
+  explorer, and View -> Spreadsheets opens the spreadsheet you pick. Before, choosing a
+  file and pressing Open did nothing.
+- Fixed processing more than one turnover report: each report wrote over the one before
+  it, so only the last report's columns appeared in the spreadsheet.
+- Fixed long inventory reports: rows past the 618th were left without the "N/A" turnover
+  placeholder and the alternating row shading.
 
 ## 2.2.1
 

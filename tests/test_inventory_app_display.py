@@ -1,4 +1,5 @@
 import tkinter as tk
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import DEFAULT, MagicMock, patch
 
@@ -1145,62 +1146,133 @@ def test_handle_results_log_shows_an_error_when_missing(display):
         display.file_editor_window_cls.assert_not_called()
 
 
-def test_handle_open_inventories_opens_a_dialog_rooted_at_the_inventory_dir(display):
+@pytest.mark.parametrize(
+    ("handler_name", "folder"),
+    [
+        ("handle_open_inventories", INVENTORY_DIR),
+        ("handle_open_turnover_reports", TURNOVER_DIR),
+    ],
+)
+def test_handle_open_folder_menus_open_the_folder_in_the_file_explorer(display, handler_name, folder):
     """
-    Tests that "Inventories" opens a browse-only file dialog rooted at the
-    inventory availability directory, filtered to PDFs
+    Tests that "Inventories" and "Turnover Reports" hand their folder to the
+    shared file explorer launcher, and show no popup when it opens
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+        handler_name (str): The View-menu handler under test
+        folder (pathlib.Path): The folder that handler should open
+    """
+
+    with (
+        patch("source.gui.inventory_app_display.open_in_file_explorer", return_value=True) as mock_open,
+        patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog,
+    ):
+        getattr(display.display, handler_name)()
+
+    mock_open.assert_called_once_with(folder)
+    mock_dialog.assert_not_called()
+    display.message_window_cls.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("handler_name", "folder"),
+    [
+        ("handle_open_inventories", INVENTORY_DIR),
+        ("handle_open_turnover_reports", TURNOVER_DIR),
+    ],
+)
+def test_handle_open_folder_menus_show_an_error_when_the_folder_cannot_open(display, handler_name, folder):
+    """
+    Tests that "Inventories" and "Turnover Reports" show a "Folder Not Found"
+    popup naming the resolved folder when the launcher reports it could not open
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+        handler_name (str): The View-menu handler under test
+        folder (pathlib.Path): The folder that handler should open
+    """
+
+    with patch("source.gui.inventory_app_display.open_in_file_explorer", return_value=False):
+        getattr(display.display, handler_name)()
+
+    popup_kwargs = display.message_window_cls.call_args.kwargs
+    assert popup_kwargs["title"] == "Folder Not Found"
+    assert str(folder.resolve()) in popup_kwargs["message"]
+
+
+def test_handle_open_spreadsheets_opens_the_chosen_spreadsheet(display):
+    """
+    Tests that "Spreadsheets" opens a dialog rooted at the output directory,
+    filtered to .xlsx files, and opens the chosen spreadsheet in its default
+    application with no popup
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
             fully mocked out
     """
 
-    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
-        display.display.handle_open_inventories()
-
-    dialog_kwargs = mock_dialog.call_args.kwargs
-    assert dialog_kwargs["initialdir"] == str(INVENTORY_DIR)
-    assert dialog_kwargs["filetypes"] == [("PDF files", "*.pdf")]
-
-
-def test_handle_open_turnover_reports_opens_a_dialog_rooted_at_the_turnover_dir(
-    display,
-):
-    """
-    Tests that "Turnover Reports" opens a browse-only file dialog rooted at the
-    turnover reports directory, filtered to PDFs
-
-    Args:
-        display (pytest.fixture): Test fixture building the display with tkinter
-            fully mocked out
-    """
-
-    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
-        display.display.handle_open_turnover_reports()
-
-    dialog_kwargs = mock_dialog.call_args.kwargs
-    assert dialog_kwargs["initialdir"] == str(TURNOVER_DIR)
-    assert dialog_kwargs["filetypes"] == [("PDF files", "*.pdf")]
-
-
-def test_handle_open_spreadsheets_opens_a_dialog_rooted_at_the_output_dir(
-    display,
-):
-    """
-    Tests that "Spreadsheets" opens a browse-only file dialog rooted at the
-    directory the generated spreadsheets are written to, filtered to .xlsx files
-
-    Args:
-        display (pytest.fixture): Test fixture building the display with tkinter
-            fully mocked out
-    """
-
-    with patch("source.gui.inventory_app_display.filedialog.askopenfilename") as mock_dialog:
+    with (
+        patch(
+            "source.gui.inventory_app_display.filedialog.askopenfilename",
+            return_value="C:/Fishbowl/Inventory 01222024.xlsx",
+        ) as mock_dialog,
+        patch("source.gui.inventory_app_display.open_with_default_app", return_value=True) as mock_open,
+    ):
         display.display.handle_open_spreadsheets()
 
     dialog_kwargs = mock_dialog.call_args.kwargs
     assert dialog_kwargs["initialdir"] == str(OUTPUT_DIR)
     assert dialog_kwargs["filetypes"] == [("Excel files", "*.xlsx")]
+
+    mock_open.assert_called_once_with(Path("C:/Fishbowl/Inventory 01222024.xlsx"))
+    display.message_window_cls.assert_not_called()
+
+
+def test_handle_open_spreadsheets_does_nothing_when_cancelled(display):
+    """
+    Tests that dismissing the "Spreadsheets" dialog opens nothing and shows no
+    popup
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with (
+        patch("source.gui.inventory_app_display.filedialog.askopenfilename", return_value=""),
+        patch("source.gui.inventory_app_display.open_with_default_app") as mock_open,
+    ):
+        display.display.handle_open_spreadsheets()
+
+    mock_open.assert_not_called()
+    display.message_window_cls.assert_not_called()
+
+
+def test_handle_open_spreadsheets_shows_an_error_when_the_spreadsheet_cannot_open(display):
+    """
+    Tests that "Spreadsheets" shows a popup naming the chosen file when no
+    application could be started on it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    with (
+        patch(
+            "source.gui.inventory_app_display.filedialog.askopenfilename",
+            return_value="C:/Fishbowl/Inventory 01222024.xlsx",
+        ),
+        patch("source.gui.inventory_app_display.open_with_default_app", return_value=False),
+    ):
+        display.display.handle_open_spreadsheets()
+
+    popup_kwargs = display.message_window_cls.call_args.kwargs
+    assert popup_kwargs["title"] == "Could Not Open Spreadsheet"
+    assert "C:/Fishbowl/Inventory 01222024.xlsx" in popup_kwargs["message"]
 
 
 def test_handle_about_opens_the_about_window(display):

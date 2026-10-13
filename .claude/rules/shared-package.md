@@ -20,6 +20,8 @@ wiring. Definitions and their tests live in that repo; do not duplicate either h
 | `fishbowl_common` | `UpdateCoordinator` | `VERSION`, `GITHUB_REPO`, `display`, `INSTALLER_ASSET_PATTERN` as `asset_pattern` |
 | `fishbowl_common` | `PatchNotes` | `PATCH_NOTES_PATH` as `notes_path` |
 | `fishbowl_common` | `compare_versions()` | — (helper) |
+| `fishbowl_common` | `open_in_file_explorer()` | `INVENTORY_DIR` / `TURNOVER_DIR` (View menu, in the display) |
+| `fishbowl_common` | `open_with_default_app()` | the `.xlsx` picked under `OUTPUT_DIR` (View -> Spreadsheets, in the display) |
 
 `UpdateChecker` is **not** imported here at all — the coordinator constructs it. The pin requests
 the **`[gui]` extra**, which adds the package's GUI half (the themed subwindows, the tooltip and

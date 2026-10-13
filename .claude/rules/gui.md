@@ -90,10 +90,15 @@ Built inline in `build_widgets()`, with no separate `MenuBar` class (matching th
   Exit button's own convention.
 - **View** — Results Log opens `RESULTS_FILE` in a read-only `FileEditorWindow` via
   `_open_readonly_file_viewer()`, or a "File Not Found" popup if it does not exist yet.
-  Inventories / Turnover Reports / Spreadsheets open a browse-only
-  `filedialog.askopenfilename` rooted at `INVENTORY_DIR` / `TURNOVER_DIR` / `OUTPUT_DIR` and
-  filtered to that folder's file type, reusing the same dialog mechanism as the top-level Browse
-  button rather than shelling out to the OS's file explorer.
+  Inventories / Turnover Reports open `INVENTORY_DIR` / `TURNOVER_DIR` in the OS file explorer
+  through `_open_folder()`, which calls the shared `open_in_file_explorer()` and shows a "Folder
+  Not Found" popup naming the resolved path when it returns `False`. Spreadsheets instead opens
+  a `.xlsx`-filtered dialog rooted at `OUTPUT_DIR` and hands the chosen file to the shared
+  `open_with_default_app()`, with a "Could Not Open Spreadsheet" popup on `False`. It picks a
+  file rather than opening the folder because `OUTPUT_DIR` is the application root, full of the
+  app's own files, and the filter is what hides them. These menus used to open a dialog and
+  discard the result, so its Open button did nothing (#60). **Every `askopenfilename` goes
+  through `_ask_for_file()`** (Browse and Spreadsheets), and each caller must use what it returns.
 - **Preferences** — Theme / Font / Font Size submenus built by looping
   `ALL_THEMES` / `FONT_FAMILIES` / `FONT_SIZES`, each `command` a
   `lambda x=option: self.apply_x(x)` to avoid a late-binding closure bug.

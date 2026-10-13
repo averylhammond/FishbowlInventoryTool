@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, scrolledtext
 
-from fishbowl_common import UpdateCheckResult
+from fishbowl_common import UpdateCheckResult, open_in_file_explorer, open_with_default_app
 from fishbowl_common.gui import (
     ALL_THEMES,  # Themes offered in the Preferences -> Theme menu
     DARK,  # Default theme used by the GUI
@@ -566,11 +566,10 @@ class InventoryAppDisplay(tk.Tk):
         member variable
         """
 
-        # Open a file dialog to select a PDF inventory file (Tk requires a str path)
-        file_path = filedialog.askopenfilename(
-            initialdir=str(INVENTORY_DIR),
-            title="Select Inventory Availability PDF",
-            filetypes=[("PDF files", "*.pdf")],  # Filter for PDF files only
+        file_path = self._ask_for_file(
+            INVENTORY_DIR,
+            "Select Inventory Availability PDF",
+            [("PDF files", "*.pdf")],
         )
 
         # If a valid filepath was selected, update the selected_file variable
@@ -729,6 +728,39 @@ class InventoryAppDisplay(tk.Tk):
         else:
             self.show_popup(title="File Not Found", message=missing_message)
 
+    def _ask_for_file(self, initial_dir: Path, title: str, filetypes: list[tuple[str, str]]) -> str | None:
+        """
+        Opens a file dialog rooted at the given directory and filtered to the
+        given file types, so the user can pick a file
+
+        Args:
+            initial_dir: The directory the dialog opens in
+            title: The title to display on the dialog
+            filetypes: The (description, pattern) pairs the dialog filters by
+
+        Returns:
+            The chosen file's path exactly as the dialog reports it, or None if
+            the dialog was cancelled
+        """
+
+        # Tk requires a str path, and reports a cancel as an empty string
+        file_path = filedialog.askopenfilename(initialdir=str(initial_dir), title=title, filetypes=filetypes)
+
+        return file_path or None
+
+    def _open_folder(self, folder: Path, missing_message: str) -> None:
+        """
+        Opens the given folder in the operating system's file explorer. Shows an
+        error popup with the provided message if the folder cannot be opened.
+
+        Args:
+            folder: The folder to open
+            missing_message: The popup message shown when the folder cannot be opened
+        """
+
+        if not open_in_file_explorer(folder):
+            self.show_popup(title="Folder Not Found", message=missing_message)
+
     def handle_results_log(self) -> None:
         """
         On "Results Log" menu press, opens the results log file in a native
@@ -744,40 +776,43 @@ class InventoryAppDisplay(tk.Tk):
 
     def handle_open_inventories(self) -> None:
         """
-        On "Inventories" menu press, opens a file dialog rooted at the
-        inventory availability directory so the user can browse its contents
+        On "Inventories" menu press, opens the inventory availability directory
+        in the file explorer. Shows an error popup if it cannot be opened.
         """
 
-        filedialog.askopenfilename(
-            initialdir=str(INVENTORY_DIR),
-            title="Inventories",
-            filetypes=[("PDF files", "*.pdf")],
+        self._open_folder(
+            INVENTORY_DIR,
+            f"Could not open {INVENTORY_DIR.resolve()}. Create it and copy your Inventory Availability PDFs into it.",
         )
 
     def handle_open_turnover_reports(self) -> None:
         """
-        On "Turnover Reports" menu press, opens a file dialog rooted at the
-        turnover reports directory so the user can browse its contents
+        On "Turnover Reports" menu press, opens the turnover reports directory in
+        the file explorer. Shows an error popup if it cannot be opened.
         """
 
-        filedialog.askopenfilename(
-            initialdir=str(TURNOVER_DIR),
-            title="Turnover Reports",
-            filetypes=[("PDF files", "*.pdf")],
+        self._open_folder(
+            TURNOVER_DIR,
+            f"Could not open {TURNOVER_DIR.resolve()}. Create it and copy your Turnover Report PDFs into it.",
         )
 
     def handle_open_spreadsheets(self) -> None:
         """
-        On "Spreadsheets" menu press, opens a file dialog rooted at the
-        directory the generated spreadsheets are written to so the user can
-        browse its contents
+        On "Spreadsheets" menu press, opens a file dialog rooted at the directory
+        the generated spreadsheets are written to, then opens the chosen
+        spreadsheet in its default application. Shows an error popup if it cannot
+        be opened.
         """
 
-        filedialog.askopenfilename(
-            initialdir=str(OUTPUT_DIR),
-            title="Spreadsheets",
-            filetypes=[("Excel files", "*.xlsx")],
-        )
+        # The output directory is the application root, so the .xlsx filter is what
+        # keeps the application's own files out of the list
+        file_path = self._ask_for_file(OUTPUT_DIR, "Spreadsheets", [("Excel files", "*.xlsx")])
+
+        if file_path and not open_with_default_app(Path(file_path)):
+            self.show_popup(
+                title="Could Not Open Spreadsheet",
+                message=f"Could not open {file_path}. Check that a spreadsheet application is installed.",
+            )
 
     def handle_about(self) -> None:
         """

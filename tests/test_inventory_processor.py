@@ -124,6 +124,8 @@ def test_process_turnover_file_writes_each_entry_to_the_results_file(processor):
     assert [entry.part_description for entry in turnover] == ["PART-A", "PART-B"]
 
     logged = [written.args[0] for written in processor.file_io.write_to_results_file.call_args_list]
+    assert "Processing turnover file: Turnover.pdf" in logged
+    assert "Number of Pages in turnover report: 1" in logged
     for entry in turnover:
         assert entry.to_formatted_string() in logged
 

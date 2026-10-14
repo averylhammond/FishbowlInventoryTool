@@ -29,6 +29,13 @@ and user-facing status reaches the caller only through an injected callback.
   Status strings go to the injected `report_status` callback (the GUI output line, or
   `print`/stdout in headless mode) — **never** to the results file, so the results log stays
   deterministic for CI diffing.
+- `process_all_inventories(checkbox_dict, report_status)` — the batch loop shared by the GUI's
+  "Process All Inventories" button and headless mode. It calls `process_inventory()` for every
+  PDF from `InventoryAppFileIO.list_inventory_files()`, announcing each by name through
+  `report_status` first, since `process_inventory()`'s own messages do not name the file. It keeps
+  going past a failed file and returns `True` only if every spreadsheet was saved. An empty
+  directory is reported and returns `False`. The file listing stays in `InventoryAppFileIO`; the
+  sibling's version iterates the folder inside its display, which is the pattern to avoid.
 - `process_inventory_file` and `process_turnover_file` source page text from
   `InventoryAppFileIO.read_pdf()`, delegate column parsing to `PdfTableParser`, and map the
   resulting rows onto the entry classes. **Every page is parsed before any entry is built**,
@@ -83,7 +90,7 @@ Home of **all** file I/O. Directory and file paths come from `source/constants.p
 - `read_pdf()` reads an inventory or turnover PDF via `pypdf`, returning one string of page text
   per page; `read_text_file()` reads a plain text file's full contents (used by the display's View
   menu to populate its read-only file viewer).
-- `list_inventory_files()` (used by headless mode) and `list_turnover_files()` return full
+- `list_inventory_files()` (used by `process_all_inventories()`) and `list_turnover_files()` return full
   `Path`s ready to read.
 - It owns the output spreadsheet lifecycle: `create_workbook()` places the workbook under
   `OUTPUT_DIR`, `save_workbook()` saves it. The in-memory cell writing lives in

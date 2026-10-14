@@ -2,6 +2,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from source.constants import INVENTORY_DIR
 from source.inventory_app_file_io import InventoryAppFileIO
 from source.inventory_entry import InventoryEntry
 from source.pdf_table_parser import PdfTableParser
@@ -156,3 +157,39 @@ class InventoryProcessor:
 
         report_status("Could not save the output spreadsheet. See log for details.")
         return False
+
+    def process_all_inventories(
+        self,
+        checkbox_dict: dict[str, bool],
+        report_status: Callable[[str], None],
+    ) -> bool:
+        """
+        Processes every inventory availability PDF in the inventory directory, one
+        spreadsheet each. Shared by the GUI's "Process All Inventories" button and the
+        headless integration-test path.
+
+        Args:
+            checkbox_dict: Column-selection dict deciding which columns to emit
+            report_status: Callback for user-facing status messages (the GUI output
+                line, or stdout in headless mode)
+
+        Returns:
+            True if every inventory's spreadsheet was saved, False if there were no
+            inventories or any of them failed
+        """
+
+        inventory_files = self.file_io.list_inventory_files()
+        if not inventory_files:
+            report_status(f"No inventory PDFs found in {INVENTORY_DIR.resolve()}.")
+            return False
+
+        # Keep going past a failed inventory so one bad PDF does not block the rest.
+        # Each file is named first, since the status lines below it do not say which
+        # inventory they belong to.
+        all_saved = True
+        for path in inventory_files:
+            report_status(f"Inventory: {path.name}")
+            if not self.process_inventory(str(path), checkbox_dict, report_status):
+                all_saved = False
+
+        return all_saved

@@ -59,7 +59,8 @@ mode.
 `start_application()` therefore reads: check `argument_provider.integration_test_mode` and call
 `run_integration_test()` if set; otherwise construct `SettingsRepository` at `SETTINGS_DB_PATH`
 and read `get_all_settings()`, import and construct `InventoryAppDisplay` (passing
-`process_callback`, `read_file_callback=self.file_io.read_text_file`,
+`process_callback`, `process_all_callback=self.handle_process_all_inventories`,
+`read_file_callback=self.file_io.read_text_file`,
 `check_for_updates_callback=self.handle_check_for_updates`,
 `view_patch_notes_callback=self.handle_view_patch_notes`,
 `save_settings_callback=self.handle_save_setting`, `title`, `window_resolution` and the settings
@@ -73,16 +74,19 @@ writes reach `show_popup`. `handle_save_setting(key, value)` forwards to
 `settings_repository.save_setting()` and is the display's only route to the database — the
 display never imports the repository.
 
-## The controller's own two callbacks
+## The controller's own processing entry points
 
-- `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the callback handed to the
-  display. It runs `self.processor.process_inventory()` with status routed to the display's output
-  box, keeping the display's callback contract to two arguments.
+- `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the display's process callback.
+  It runs `self.processor.process_inventory()` with status routed to the display's output box,
+  keeping the display's callback contract to two arguments.
+- `handle_process_all_inventories(checkbox_dict)` — the display's process-all callback ("Process
+  All Inventories"). It runs `self.processor.process_all_inventories()` with status routed to the
+  display's output box.
 - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout, takes an
-  all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and calls
-  `self.processor.process_inventory()` for every PDF from
-  `InventoryAppFileIO.list_inventory_files()`. Lets a CI workflow generate `logs/results.txt` with
-  no GUI interaction.
+  all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and calls the **same**
+  `self.processor.process_all_inventories()` with `print` as its reporter. Lets a CI workflow
+  generate `logs/results.txt` with no GUI interaction. The button and the headless path share that
+  one loop and differ only in `report_status` (#59); do not reintroduce a second loop here.
 
 New logic goes in the class that owns that concern, not bolted onto the controller: it owns
 wiring, not parsing, spreadsheet or display behavior.

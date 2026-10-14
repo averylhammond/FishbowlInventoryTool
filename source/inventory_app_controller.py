@@ -145,6 +145,22 @@ class InventoryAppController:
 
         return self.processor.process_inventory(inventory_pdf_path, checkbox_dict, self.display.write_output)
 
+    def handle_process_all_inventories(self, checkbox_dict: dict[str, bool]) -> bool:
+        """
+        Processes every inventory PDF in the inventory directory, routing status
+        messages to the GUI's output box. Wired into the display as its process-all
+        callback.
+
+        Args:
+            checkbox_dict: Column-selection dict deciding which columns to emit
+
+        Returns:
+            True if every spreadsheet was saved, False if there were no inventories
+            or any of them failed
+        """
+
+        return self.processor.process_all_inventories(checkbox_dict, self.display.write_output)
+
     def handle_save_setting(self, key: str, value: str) -> None:
         """
         Persists a single user setting so it is restored on the next launch. Wired
@@ -172,8 +188,7 @@ class InventoryAppController:
         checkbox_dict = all_columns_selected()
 
         # Process every inventory PDF, routing status to stdout (not the results file)
-        for path in self.file_io.list_inventory_files():
-            self.processor.process_inventory(str(path), checkbox_dict, print)
+        self.processor.process_all_inventories(checkbox_dict, print)
 
     def start_application(self) -> None:
         """
@@ -205,6 +220,7 @@ class InventoryAppController:
         # and the settings to restore the user's last theme, font and column choices
         self.display = InventoryAppDisplay(
             process_callback=self.handle_process_inventory,
+            process_all_callback=self.handle_process_all_inventories,
             read_file_callback=self.file_io.read_text_file,
             check_for_updates_callback=self.handle_check_for_updates,
             view_patch_notes_callback=self.handle_view_patch_notes,

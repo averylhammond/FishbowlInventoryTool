@@ -56,6 +56,7 @@ class InventoryAppDisplay(tk.Tk):
     def __init__(
         self,
         process_callback: Callable[[str, dict[str, bool]], bool],
+        process_all_callback: Callable[[dict[str, bool]], bool],
         read_file_callback: Callable[[Path], str],
         check_for_updates_callback: Callable[[], None],
         view_patch_notes_callback: Callable[[], None],
@@ -73,6 +74,8 @@ class InventoryAppDisplay(tk.Tk):
         Args:
             process_callback: Callback that processes the selected inventory PDF,
                 taking the chosen file path and the column-selection dict
+            process_all_callback: Callback that processes every inventory PDF in the
+                inventory directory, taking the column-selection dict
             read_file_callback: Callback that reads a text file's contents, used to
                 populate the read-only file viewer (e.g. View -> Results Log)
             check_for_updates_callback: Callback that triggers an on-demand update
@@ -114,6 +117,9 @@ class InventoryAppDisplay(tk.Tk):
         # Callback function to process the selected inventory file
         self.process_callback = process_callback
 
+        # Callback function to process every inventory file in the inventory directory
+        self.process_all_callback = process_all_callback
+
         # Callback function to read a text file's contents for the file viewer
         self.read_file_callback = read_file_callback
 
@@ -146,24 +152,25 @@ class InventoryAppDisplay(tk.Tk):
 
         # Tkinter Widgets
         # fmt:off
-        self.menu_bar:                 tk.Menu
-        self.file_menu:                tk.Menu
-        self.view_menu:                tk.Menu
-        self.preferences_menu:         tk.Menu
-        self.help_menu:                tk.Menu
-        self.title_label:              tk.Label
-        self.file_frame:               tk.Frame
-        self.file_entry:               tk.Entry
-        self.browse_button:            tk.Button
-        self.inventory_label:          tk.Label
-        self.inventory_frame:          tk.Frame
-        self.turnover_label:           tk.Label
-        self.turnover_frame:           tk.Frame
-        self.button_frame:             tk.Frame
-        self.process_inventory_button: tk.Button
-        self.exit_button:              tk.Button
-        self.output_label:             tk.Label
-        self.output_box:               scrolledtext.ScrolledText
+        self.menu_bar:                       tk.Menu
+        self.file_menu:                      tk.Menu
+        self.view_menu:                      tk.Menu
+        self.preferences_menu:               tk.Menu
+        self.help_menu:                      tk.Menu
+        self.title_label:                    tk.Label
+        self.file_frame:                     tk.Frame
+        self.file_entry:                     tk.Entry
+        self.browse_button:                  tk.Button
+        self.inventory_label:                tk.Label
+        self.inventory_frame:                tk.Frame
+        self.turnover_label:                 tk.Label
+        self.turnover_frame:                 tk.Frame
+        self.button_frame:                   tk.Frame
+        self.process_inventory_button:       tk.Button
+        self.process_all_inventories_button: tk.Button
+        self.exit_button:                    tk.Button
+        self.output_label:                   tk.Label
+        self.output_box:                     scrolledtext.ScrolledText
         # fmt:on
 
         # The column checkbuttons, keyed by column key. Columns marked always get
@@ -413,6 +420,19 @@ class InventoryAppDisplay(tk.Tk):
         )
         self.process_inventory_button.grid(row=0, column=0, padx=10)
 
+        self.process_all_inventories_button = tk.Button(
+            self.button_frame,
+            text="Process All Inventories",
+            command=self.handle_process_all_inventories,
+            bg=self.current_theme.button_bg,
+            fg=self.current_theme.button_fg,
+            activebackground=self.current_theme.accent,
+            activeforeground=self.current_theme.fg_text,
+            relief="flat",
+            font=(self.current_font_family, self.current_font_size, "bold"),
+        )
+        self.process_all_inventories_button.grid(row=0, column=1, padx=10)
+
         # handle_exit() rather than quit() so the button and the window's close box
         # behave identically: quit() would only end the main loop, leaving the
         # window and the interpreter's Tk state alive behind it
@@ -427,7 +447,7 @@ class InventoryAppDisplay(tk.Tk):
             relief="flat",
             font=(self.current_font_family, self.current_font_size, "bold"),
         )
-        self.exit_button.grid(row=1, column=0, pady=(10, 0))
+        self.exit_button.grid(row=1, column=0, columnspan=2, pady=(10, 0))
 
         self.output_label = tk.Label(
             self,
@@ -458,6 +478,10 @@ class InventoryAppDisplay(tk.Tk):
         self._attach_tooltip(
             self.process_inventory_button,
             "Process the selected inventory and write the report spreadsheet",
+        )
+        self._attach_tooltip(
+            self.process_all_inventories_button,
+            "Process every inventory PDF in the InventoryAvailability folder",
         )
         self._attach_tooltip(self.exit_button, "Close the application")
 
@@ -644,6 +668,17 @@ class InventoryAppDisplay(tk.Tk):
 
         self.clear_output()
         self.process_callback(file_path, self.get_selected_columns())
+
+    def handle_process_all_inventories(self) -> None:
+        """
+        On "Process All Inventories" button press, hands the chosen columns to the
+        process-all callback, after clearing any output left over from a previous
+        run. Output is cleared once here rather than per inventory, so every file's
+        status stays visible.
+        """
+
+        self.clear_output()
+        self.process_all_callback(self.get_selected_columns())
 
     def write_output(self, message: str) -> None:
         """
@@ -962,6 +997,12 @@ class InventoryAppDisplay(tk.Tk):
             activebackground=theme.accent,
             activeforeground=theme.fg_text,
         )
+        self.process_all_inventories_button.configure(
+            bg=theme.button_bg,
+            fg=theme.button_fg,
+            activebackground=theme.accent,
+            activeforeground=theme.fg_text,
+        )
         self.exit_button.configure(
             bg=theme.bg_entry,
             fg=theme.fg_text,
@@ -1018,6 +1059,7 @@ class InventoryAppDisplay(tk.Tk):
         self.inventory_label.configure(font=font)
         self.turnover_label.configure(font=font)
         self.process_inventory_button.configure(font=font)
+        self.process_all_inventories_button.configure(font=font)
         self.exit_button.configure(font=font)
         self.output_label.configure(font=font)
         self.output_box.configure(font=font)

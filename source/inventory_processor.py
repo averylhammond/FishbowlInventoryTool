@@ -5,7 +5,7 @@ from pathlib import Path
 from source.constants import INVENTORY_DIR
 from source.inventory_app_file_io import InventoryAppFileIO
 from source.inventory_entry import InventoryEntry
-from source.pdf_table_parser import PdfTableParser
+from source.pdf_table_parser import ParsedRow, PdfTableParser
 from source.spreadsheet_writer import SpreadsheetWriter
 from source.turnover_entry import TurnoverEntry
 
@@ -40,25 +40,11 @@ class InventoryProcessor:
             A list of InventoryEntry objects for the file's inventory entries
         """
 
-        # Read pdf data
-        pages = self.file_io.read_pdf(filepath)
+        rows = self._parse_pdf(filepath, "inventory", "Inventory", self.parser.parse_inventory_page)
 
-        # Log the bare filename, not the path, so the results file reads the same
-        # regardless of the platform or how the file was selected
-        self.file_io.write_to_results_file(f"Processing inventory file: {Path(filepath).name}")
-        self.file_io.write_to_results_file(f"Number of Pages in Inventory: {len(pages)}")
-
-        # Parse every page before building entries, since a row's part or
-        # description may wrap from the bottom of one page onto the top of the next
-        rows = []
-        for page in pages:
-            rows = self.parser.parse_inventory_page(page, rows)
-
-        # Table that will contain InventoryEntry objects. Each row holds one field
-        # per column in declaration order, so it expands straight into the constructor
-        inventory_table = [InventoryEntry(*row) for row in rows]
-
-        return inventory_table
+        # Each row holds one field per column in declaration order, so it expands
+        # straight into the constructor
+        return [InventoryEntry(*row) for row in rows]
 
     def process_turnover_file(self, filepath: Path) -> list[TurnoverEntry]:
         """
@@ -72,23 +58,50 @@ class InventoryProcessor:
             A list of TurnoverEntry objects for the file's turnover entries
         """
 
-        # Read pdf data
-        pages = self.file_io.read_pdf(filepath)
+        rows = self._parse_pdf(filepath, "turnover", "turnover report", self.parser.parse_turnover_page)
 
-        self.file_io.write_to_results_file(f"Processing turnover file: {Path(filepath).name}")
-        self.file_io.write_to_results_file(f"Number of Pages in turnover report: {len(pages)}")
-
-        rows = []
-        for page in pages:
-            rows = self.parser.parse_turnover_page(page, rows)
-
-        # Table that will contain TurnoverEntry objects
         turnover_table = [TurnoverEntry(*row) for row in rows]
 
         for entry in turnover_table:
             self.file_io.write_to_results_file(entry.to_formatted_string())
 
         return turnover_table
+
+    def _parse_pdf(
+        self,
+        filepath: str | Path,
+        file_label: str,
+        pages_label: str,
+        parse_page: Callable[[str, list[ParsedRow]], list[ParsedRow]],
+    ) -> list[ParsedRow]:
+        """
+        Reads a PDF, logs its name and page count to the results file, and parses
+        every page into rows
+
+        Args:
+            filepath: The path to the PDF to be opened and parsed
+            file_label: How the file is named in the "Processing ... file" line
+            pages_label: How the file is named in the "Number of Pages in ..." line
+            parse_page: The parser method that extends the rows with one page's rows
+
+        Returns:
+            Every row parsed out of the PDF, one field per column
+        """
+
+        pages = self.file_io.read_pdf(filepath)
+
+        # Log the bare filename, not the path, so the results file reads the same
+        # regardless of the platform or how the file was selected
+        self.file_io.write_to_results_file(f"Processing {file_label} file: {Path(filepath).name}")
+        self.file_io.write_to_results_file(f"Number of Pages in {pages_label}: {len(pages)}")
+
+        # Parse every page before building entries, since a row's part or
+        # description may wrap from the bottom of one page onto the top of the next
+        rows = []
+        for page in pages:
+            rows = parse_page(page, rows)
+
+        return rows
 
     def process_inventory(
         self,

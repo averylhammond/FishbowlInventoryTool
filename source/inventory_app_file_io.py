@@ -132,21 +132,7 @@ class InventoryAppFileIO:
             read
         """
 
-        try:
-            # Only return PDFs (the directory may hold other files), sorted by name so
-            # the inventory files are processed in the same order on every platform
-            # (Path comparison is case-insensitive on Windows, case-sensitive on POSIX)
-            return sorted(
-                (f for f in INVENTORY_DIR.iterdir() if f.suffix.lower() == ".pdf"),
-                key=lambda f: f.name,
-            )
-
-        except OSError as error:
-            self.report_error(
-                "File Error",
-                f"Could not read the inventory directory at {INVENTORY_DIR}: {error}",
-            )
-            return []
+        return self._list_pdfs(INVENTORY_DIR, "inventory directory")
 
     def list_turnover_files(self) -> list[Path]:
         """
@@ -157,18 +143,34 @@ class InventoryAppFileIO:
             or an empty list if the directory is missing or could not be read
         """
 
+        return self._list_pdfs(TURNOVER_DIR, "turnover reports directory")
+
+    def _list_pdfs(self, directory: Path, description: str) -> list[Path]:
+        """
+        Lists the PDFs found in a directory, sorted by filename
+
+        Args:
+            directory: The directory to list
+            description: How the directory is named in the error message
+
+        Returns:
+            A sorted list of full Paths to the *.pdf files in the directory, or an
+            empty list if the directory is missing or could not be read
+        """
+
         try:
             # Only return PDFs (the directory may hold other files), sorted by name so
-            # the turnover columns are emitted in the same order on every platform
+            # the files are processed in the same order on every platform (Path
+            # comparison is case-insensitive on Windows, case-sensitive on POSIX)
             return sorted(
-                (f for f in TURNOVER_DIR.iterdir() if f.suffix.lower() == ".pdf"),
+                (f for f in directory.iterdir() if f.suffix.lower() == ".pdf"),
                 key=lambda f: f.name,
             )
 
         except OSError as error:
             self.report_error(
                 "File Error",
-                f"Could not read the turnover reports directory at {TURNOVER_DIR}: {error}",
+                f"Could not read the {description} at {directory}: {error}",
             )
             return []
 

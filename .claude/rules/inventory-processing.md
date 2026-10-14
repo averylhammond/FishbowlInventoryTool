@@ -40,7 +40,11 @@ and user-facing status reaches the caller only through an injected callback.
   `InventoryAppFileIO.read_pdf()`, delegate column parsing to `PdfTableParser`, and map the
   resulting rows onto the entry classes. **Every page is parsed before any entry is built**,
   because a row's part or description can wrap from the bottom of one page onto the top of the
-  next.
+  next. The read, the two header log lines and the page loop are shared in `_parse_pdf()`, which
+  returns rows; each wrapper builds its own entries, and only the turnover one logs them (the
+  inventory entries are logged by `process_inventory()` after the workbook exists). The two log
+  labels are passed separately because the canonical results file spells them asymmetrically —
+  `Number of Pages in Inventory` vs `Number of Pages in turnover report` — so do not "tidy" them.
 - It constructs **one `SpreadsheetWriter` per workbook**, after the `create_workbook()` `None`
   guard — the writer opens the worksheet in its constructor, so a failed workbook must never
   reach it — and threads each turnover report's returned end column into the next call. It used
@@ -91,7 +95,8 @@ Home of **all** file I/O. Directory and file paths come from `source/constants.p
   per page; `read_text_file()` reads a plain text file's full contents (used by the display's View
   menu to populate its read-only file viewer).
 - `list_inventory_files()` (used by `process_all_inventories()`) and `list_turnover_files()` return full
-  `Path`s ready to read.
+  `Path`s ready to read. Both are thin wrappers over `_list_pdfs(directory, description)`, which
+  holds the filter, the explicitly-keyed sort and the error report.
 - It owns the output spreadsheet lifecycle: `create_workbook()` places the workbook under
   `OUTPUT_DIR`, `save_workbook()` saves it. The in-memory cell writing lives in
   `SpreadsheetWriter`, which is constructed around the already-open workbook.

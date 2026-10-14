@@ -55,8 +55,8 @@ GEOMETRY_PATTERN = re.compile(r"^\d+x\d+([+-]\d+[+-]\d+)?$")
 class InventoryAppDisplay(tk.Tk):
     def __init__(
         self,
-        process_callback: Callable[[str, dict[str, bool]], bool],
-        process_all_callback: Callable[[dict[str, bool]], bool],
+        process_callback: Callable[[str, dict[str, bool]], None],
+        process_all_callback: Callable[[dict[str, bool]], None],
         read_file_callback: Callable[[Path], str],
         check_for_updates_callback: Callable[[], None],
         view_patch_notes_callback: Callable[[], None],
@@ -72,10 +72,12 @@ class InventoryAppDisplay(tk.Tk):
         Initializes the InventoryAppDisplay object
 
         Args:
-            process_callback: Callback that processes the selected inventory PDF,
-                taking the chosen file path and the column-selection dict
-            process_all_callback: Callback that processes every inventory PDF in the
-                inventory directory, taking the column-selection dict
+            process_callback: Callback that starts processing the selected
+                inventory PDF in the background, taking the chosen file path and the
+                column-selection dict
+            process_all_callback: Callback that starts processing every inventory
+                PDF in the inventory directory in the background, taking the
+                column-selection dict
             read_file_callback: Callback that reads a text file's contents, used to
                 populate the read-only file viewer (e.g. View -> Results Log)
             check_for_updates_callback: Callback that triggers an on-demand update
@@ -691,10 +693,18 @@ class InventoryAppDisplay(tk.Tk):
         self.output_box.insert(tk.END, f"{message}\n")
         self.output_box.see(tk.END)
 
-        # Repaint now rather than at the next idle moment: processing runs on the
-        # GUI thread, so without this a status message would not appear until the
-        # work it announces has already finished
-        self.output_box.update_idletasks()
+    def set_processing(self, busy: bool) -> None:
+        """
+        Disables both process buttons while a run is in progress, and re-enables
+        them once it finishes, so a second click cannot start an overlapping run
+
+        Args:
+            busy: True while a run is in progress, False once it has finished
+        """
+
+        state = "disabled" if busy else "normal"
+        self.process_inventory_button.configure(state=state)
+        self.process_all_inventories_button.configure(state=state)
 
     def clear_output(self) -> None:
         """

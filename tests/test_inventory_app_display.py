@@ -1077,9 +1077,8 @@ def test_handle_process_all_inventories_forwards_the_columns(display):
 
 def test_write_output_appends_the_message_and_scrolls_to_it(display):
     """
-    Tests that a status message is appended to the output box on its own line,
-    scrolled into view, and painted immediately rather than at the next idle
-    moment, since processing blocks the GUI thread
+    Tests that a status message is appended to the output box on its own line
+    and scrolled into view
 
     Args:
         display (pytest.fixture): Test fixture building the display with tkinter
@@ -1090,7 +1089,29 @@ def test_write_output_appends_the_message_and_scrolls_to_it(display):
 
     display.display.output_box.insert.assert_called_once_with(tk.END, "Processing Inventory... Please wait.\n")
     display.display.output_box.see.assert_called_once_with(tk.END)
-    display.display.output_box.update_idletasks.assert_called_once_with()
+
+
+@pytest.mark.parametrize(("busy", "state"), [(True, "disabled"), (False, "normal")])
+def test_set_processing_toggles_both_process_buttons(display, busy, state):
+    """
+    Tests that both process buttons are disabled while a run is in progress and
+    re-enabled once it finishes, while Exit is left alone so the user can always
+    leave
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+        busy (bool): Whether a run is in progress
+        state (str): The Tk state both process buttons should be set to
+    """
+
+    display.display.exit_button.configure.reset_mock()
+
+    display.display.set_processing(busy)
+
+    display.display.process_inventory_button.configure.assert_called_with(state=state)
+    display.display.process_all_inventories_button.configure.assert_called_with(state=state)
+    display.display.exit_button.configure.assert_not_called()
 
 
 def test_clear_output_empties_the_output_box(display):

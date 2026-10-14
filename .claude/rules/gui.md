@@ -68,9 +68,17 @@ by the required `title` and `window_resolution` and the defaulted
 It owns the file picker, the two checkbox grids, the Process This Inventory / Process All
 Inventories / Exit buttons (the first two side by side, Exit spanning both beneath them), the
 `ScrolledText` output box and the menu bar, and exposes `show_popup()`, `show_update_available()`,
-`show_patch_notes()`, `write_output()`, `clear_output()` and `get_selected_columns()`.
-`write_output()` calls `update_idletasks()` because processing runs on the GUI thread — without
-it a status line would not paint until the work it announces had already finished.
+`show_patch_notes()`, `write_output()`, `set_processing()`, `clear_output()` and
+`get_selected_columns()`.
+
+**Processing runs on a worker thread, not the GUI thread (#36).** The two process callbacks return
+immediately; the controller's worker then reaches back into the display only through
+`after(0, …)` — every `write_output()` status line, every file-I/O `show_popup()`, and the final
+`set_processing(False)`. **Never call a display method from that thread directly**: Tk is not
+thread-safe. `set_processing(busy)` disables Process This Inventory and Process All Inventories
+while a run is in progress; Exit, the menus and Preferences stay live, and exiting mid-run simply
+kills the daemon worker. `write_output()` no longer calls `update_idletasks()` — that was a
+workaround for processing blocking the main loop, and is unnecessary now that it does not.
 
 **Settings restore happens in `__init__`, before `build_widgets()`**, so every widget is created
 already themed rather than restyled afterwards, and no `save_settings_callback` fires during

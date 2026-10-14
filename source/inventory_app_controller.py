@@ -1,3 +1,6 @@
+import threading
+import traceback
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from fishbowl_common import (
@@ -129,37 +132,79 @@ class InventoryAppController:
         # until the root window has been mapped
         self.display.after(0, self.display.show_patch_notes, APP_NAME, VERSION, notes)
 
-    def handle_process_inventory(self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]) -> bool:
+    def handle_process_inventory(self, inventory_pdf_path: str, checkbox_dict: dict[str, bool]) -> None:
         """
-        Processes the inventory PDF the user chose in the GUI, routing status
-        messages to the GUI's output box. Wired into the display as its process
-        callback.
+        Processes the inventory PDF the user chose in the GUI on a background
+        thread, routing status messages to the GUI's output box. Wired into the
+        display as its process callback.
 
         Args:
             inventory_pdf_path: Path to the inventory availability PDF to process
             checkbox_dict: Column-selection dict deciding which columns to emit
-
-        Returns:
-            True if the spreadsheet was saved, False if any step failed
         """
 
-        return self.processor.process_inventory(inventory_pdf_path, checkbox_dict, self.display.write_output)
+        self._start_processing(
+            lambda report_status: self.processor.process_inventory(inventory_pdf_path, checkbox_dict, report_status)
+        )
 
-    def handle_process_all_inventories(self, checkbox_dict: dict[str, bool]) -> bool:
+    def handle_process_all_inventories(self, checkbox_dict: dict[str, bool]) -> None:
         """
-        Processes every inventory PDF in the inventory directory, routing status
-        messages to the GUI's output box. Wired into the display as its process-all
-        callback.
+        Processes every inventory PDF in the inventory directory on a background
+        thread, routing status messages to the GUI's output box. Wired into the
+        display as its process-all callback.
 
         Args:
             checkbox_dict: Column-selection dict deciding which columns to emit
-
-        Returns:
-            True if every spreadsheet was saved, False if there were no inventories
-            or any of them failed
         """
 
-        return self.processor.process_all_inventories(checkbox_dict, self.display.write_output)
+        self._start_processing(
+            lambda report_status: self.processor.process_all_inventories(checkbox_dict, report_status)
+        )
+
+    def _start_processing(self, work: Callable[[Callable[[str], None]], bool]) -> None:
+        """
+        Locks the GUI's process buttons and spawns a daemon thread to run a
+        processing job.
+
+        Running on a background thread keeps the window responsive while PDFs are
+        parsed and spreadsheets written. Daemon, so exiting mid-run does not hang
+        the application waiting on it.
+
+        Args:
+            work: The processing job, called with the status callback to report
+                through
+        """
+
+        # Locked here, on the GUI thread, so a second click cannot start an
+        # overlapping run before the worker gets going
+        self.display.set_processing(True)
+        threading.Thread(target=self._run_processing, args=(work,), daemon=True).start()
+
+    def _run_processing(self, work: Callable[[Callable[[str], None]], bool]) -> None:
+        """
+        Worker-thread body for a processing job.
+
+        Every status line and the final unlock are handed back to the GUI thread
+        via display.after() so the toolkit is only ever touched from the thread
+        that owns it.
+
+        Args:
+            work: The processing job, called with the status callback to report
+                through
+        """
+
+        try:
+            work(lambda message: self.display.after(0, self.display.write_output, message))
+        except Exception:  # noqa: BLE001
+            # The release build has no console, so an uncaught error here would
+            # vanish without a trace; log it and tell the user rather than stop
+            # silently
+            self.file_io.write_to_results_file(traceback.format_exc())
+            self.display.after(0, self.display.write_output, "Processing failed unexpectedly. See log for details.")
+        finally:
+            # Unlocked whatever happened, or a failed run would leave the buttons
+            # disabled for the rest of the session
+            self.display.after(0, self.display.set_processing, False)
 
     def handle_save_setting(self, key: str, value: str) -> None:
         """
@@ -232,8 +277,13 @@ class InventoryAppController:
 
         # Wire the GUI's popup into the file I/O controller and the settings
         # repository so file and database failures reach the user without coupling
-        # either of them to the GUI
-        self.file_io.report_error = self.display.show_popup
+        # either of them to the GUI. File I/O errors are raised on the processing
+        # worker thread, so they reach the popup through after() rather than
+        # touching the toolkit from that thread; database errors only arise on
+        # the GUI thread.
+        self.file_io.report_error = lambda title, message: self.display.after(
+            0, self.display.show_popup, title, message
+        )
         self.settings_repository.report_error = self.display.show_popup
 
         # Kick off a background check for a newer release before entering the GUI

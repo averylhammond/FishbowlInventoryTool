@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -195,7 +195,9 @@ def test_start_application_loads_the_persisted_settings(controller):
 def test_start_application_wires_the_gui_popup_into_file_io(controller):
     """
     Tests that file I/O failures surface to the user through the GUI's popup,
-    which is what keeps the file I/O controller free of any GUI dependency
+    which is what keeps the file I/O controller free of any GUI dependency, and
+    that the popup is scheduled through after() since those failures are raised
+    on the processing worker thread
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -210,7 +212,13 @@ def test_start_application_wires_the_gui_popup_into_file_io(controller):
     ):
         controller.controller.start_application()
 
-    assert controller.file_io.report_error is mock_display_cls.return_value.show_popup
+    display = mock_display_cls.return_value
+    display.after.reset_mock()
+
+    controller.file_io.report_error("PDF Read Error", "Could not read the file")
+
+    display.show_popup.assert_not_called()
+    display.after.assert_called_once_with(0, display.show_popup, "PDF Read Error", "Could not read the file")
 
 
 def test_start_application_wires_the_gui_popup_into_the_settings_repository(controller):
@@ -521,10 +529,11 @@ def test_run_integration_test_routes_errors_away_from_the_default_reporter(contr
     controller.file_io.report_error("File Error", "Could not read the file")
 
 
-def test_handle_process_inventory_routes_status_to_the_output_box(controller):
+def test_handle_process_inventory_runs_the_processor_on_a_worker_thread(controller):
     """
-    Tests that the GUI's process callback runs the processor with status directed
-    at the display's output box, and hands back its result
+    Tests that the GUI's process callback hands the processor to a background
+    thread rather than running it inline, and that the job it hands over runs
+    the processor with the chosen file and columns
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -532,24 +541,27 @@ def test_handle_process_inventory_routes_status_to_the_output_box(controller):
     """
 
     controller.controller.display = MagicMock()
-    controller.processor.process_inventory.return_value = True
     checkbox_dict = all_columns_selected()
 
-    result = controller.controller.handle_process_inventory("Inventory 01222024.pdf", checkbox_dict)
+    with patch("source.inventory_app_controller.threading.Thread") as mock_thread_cls:
+        controller.controller.handle_process_inventory("Inventory 01222024.pdf", checkbox_dict)
+
+    controller.processor.process_inventory.assert_not_called()
+    mock_thread_cls.return_value.start.assert_called_once_with()
+
+    work = mock_thread_cls.call_args.kwargs["args"][0]
+    report_status = MagicMock()
+    work(report_status)
 
     controller.processor.process_inventory.assert_called_once_with(
-        "Inventory 01222024.pdf",
-        checkbox_dict,
-        controller.controller.display.write_output,
+        "Inventory 01222024.pdf", checkbox_dict, report_status
     )
-    assert result is True
 
 
-def test_handle_process_all_inventories_routes_status_to_the_output_box(controller):
+def test_handle_process_all_inventories_runs_the_processor_on_a_worker_thread(controller):
     """
-    Tests that the GUI's process-all callback runs the same loop the headless path
-    does, with status directed at the display's output box, and hands back its
-    result
+    Tests that the GUI's process-all callback hands the same loop the headless
+    path runs to a background thread rather than running it inline
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
@@ -557,16 +569,103 @@ def test_handle_process_all_inventories_routes_status_to_the_output_box(controll
     """
 
     controller.controller.display = MagicMock()
-    controller.processor.process_all_inventories.return_value = True
     checkbox_dict = all_columns_selected()
 
-    result = controller.controller.handle_process_all_inventories(checkbox_dict)
+    with patch("source.inventory_app_controller.threading.Thread") as mock_thread_cls:
+        controller.controller.handle_process_all_inventories(checkbox_dict)
 
-    controller.processor.process_all_inventories.assert_called_once_with(
-        checkbox_dict,
-        controller.controller.display.write_output,
-    )
-    assert result is True
+    controller.processor.process_all_inventories.assert_not_called()
+    mock_thread_cls.return_value.start.assert_called_once_with()
+
+    work = mock_thread_cls.call_args.kwargs["args"][0]
+    report_status = MagicMock()
+    work(report_status)
+
+    controller.processor.process_all_inventories.assert_called_once_with(checkbox_dict, report_status)
+
+
+def test_start_processing_locks_the_buttons_before_starting_a_daemon_thread(controller):
+    """
+    Tests that the process buttons are disabled on the GUI thread before the
+    worker starts, so a second click cannot overlap the run, and that the worker
+    is a daemon so exiting mid-run does not hang the application
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    controller.controller.display = MagicMock()
+    order = MagicMock()
+    work = MagicMock()
+
+    with patch("source.inventory_app_controller.threading.Thread") as mock_thread_cls:
+        order.attach_mock(controller.controller.display.set_processing, "set_processing")
+        order.attach_mock(mock_thread_cls.return_value.start, "start")
+        controller.controller._start_processing(work)
+
+    mock_thread_cls.assert_called_once_with(target=controller.controller._run_processing, args=(work,), daemon=True)
+    assert [c[0] for c in order.mock_calls] == ["set_processing", "start"]
+    controller.controller.display.set_processing.assert_called_once_with(True)
+
+
+def test_run_processing_routes_status_to_the_output_box_through_after(controller):
+    """
+    Tests that each status line the job reports is handed back to the GUI thread
+    through after() rather than written to the output box from the worker
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    display = controller.controller.display = MagicMock()
+
+    controller.controller._run_processing(lambda report_status: report_status("Processing Inventory..."))
+
+    display.write_output.assert_not_called()
+    display.after.assert_any_call(0, display.write_output, "Processing Inventory...")
+
+
+def test_run_processing_unlocks_the_buttons_once_the_job_finishes(controller):
+    """
+    Tests that the process buttons are re-enabled, through after(), once the job
+    has finished, and only then
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    display = controller.controller.display = MagicMock()
+
+    controller.controller._run_processing(MagicMock(return_value=True))
+
+    display.set_processing.assert_not_called()
+    display.after.assert_called_once_with(0, display.set_processing, False)
+
+
+def test_run_processing_reports_and_unlocks_the_buttons_on_error(controller):
+    """
+    Tests that a job raising an unexpected error still re-enables the process
+    buttons, logs the traceback to the results file, and tells the user
+    processing failed rather than stopping silently
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    display = controller.controller.display = MagicMock()
+
+    controller.controller._run_processing(MagicMock(side_effect=ValueError("bad page")))
+
+    controller.file_io.write_to_results_file.assert_called_once()
+    assert "ValueError: bad page" in controller.file_io.write_to_results_file.call_args.args[0]
+
+    assert display.after.call_args_list[-1] == call(0, display.set_processing, False)
+    status_calls = [c for c in display.after.call_args_list if c.args[1] is display.write_output]
+    assert len(status_calls) == 1
 
 
 def test_handle_save_setting_delegates_to_the_settings_repository(controller):

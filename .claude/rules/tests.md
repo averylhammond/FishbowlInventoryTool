@@ -69,6 +69,10 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
   `InventoryAppFileIO` and `InventoryProcessor` patched at `source.inventory_app_controller.<name>`
   as usual. Because the processor is mocked there, the GUI and headless paths are asserted against
   `processor.process_inventory` directly rather than by patching a method onto the controller.
+  The GUI process callbacks start a worker thread, so their tests patch
+  `source.inventory_app_controller.threading.Thread`, pull the job out of its `args` and run it by
+  hand; `_run_processing()` is called directly on the test thread and asserted through
+  `display.after` — never start a real thread in a unit test.
   **The display is the one exception to the patch-at-the-point-of-use rule:**
   `start_application()` imports it inside the function, so the name never exists at module scope
   and the target is its definition site,

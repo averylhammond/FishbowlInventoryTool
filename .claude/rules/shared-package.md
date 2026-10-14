@@ -64,8 +64,9 @@ and read `get_all_settings()`, import and construct `InventoryAppDisplay` (passi
 `check_for_updates_callback=self.handle_check_for_updates`,
 `view_patch_notes_callback=self.handle_view_patch_notes`,
 `save_settings_callback=self.handle_save_setting`, `title`, `window_resolution` and the settings
-just read), wire both the file I/O controller's and the settings repository's `report_error` to
-the display's `show_popup`, `start()` the background update check, construct `PatchNotes` and run
+just read), wire the file I/O controller's `report_error` to the display's `show_popup` **through
+`display.after(0, …)`** (it fires on the processing worker thread) and the settings repository's
+directly (it only fires on the GUI thread), `start()` the background update check, construct `PatchNotes` and run
 `show_patch_notes_if_updated(saved_settings)`, then enter `mainloop()`.
 
 Because `SettingsRepository.__init__` runs `initialize_database()` before any display exists, an
@@ -77,11 +78,18 @@ display never imports the repository.
 ## The controller's own processing entry points
 
 - `handle_process_inventory(inventory_pdf_path, checkbox_dict)` — the display's process callback.
-  It runs `self.processor.process_inventory()` with status routed to the display's output box,
-  keeping the display's callback contract to two arguments.
+  It hands `self.processor.process_inventory()` to a worker thread with status routed to the
+  display's output box, keeping the display's callback contract to two arguments. Returns `None`.
 - `handle_process_all_inventories(checkbox_dict)` — the display's process-all callback ("Process
-  All Inventories"). It runs `self.processor.process_all_inventories()` with status routed to the
-  display's output box.
+  All Inventories"). The same, for `self.processor.process_all_inventories()`.
+- **Both go through `_start_processing(work)` / `_run_processing(work)` (#36)**, the same shape as
+  `UpdateCoordinator`'s check: `_start_processing` calls `display.set_processing(True)` on the GUI
+  thread, then starts a `daemon=True` thread on `_run_processing`, which runs the job with a
+  `report_status` that posts each line through `display.after(0, display.write_output, …)`. An
+  unexpected exception is written to the results file as a traceback and reported as one status
+  line, since the `--noconsole` build would otherwise swallow it; `finally` posts
+  `set_processing(False)` so a failed run never leaves the buttons locked. The processor itself
+  knows nothing about threads.
 - `run_integration_test()` — the headless entry point. Routes `report_error` to stdout, takes an
   all-columns-checked `checkbox_dict` from `columns.all_columns_selected()`, and calls the **same**
   `self.processor.process_all_inventories()` with `print` as its reporter. Lets a CI workflow

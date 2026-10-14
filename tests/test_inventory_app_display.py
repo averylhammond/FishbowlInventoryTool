@@ -131,7 +131,7 @@ def display(request):
             are asserted (`button_cls`, `checkbutton_cls`, `message_window_cls`,
             `about_window_cls`, `file_editor_window_cls`, `update_window_cls`,
             `patch_notes_window_cls`, `tooltip_cls`), and the callbacks passed at
-            construction (`process_callback`, `read_file_callback`,
+            construction (`process_callback`, `process_all_callback`, `read_file_callback`,
             `check_for_updates_callback`, `view_patch_notes_callback`,
             `save_settings_callback`)
     """
@@ -182,6 +182,7 @@ def display(request):
 
         # The callbacks the controller would normally supply; mocks are sufficient
         process_callback = MagicMock()
+        process_all_callback = MagicMock()
         read_file_callback = MagicMock()
         check_for_updates_callback = MagicMock()
         view_patch_notes_callback = MagicMock()
@@ -189,6 +190,7 @@ def display(request):
 
         arguments = {
             "process_callback": process_callback,
+            "process_all_callback": process_all_callback,
             "read_file_callback": read_file_callback,
             "check_for_updates_callback": check_for_updates_callback,
             "view_patch_notes_callback": view_patch_notes_callback,
@@ -218,6 +220,7 @@ def display(request):
             patch_notes_window_cls=mock_patch_notes_window_cls,
             tooltip_cls=mock_tooltip_cls,
             process_callback=process_callback,
+            process_all_callback=process_all_callback,
             read_file_callback=read_file_callback,
             check_for_updates_callback=check_for_updates_callback,
             view_patch_notes_callback=view_patch_notes_callback,
@@ -622,6 +625,25 @@ def test_build_widgets_wires_the_process_button_to_its_handler(display):
     assert button_call(display, "Process This Inventory").kwargs["command"] == display.display.handle_process_inventory
 
 
+def test_build_widgets_wires_the_process_all_button_to_its_handler(display):
+    """
+    Tests that the process-all button triggers processing of every inventory, and
+    sits beside the process button rather than below it
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    process_all_call = button_call(display, "Process All Inventories")
+
+    assert process_all_call.kwargs["command"] == display.display.handle_process_all_inventories
+    display.display.process_all_inventories_button.grid.assert_called_once_with(row=0, column=1, padx=10)
+
+    # The exit button spans both action buttons beneath them
+    display.display.exit_button.grid.assert_called_once_with(row=1, column=0, columnspan=2, pady=(10, 0))
+
+
 def test_build_widgets_wires_the_exit_button_to_handle_exit(display):
     """
     Tests that the exit button closes the application through handle_exit, so it
@@ -851,6 +873,7 @@ def test_build_widgets_attaches_a_tooltip_to_every_button(display):
     for button in (
         display.display.browse_button,
         display.display.process_inventory_button,
+        display.display.process_all_inventories_button,
         display.display.exit_button,
     ):
         assert tooltip_texts.get(button)
@@ -892,7 +915,7 @@ def test_build_widgets_tracks_every_tooltip_for_restyling(display):
     # One per action button, plus one per column that has a checkbutton
     selectable = [column for column in ALL_COLUMNS if not column.always]
 
-    assert len(display.display.tooltips) == 3 + len(selectable)
+    assert len(display.display.tooltips) == 4 + len(selectable)
 
 
 def test_build_widgets_styles_the_tooltips_with_the_theme_and_font(display):
@@ -1030,6 +1053,26 @@ def test_handle_process_inventory_with_no_file_warns_and_does_not_process(displa
 
     display.message_window_cls.assert_called_once()
     display.process_callback.assert_not_called()
+
+
+def test_handle_process_all_inventories_forwards_the_columns(display):
+    """
+    Tests that pressing the process-all button hands the current column selection
+    to the controller's callback, clearing the previous run's output once before it
+    starts. No file needs to be selected, since every inventory is processed.
+
+    Args:
+        display (pytest.fixture): Test fixture building the display with tkinter
+            fully mocked out
+    """
+
+    display.display.column_vars["OnHand"].set(True)
+
+    display.display.handle_process_all_inventories()
+
+    display.process_all_callback.assert_called_once_with(display.display.get_selected_columns())
+    display.display.output_box.delete.assert_called_once_with(1.0, tk.END)
+    display.message_window_cls.assert_not_called()
 
 
 def test_write_output_appends_the_message_and_scrolls_to_it(display):
@@ -1474,6 +1517,12 @@ def test_apply_theme_updates_state_and_restyles_every_widget(display):
     display.display.output_box.configure.assert_called_once_with(
         bg=FOREST.bg_entry, fg=FOREST.fg_text, insertbackground=FOREST.fg_text
     )
+    display.display.process_all_inventories_button.configure.assert_called_once_with(
+        bg=FOREST.button_bg,
+        fg=FOREST.button_fg,
+        activebackground=FOREST.accent,
+        activeforeground=FOREST.fg_text,
+    )
 
     for checkbutton in display.display.column_checkbuttons.values():
         checkbutton.configure.assert_called_once_with(
@@ -1519,6 +1568,9 @@ def test_apply_font_family_updates_state_and_restyles_every_widget(display):
 
     assert display.display.current_font_family == "Arial"
     display.display.title_label.configure.assert_called_once_with(font=("Arial", DEFAULT_FONT_SIZE, "bold"))
+    display.display.process_all_inventories_button.configure.assert_called_once_with(
+        font=("Arial", DEFAULT_FONT_SIZE, "bold")
+    )
 
     for checkbutton in display.display.column_checkbuttons.values():
         checkbutton.configure.assert_called_once_with(font=("Arial", DEFAULT_FONT_SIZE))

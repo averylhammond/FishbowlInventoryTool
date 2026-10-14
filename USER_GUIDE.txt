@@ -4,9 +4,11 @@ under Help -> About.
 To use the tool:
 
 1) Download any inventory availability you would like to process as a '.pdf' file, and 
-place it into the 'InventoryAvailability' folder. Do not rename the file. The tool will 
-process only one file at this time, generate an excel file, and use the date listed in
-the .pdf file as the name of the excel .xlsx file.
+place it into the 'InventoryAvailability' folder. Do not rename the file. For each file
+the tool processes, it generates an excel file and uses the date listed in the .pdf file
+as the name of the excel .xlsx file. Use 'Process This Inventory' to process the one file
+you chose with Browse, or 'Process All Inventories' to process every .pdf file in the
+'InventoryAvailability' folder at once.
 
 2) Run 'AutoInventoryProc.exe' to begin processing the inventory. Once the tool is
 finished, create/update  mmddyyyy.xlsx, where mm dd yyy represent the date that the

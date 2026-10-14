@@ -103,9 +103,9 @@ matching `vX.Y.Z` tag.** Details in `.claude/rules/ci.md`.
 | Module | Owns |
 | --- | --- |
 | `main.py` | Thin entry point: constructs the controller and calls `start_application()`. No application logic, no argument parsing |
-| `source/inventory_app_controller.py` | Entry-point glue: builds the collaborators, gates the GUI half behind the headless check, owns `handle_process_inventory()` and `run_integration_test()`, and the patch-notes feature |
+| `source/inventory_app_controller.py` | Entry-point glue: builds the collaborators, gates the GUI half behind the headless check, owns `handle_process_inventory()`, `handle_process_all_inventories()` and `run_integration_test()`, and the patch-notes feature |
 | `source/inventory_app_file_io.py` | All file I/O: inventory/turnover PDFs via pypdf (one string per page), text files for the View menu, listing input files, the workbook lifecycle, and the `logs/` results file |
-| `source/inventory_processor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report |
+| `source/inventory_processor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report; plus the process-all loop the GUI button and headless mode share |
 | `source/pdf_table_parser.py` | Parsing only: layout-extracted page text → positional field lists (`align_to_columns`, `to_number`) |
 | `source/inventory_entry.py` / `source/turnover_entry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
 | `source/columns.py` | The `(key, label, field, always, tooltip)` record for every selectable column, and `all_columns_selected()` |

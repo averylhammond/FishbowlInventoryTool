@@ -60,13 +60,14 @@ Details worth knowing before touching them:
 ## `InventoryAppDisplay`
 
 A `tk.Tk` subclass that takes every dependency as a constructor argument and never imports the
-controller. The five callbacks are `process_callback`, `read_file_callback`,
+controller. The six callbacks are `process_callback`, `process_all_callback`, `read_file_callback`,
 `check_for_updates_callback`, `view_patch_notes_callback` and `save_settings_callback`, followed
 by the required `title` and `window_resolution` and the defaulted
 `theme`/`font_family`/`font_size`/`settings`.
 
-It owns the file picker, the two checkbox grids, the Process/Exit buttons, the `ScrolledText`
-output box and the menu bar, and exposes `show_popup()`, `show_update_available()`,
+It owns the file picker, the two checkbox grids, the Process This Inventory / Process All
+Inventories / Exit buttons (the first two side by side, Exit spanning both beneath them), the
+`ScrolledText` output box and the menu bar, and exposes `show_popup()`, `show_update_available()`,
 `show_patch_notes()`, `write_output()`, `clear_output()` and `get_selected_columns()`.
 `write_output()` calls `update_idletasks()` because processing runs on the GUI thread — without
 it a status line would not paint until the work it announces had already finished.
@@ -134,7 +135,7 @@ Built inline in `build_widgets()`, with no separate `MenuBar` class (matching th
   to the database on every frame.
 - Tooltips are attached through **`_attach_tooltip(widget, text)`**, which tracks each one in
   `self.tooltips` — initialized in `__init__` **before** `build_widgets()`, since the grid
-  builder attaches as it goes. Two groups get them: the three action buttons, attached at the end
+  builder attaches as it goes. Two groups get them: the four action buttons, attached at the end
   of `build_widgets()` as the sibling does, and **every column checkbutton**, attached in
   `_build_checkbox_grid()` from that column's own `Column.tooltip`. The checkbox group has no
   sibling analog and is why the feature is worth more here than there — the labels are Fishbowl

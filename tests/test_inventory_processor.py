@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from source.columns import all_columns_selected
+from source.constants import INVENTORY_DIR
 from source.inventory_app_file_io import InventoryAppFileIO
 from source.inventory_entry import InventoryEntry
 from source.inventory_processor import InventoryProcessor
@@ -366,3 +367,78 @@ def test_process_inventory_reports_and_returns_false_when_the_save_fails(process
 
     assert result is False
     report_status.assert_called_with("Could not save the output spreadsheet. See log for details.")
+
+
+def test_process_all_inventories_processes_every_listed_inventory_in_order(processor):
+    """
+    Tests that every inventory PDF the file I/O controller lists is processed in
+    that order, with the same columns and reporter, each announced by name so its
+    status lines can be told apart from the next file's
+
+    Args:
+        processor (pytest.fixture): Test fixture building the processor with its
+            file I/O controller and parser mocked
+    """
+
+    processor.file_io.list_inventory_files.return_value = [
+        Path("InventoryAvailability/Inventory 01222024.pdf"),
+        Path("InventoryAvailability/Inventory 02222024.pdf"),
+    ]
+    checkbox_dict = all_columns_selected()
+    report_status = MagicMock()
+
+    with patch.object(processor.processor, "process_inventory", return_value=True) as mock_process:
+        result = processor.processor.process_all_inventories(checkbox_dict, report_status)
+
+    assert result is True
+    assert mock_process.call_args_list == [
+        call(str(Path("InventoryAvailability/Inventory 01222024.pdf")), checkbox_dict, report_status),
+        call(str(Path("InventoryAvailability/Inventory 02222024.pdf")), checkbox_dict, report_status),
+    ]
+    assert report_status.call_args_list == [
+        call("Inventory: Inventory 01222024.pdf"),
+        call("Inventory: Inventory 02222024.pdf"),
+    ]
+
+
+def test_process_all_inventories_keeps_going_past_a_failure(processor):
+    """
+    Tests that one inventory failing does not stop the rest from being processed,
+    and that the failure is reflected in the result
+
+    Args:
+        processor (pytest.fixture): Test fixture building the processor with its
+            file I/O controller and parser mocked
+    """
+
+    processor.file_io.list_inventory_files.return_value = [
+        Path("InventoryAvailability/Inventory 01222024.pdf"),
+        Path("InventoryAvailability/Inventory 02222024.pdf"),
+    ]
+
+    with patch.object(processor.processor, "process_inventory", side_effect=[False, True]) as mock_process:
+        result = processor.processor.process_all_inventories(all_columns_selected(), MagicMock())
+
+    assert result is False
+    assert mock_process.call_count == 2
+
+
+def test_process_all_inventories_reports_and_returns_false_with_no_inventories(processor):
+    """
+    Tests that an empty inventory directory is reported to the user rather than
+    finishing silently, and is not treated as a success
+
+    Args:
+        processor (pytest.fixture): Test fixture building the processor with its
+            file I/O controller and parser mocked
+    """
+
+    processor.file_io.list_inventory_files.return_value = []
+    report_status = MagicMock()
+
+    with patch.object(processor.processor, "process_inventory") as mock_process:
+        result = processor.processor.process_all_inventories(all_columns_selected(), report_status)
+
+    assert result is False
+    mock_process.assert_not_called()
+    report_status.assert_called_once_with(f"No inventory PDFs found in {INVENTORY_DIR.resolve()}.")

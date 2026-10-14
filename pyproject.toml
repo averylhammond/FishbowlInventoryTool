@@ -88,7 +88,7 @@ known-third-party = ["fishbowl_common"]
 
 [tool.ruff.lint.pylint]
 # CLAUDE.md requires narrow dependencies be injected one at a time rather than passing a
-# god object, which puts InventoryAppDisplay.__init__ at 11 parameters by design: five
+# god object, which puts InventoryAppDisplay.__init__ at 12 parameters by design: six
 # callbacks, the title, the window resolution, the theme, the font family and size, and
 # the persisted settings.
-max-args = 11
+max-args = 12

@@ -1,6 +1,5 @@
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -158,6 +157,7 @@ def test_start_application_builds_the_gui_and_runs_the_main_loop(controller):
 
     mock_display_cls.assert_called_once_with(
         process_callback=controller.controller.handle_process_inventory,
+        process_all_callback=controller.controller.handle_process_all_inventories,
         read_file_callback=controller.file_io.read_text_file,
         check_for_updates_callback=controller.controller.handle_check_for_updates,
         view_patch_notes_callback=controller.controller.handle_view_patch_notes,
@@ -488,34 +488,18 @@ def test_handle_view_patch_notes_reports_when_there_are_no_notes(controller):
 
 def test_run_integration_test_processes_every_inventory_with_all_columns(controller):
     """
-    Tests that the headless path includes every column and hands the processor
-    each inventory PDF the file I/O controller lists, routing status to stdout
-    rather than the results file so the CI diff stays deterministic
+    Tests that the headless path includes every column and runs the processor's
+    shared process-all loop, routing status to stdout rather than the results file
+    so the CI diff stays deterministic
 
     Args:
         controller (pytest.fixture): Test fixture building the controller with all
             of its collaborators mocked
     """
 
-    controller.file_io.list_inventory_files.return_value = [
-        Path("InventoryAvailability/Inventory 01222024.pdf"),
-        Path("InventoryAvailability/Inventory 02222024.pdf"),
-    ]
-
     controller.controller.run_integration_test()
 
-    assert controller.processor.process_inventory.call_args_list == [
-        call(
-            str(Path("InventoryAvailability/Inventory 01222024.pdf")),
-            all_columns_selected(),
-            print,
-        ),
-        call(
-            str(Path("InventoryAvailability/Inventory 02222024.pdf")),
-            all_columns_selected(),
-            print,
-        ),
-    ]
+    controller.processor.process_all_inventories.assert_called_once_with(all_columns_selected(), print)
 
 
 def test_run_integration_test_routes_errors_away_from_the_default_reporter(controller):
@@ -555,6 +539,30 @@ def test_handle_process_inventory_routes_status_to_the_output_box(controller):
 
     controller.processor.process_inventory.assert_called_once_with(
         "Inventory 01222024.pdf",
+        checkbox_dict,
+        controller.controller.display.write_output,
+    )
+    assert result is True
+
+
+def test_handle_process_all_inventories_routes_status_to_the_output_box(controller):
+    """
+    Tests that the GUI's process-all callback runs the same loop the headless path
+    does, with status directed at the display's output box, and hands back its
+    result
+
+    Args:
+        controller (pytest.fixture): Test fixture building the controller with all
+            of its collaborators mocked
+    """
+
+    controller.controller.display = MagicMock()
+    controller.processor.process_all_inventories.return_value = True
+    checkbox_dict = all_columns_selected()
+
+    result = controller.controller.handle_process_all_inventories(checkbox_dict)
+
+    controller.processor.process_all_inventories.assert_called_once_with(
         checkbox_dict,
         controller.controller.display.write_output,
     )

@@ -1,6 +1,6 @@
 from source.inventory_entry import InventoryEntry
 
-# One inventory row as PdfTableParser hands it over: the part, description and UOM
+# One inventory row as pdf_table_parser hands it over: the part, description and UOM
 # as strings, the eight quantities already converted to numbers. The entry is built
 # straight from it, so the field order below is the constructor's argument order.
 PARSED_ROW = ["PART-A", "WIDGET ONE", "ea", 100, 5, 0, 0, 95, 20, 5, 0]
@@ -54,7 +54,7 @@ def test_inventory_entry_initialization_with_arguments():
 
 def test_inventory_entry_initialization_from_a_parsed_row():
     """
-    Tests that a row from PdfTableParser expands positionally into the constructor,
+    Tests that a row from pdf_table_parser expands positionally into the constructor,
     landing each field in declaration order and filling the entry completely
     """
 

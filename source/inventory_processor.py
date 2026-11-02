@@ -5,7 +5,7 @@ from pathlib import Path
 from source.constants import INVENTORY_DIR
 from source.inventory_app_file_io import InventoryAppFileIO
 from source.inventory_entry import InventoryEntry
-from source.pdf_table_parser import ParsedRow, PdfTableParser
+from source.pdf_table_parser import ParsedRow, parse_inventory_page, parse_turnover_page
 from source.spreadsheet_writer import SpreadsheetWriter
 from source.turnover_entry import TurnoverEntry
 
@@ -25,9 +25,6 @@ class InventoryProcessor:
         # File I/O controller used for every read and write this class performs
         self.file_io = file_io
 
-        # Parser that turns page text into the rows the entry classes are built from
-        self.parser = PdfTableParser()
-
     def process_inventory_file(self, filepath: str) -> list[InventoryEntry]:
         """
         Processes an inventory PDF by parsing every page into rows, then converting
@@ -40,7 +37,7 @@ class InventoryProcessor:
             A list of InventoryEntry objects for the file's inventory entries
         """
 
-        rows = self._parse_pdf(filepath, "inventory", "Inventory", self.parser.parse_inventory_page)
+        rows = self._parse_pdf(filepath, "inventory", "Inventory", parse_inventory_page)
 
         # Each row holds one field per column in declaration order, so it expands
         # straight into the constructor
@@ -58,7 +55,7 @@ class InventoryProcessor:
             A list of TurnoverEntry objects for the file's turnover entries
         """
 
-        rows = self._parse_pdf(filepath, "turnover", "turnover report", self.parser.parse_turnover_page)
+        rows = self._parse_pdf(filepath, "turnover", "turnover report", parse_turnover_page)
 
         turnover_table = [TurnoverEntry(*row) for row in rows]
 
@@ -72,7 +69,7 @@ class InventoryProcessor:
         filepath: str | Path,
         file_label: str,
         pages_label: str,
-        parse_page: Callable[[str, list[ParsedRow]], list[ParsedRow]],
+        parse_page: Callable[[str, list[ParsedRow]], None],
     ) -> list[ParsedRow]:
         """
         Reads a PDF, logs its name and page count to the results file, and parses
@@ -82,7 +79,8 @@ class InventoryProcessor:
             filepath: The path to the PDF to be opened and parsed
             file_label: How the file is named in the "Processing ... file" line
             pages_label: How the file is named in the "Number of Pages in ..." line
-            parse_page: The parser method that extends the rows with one page's rows
+            parse_page: The parser function that extends the rows in place with one
+                page's rows
 
         Returns:
             Every row parsed out of the PDF, one field per column
@@ -97,9 +95,9 @@ class InventoryProcessor:
 
         # Parse every page before building entries, since a row's part or
         # description may wrap from the bottom of one page onto the top of the next
-        rows = []
+        rows: list[ParsedRow] = []
         for page in pages:
-            rows = parse_page(page, rows)
+            parse_page(page, rows)
 
         return rows
 

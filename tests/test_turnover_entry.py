@@ -1,6 +1,6 @@
 from source.turnover_entry import TurnoverEntry
 
-# One turnover "Totals:" row as PdfTableParser hands it over: the part label as a
+# One turnover "Totals:" row as pdf_table_parser hands it over: the part label as a
 # string, the four numeric columns already converted. Units sold is whole while the
 # averages are fractional, which is why each cell is typed by what it says rather
 # than by which column it came from.
@@ -50,7 +50,7 @@ def test_turnover_entry_initialization_with_arguments():
 
 def test_turnover_entry_initialization_from_a_parsed_row():
     """
-    Tests that a row from PdfTableParser expands positionally into the constructor,
+    Tests that a row from pdf_table_parser expands positionally into the constructor,
     landing each field in declaration order
     """
 

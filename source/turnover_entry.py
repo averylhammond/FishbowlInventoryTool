@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 # TurnoverEntry class to hold all attributes of the TurnoverEntry that
-# passes to the .xlsx file. The values arrive from PdfTableParser already converted
+# passes to the .xlsx file. The values arrive from pdf_table_parser already converted
 # to numbers; the three averages default to None because the report leaves them
 # blank where the part's turnover is undefined. Every field has a default, so
 # TurnoverEntry() default-constructs while callers may also build one straight from

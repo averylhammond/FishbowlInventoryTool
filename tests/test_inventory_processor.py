@@ -15,40 +15,40 @@ from source.inventory_processor import InventoryProcessor
 def processor():
     """
     Builds an InventoryProcessor with its injected file I/O controller mocked and
-    the parser it builds itself replaced, so no PDF is read and no spreadsheet is
+    the two page parsers it calls replaced, so no PDF is read and no spreadsheet is
     written.
 
     Returns:
         types.SimpleNamespace: Holds the constructed processor (`processor`), the
-            mocked file I/O controller (`file_io`) and the mocked parser (`parser`,
-            with its patched class as `parser_cls`)
+            mocked file I/O controller (`file_io`) and the mocked page parsers
+            (`parse_inventory_page`, `parse_turnover_page`)
     """
 
-    with patch("source.inventory_processor.PdfTableParser") as mock_parser_cls:
+    with (
+        patch("source.inventory_processor.parse_inventory_page") as mock_parse_inventory_page,
+        patch("source.inventory_processor.parse_turnover_page") as mock_parse_turnover_page,
+    ):
         mock_file_io = MagicMock(spec=InventoryAppFileIO)
 
         yield SimpleNamespace(
             processor=InventoryProcessor(file_io=mock_file_io),
             file_io=mock_file_io,
-            parser=mock_parser_cls.return_value,
-            parser_cls=mock_parser_cls,
+            parse_inventory_page=mock_parse_inventory_page,
+            parse_turnover_page=mock_parse_turnover_page,
         )
 
 
-def test_init_holds_the_injected_file_io_and_builds_the_parser(processor):
+def test_init_holds_the_injected_file_io(processor):
     """
     Tests that the processor works through the file I/O controller it was handed
-    rather than one of its own, and builds the parser it delegates page text to
+    rather than one of its own
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     assert processor.processor.file_io is processor.file_io
-
-    processor.parser_cls.assert_called_once_with()
-    assert processor.processor.parser is processor.parser
 
 
 def test_process_inventory_file_parses_every_page_before_building_entries(processor):
@@ -58,26 +58,34 @@ def test_process_inventory_file_parses_every_page_before_building_entries(proces
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.read_pdf.return_value = ["page one", "page two"]
+    page_rows = {
+        "page one": ["PART-A", "WIDGET", "ea", 1, 0, 0, 0, 1, 0, 0, 0],
+        "page two": ["PART-B", "GADGET", "ea", 2, 0, 0, 0, 2, 0, 0, 0],
+    }
 
-    # Each call returns the rows accumulated so far, as the real parser does
-    processor.parser.parse_inventory_page.side_effect = [
-        [["PART-A", "WIDGET", "ea", 1, 0, 0, 0, 1, 0, 0, 0]],
-        [
-            ["PART-A", "WIDGET", "ea", 1, 0, 0, 0, 1, 0, 0, 0],
-            ["PART-B", "GADGET", "ea", 2, 0, 0, 0, 2, 0, 0, 0],
-        ],
-    ]
+    # The list is extended in place, so call_args would show only its final state;
+    # record what each page was handed at the moment it was called instead
+    seen = []
+
+    def parse_page(page, rows):
+        seen.append((page, list(rows), rows))
+        rows.append(page_rows[page])
+
+    processor.parse_inventory_page.side_effect = parse_page
 
     inventory = processor.processor.process_inventory_file("Inventory.pdf")
 
-    assert processor.parser.parse_inventory_page.call_args_list == [
-        call("page one", []),
-        call("page two", [["PART-A", "WIDGET", "ea", 1, 0, 0, 0, 1, 0, 0, 0]]),
+    assert [(page, snapshot) for page, snapshot, _rows in seen] == [
+        ("page one", []),
+        ("page two", [page_rows["page one"]]),
     ]
+
+    # Every page extends the one running list, so a wrapped row can reach back
+    assert seen[0][2] is seen[1][2]
 
     # One entry per parsed row, built in the parser's column order
     assert [entry.part for entry in inventory] == ["PART-A", "PART-B"]
@@ -90,11 +98,10 @@ def test_process_inventory_file_logs_the_bare_filename(processor):
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.read_pdf.return_value = ["page one"]
-    processor.parser.parse_inventory_page.return_value = []
 
     processor.processor.process_inventory_file("C:/Some/Absolute/Path/Inventory 01222024.pdf")
 
@@ -110,14 +117,16 @@ def test_process_turnover_file_writes_each_entry_to_the_results_file(processor):
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.read_pdf.return_value = ["page one"]
-    processor.parser.parse_turnover_page.return_value = [
-        ["PART-A", 10, 5.0, 2.0, 1.5],
-        ["PART-B", 20, 6.0, 3.0, 2.5],
-    ]
+    processor.parse_turnover_page.side_effect = lambda _page, rows: rows.extend(
+        [
+            ["PART-A", 10, 5.0, 2.0, 1.5],
+            ["PART-B", 20, 6.0, 3.0, 2.5],
+        ]
+    )
 
     turnover = processor.processor.process_turnover_file(Path("Turnover.pdf"))
 
@@ -138,7 +147,7 @@ def test_process_inventory_writes_the_spreadsheet_and_reports_success(processor)
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = [
@@ -187,7 +196,7 @@ def test_process_inventory_starts_each_turnover_report_after_the_last(width, pro
     Args:
         width (int): The number of columns each turnover report occupies
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = [
@@ -229,7 +238,7 @@ def test_process_inventory_sizes_the_turnover_columns_to_the_inventory(processor
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = [Path("TurnoverReports/January.pdf")]
@@ -261,7 +270,7 @@ def test_process_inventory_derives_the_output_name_from_the_pdf_name(processor):
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = []
@@ -285,7 +294,7 @@ def test_process_inventory_falls_back_to_a_generic_output_name(processor):
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = []
@@ -307,7 +316,7 @@ def test_process_inventory_reports_and_returns_false_on_an_unreadable_pdf(proces
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     report_status = MagicMock()
@@ -330,7 +339,7 @@ def test_process_inventory_reports_and_returns_false_when_the_workbook_fails(
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.create_workbook.return_value = None
@@ -354,7 +363,7 @@ def test_process_inventory_reports_and_returns_false_when_the_save_fails(process
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_turnover_files.return_value = []
@@ -379,7 +388,7 @@ def test_process_all_inventories_processes_every_listed_inventory_in_order(proce
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_inventory_files.return_value = [
@@ -410,7 +419,7 @@ def test_process_all_inventories_keeps_going_past_a_failure(processor):
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_inventory_files.return_value = [
@@ -432,7 +441,7 @@ def test_process_all_inventories_reports_and_returns_false_with_no_inventories(p
 
     Args:
         processor (pytest.fixture): Test fixture building the processor with its
-            file I/O controller and parser mocked
+            file I/O controller and parsers mocked
     """
 
     processor.file_io.list_inventory_files.return_value = []

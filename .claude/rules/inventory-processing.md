@@ -9,16 +9,16 @@ paths:
 
 # Inventory parsing and file I/O
 
-The pipeline is: `InventoryAppFileIO.read_pdf()` hands page text to `PdfTableParser`, which
-returns positional field lists; `InventoryProcessor` maps those onto `InventoryEntry` /
+The pipeline is: `InventoryAppFileIO.read_pdf()` hands page text to the `pdf_table_parser`
+functions, which append positional field lists to a running list of rows; `InventoryProcessor` maps those onto `InventoryEntry` /
 `TurnoverEntry` objects, writes each entry's `to_formatted_string()` into the results file, and
 drives `SpreadsheetWriter` (see `rules/spreadsheet.md`) to produce the `.xlsx`.
 
 ## `InventoryProcessor`
 
 The whole inventory-processing pipeline, mirroring `InvoiceProcessor` in the sibling. It takes
-the `InventoryAppFileIO` controller as its only constructor argument and builds its own
-`PdfTableParser`; it has no reference to the controller, the display or the argument provider,
+the `InventoryAppFileIO` controller as its only constructor argument and calls the
+`pdf_table_parser` functions directly; it has no reference to the controller, the display or the argument provider,
 and user-facing status reaches the caller only through an injected callback.
 
 - `process_inventory(inventory_pdf_path, checkbox_dict, report_status)` — the shared per-file
@@ -37,7 +37,7 @@ and user-facing status reaches the caller only through an injected callback.
   directory is reported and returns `False`. The file listing stays in `InventoryAppFileIO`; the
   sibling's version iterates the folder inside its display, which is the pattern to avoid.
 - `process_inventory_file` and `process_turnover_file` source page text from
-  `InventoryAppFileIO.read_pdf()`, delegate column parsing to `PdfTableParser`, and map the
+  `InventoryAppFileIO.read_pdf()`, delegate column parsing to `pdf_table_parser`, and map the
   resulting rows onto the entry classes. **Every page is parsed before any entry is built**,
   because a row's part or description can wrap from the bottom of one page onto the top of the
   next. The read, the two header log lines and the page loop are shared in `_parse_pdf()`, which
@@ -52,12 +52,19 @@ and user-facing status reaches the caller only through an injected callback.
   under `source/`; #57 replaced that with an explicit import, which is why `F403`/`F405` have
   no subject left in this repo.
 
-## `PdfTableParser`
+## `pdf_table_parser`
 
 Turns one page of layout-extracted text into positional field lists, with no knowledge of the
-filesystem, `pypdf`, the entry classes or the GUI. `parse_inventory_page(page, rows)` and
-`parse_turnover_page(page, rows)` each take the rows parsed so far and return them extended, so a
-row wrapped across a page boundary can be folded back into the row it continues.
+filesystem, `pypdf`, the entry classes or the GUI. It holds no state, so it is **module-level
+functions, not a class** — the same shape as the sibling's `processor_utilities.py` (#62 removed
+the `PdfTableParser` class, which nothing needed to construct).
+
+`parse_inventory_page(page, rows)` and `parse_turnover_page(page, rows)` **extend `rows` in place
+and return `None`**. The caller passes the same list in for every page, because a row wrapped
+across a page boundary is folded back into the row it continues — which means amending
+`rows[-1]`, an inner list from the previous page. Returning a "new" list would still share those
+inner rows unless every page deep-copied them, so in-place is the honest contract; do not
+reintroduce `rows = parse_page(page, rows)`. `test_*_extends_the_rows_it_is_given_in_place` pins it.
 
 - `align_to_columns()` assigns each numeric value to the column whose header right edge it lines
   up with, so a column the report leaves blank stays blank instead of shifting every later value
@@ -68,8 +75,8 @@ row wrapped across a page boundary can be folded back into the row it continues.
   spreadsheet gets numeric cells Excel will sort and sum. A cell that is not a number (the
   numeric pattern also matches a stray `-`) is handed back unconverted rather than failing the
   report.
-- `CONTINUATION_SEPARATOR` and `ParsedRow` are **module-level** names, not attributes of the
-  class. `CONTINUATION_SEPARATOR` is the single knob for how the fragments of a part or
+- `CONTINUATION_SEPARATOR` and `ParsedRow` are module-level names alongside the functions.
+  `CONTINUATION_SEPARATOR` is the single knob for how the fragments of a part or
   description wrapped across several lines are rejoined; it is a space, matching how the report
   reads. Set it to `""` to concatenate with nothing between.
 
@@ -132,7 +139,7 @@ everything else here. Errors are never written *into* the results file; they go 
   parity rather than because anything mutates them — nothing does), the field block wrapped in
   `# fmt:off` / `# fmt:on` with a trailing comment per field, and exactly two things in the class
   body. There is deliberately no `__post_init__` and no `populate*` method: converting the
-  report's text into fields is `PdfTableParser`'s job.
+  report's text into fields is `pdf_table_parser`'s job.
 - **Field names and results-file labels are decoupled on purpose.** Fields are snake_case
   (`on_hand`, `part_description`) while `to_formatted_string()` prints the labels the report and
   the canonical results file use (`onHand:`, `partDescription:`). Renaming a field must not

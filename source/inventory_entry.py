@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 # InventoryEntry class to hold all attributes of the InventoryEntry that
-# passes to the .xlsx file. The quantities arrive from PdfTableParser already
+# passes to the .xlsx file. The quantities arrive from pdf_table_parser already
 # converted to numbers, so they reach the spreadsheet as numeric cells. The fields
 # below are exactly one parsed row, in the parser's column order, so a caller may
 # build one straight from a row with InventoryEntry(*row). Every field also has a

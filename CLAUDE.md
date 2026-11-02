@@ -69,8 +69,10 @@ guidance here to name the open issue behind anything that has not caught up yet.
 
 ## CI
 
-Five workflows in `.github/workflows/`: unit tests, code coverage, lint and integration tests on
-`ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by `fail_under` in
+Five workflows in `.github/workflows/`: unit tests, lint and integration tests on `ubuntu-24.04`,
+code coverage on `ubuntu-latest`, releases on `windows-latest`. The three `3.11.9` jobs pin the
+runner image because `setup-python` has no 3.11.9 build for Ubuntu 26.04, which `ubuntu-latest`
+now resolves to — see `.claude/rules/ci.md`. Coverage is gated at **90%** by `fail_under` in
 `pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
 `code-coverage.yml`. The lint job fails on any `ruff check` finding or any formatting
 difference — the gate is the whole rule set, not a subset.
@@ -106,7 +108,7 @@ matching `vX.Y.Z` tag.** Details in `.claude/rules/ci.md`.
 | `source/inventory_app_controller.py` | Entry-point glue: builds the collaborators, gates the GUI half behind the headless check, owns `handle_process_inventory()`, `handle_process_all_inventories()` (run on a daemon worker thread that reaches the display only through `after(0, …)`) and `run_integration_test()` (synchronous), and the patch-notes feature |
 | `source/inventory_app_file_io.py` | All file I/O: inventory/turnover PDFs via pypdf (one string per page), text files for the View menu, listing input files, the workbook lifecycle, and the `logs/` results file |
 | `source/inventory_processor.py` | The processing pipeline: parse one inventory PDF, build the entries, drive the spreadsheet writers, append every turnover report; plus the process-all loop the GUI button and headless mode share |
-| `source/pdf_table_parser.py` | Parsing only: layout-extracted page text → positional field lists (`align_to_columns`, `to_number`) |
+| `source/pdf_table_parser.py` | Parsing only, as module functions: layout-extracted page text → positional field lists, appended in place to the caller's rows (`parse_inventory_page`, `parse_turnover_page`, `align_to_columns`, `to_number`) |
 | `source/inventory_entry.py` / `source/turnover_entry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
 | `source/columns.py` | The `(key, label, field, always, tooltip)` record for every selectable column, and `all_columns_selected()` |
 | `source/spreadsheet_writer.py` | All `xlsxwriter` output: the `SpreadsheetWriter` class, built once around the open workbook |
@@ -153,7 +155,7 @@ Three responsibilities worth knowing before touching them:
 - Prefer extending behavior through a `columns.py` entry, or new theme/font data upstream, over
   adding `if/elif` branches to existing parsing and display methods.
 - Pass a class only the narrow dependencies it needs — `InventoryProcessor` takes the
-  `InventoryAppFileIO` controller and builds its own parser; the display takes callbacks, never
+  `InventoryAppFileIO` controller and calls the stateless parser functions directly; the display takes callbacks, never
   the controller. Avoid god objects in constructors.
 - New logic goes in the class that owns that concern, not bolted onto `InventoryAppController`. If
   a method is doing two distinct jobs (parsing *and* formatting), split it.
@@ -166,7 +168,7 @@ Three responsibilities worth knowing before touching them:
   out — `list[str]`, `dict[str, bool]`, `tuple[Column, ...]` — since a bare `list` tells a
   reader as little as no annotation at all. Use `X | None`, never `Optional[X]`. Where a union
   would be spelled out twice in one signature, name it once at module scope instead, as
-  `PdfTableParser`'s `ParsedRow` does.
+  `pdf_table_parser`'s `ParsedRow` does.
 - **The annotation is the only place a type is written.** Under `source/`, an `Args:` entry is
   `name: description` and a `Returns:` block is the description alone, with no parenthesized or
   prefixed type repeating the signature. Under `tests/` the docstring type stays, since test

@@ -27,9 +27,10 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
 
 - **`tests/test_inventory_app_file_io.py`** — a class with collaborators and I/O. Follow it for the
   mocking and error-path conventions below.
-- **`tests/test_pdf_table_parser.py`** — pure logic with no collaborators, so nothing is mocked and
-  the fixture just constructs the object. Follow it for parser-style tests, including the
-  synthetic-fixture rule below.
+- **`tests/test_pdf_table_parser.py`** — pure module functions with no collaborators, so nothing
+  is mocked and there is no fixture: each test builds its page, calls the function and asserts on
+  the `rows` list it passed in, since the page parsers extend that list in place and return
+  `None`. Follow it for parser-style tests, including the synthetic-fixture rule below.
 - **`tests/test_inventory_entry.py` / `tests/test_turnover_entry.py`** — dataclasses, so there is no
   fixture at all: each test constructs the object it needs. Cover the defaults, a subset of
   keyword arguments, positional construction from a `PARSED_ROW` module constant shaped like the
@@ -58,8 +59,10 @@ Mirror these (and the sibling's `tests/` suite) rather than inventing new patter
   column/data desync fails loudly instead of matching by coincidence.
 - **`tests/test_inventory_processor.py`** — a class whose collaborator is injected rather than
   constructed, so the file I/O controller is a `MagicMock(spec=InventoryAppFileIO)` handed to the
-  constructor while the `PdfTableParser` the processor builds itself is patched at
-  `source.inventory_processor.PdfTableParser`. The `spec=` is safe only because the processor never
+  constructor while the two page parsers it imports are patched at
+  `source.inventory_processor.parse_inventory_page` / `parse_turnover_page`. Those mutate the list
+  they are handed, so a test that cares what each page saw records a snapshot from a `side_effect`
+  rather than reading `call_args_list`, which would show only the list's final state. The `spec=` is safe only because the processor never
   touches `report_error`, which is an instance attribute a spec'd mock would reject. The
   spreadsheet writer is imported by name, so `source.inventory_processor.SpreadsheetWriter` is
   the point of use; a test drives the mocked class's `return_value` to stand in for the writer
@@ -202,8 +205,8 @@ real filesystem, a real PDF, or the GUI.
   needs a differently-constructed object its arguments through indirect parametrization rather
   than a `_build_window(...)`-style helper function. The helper form left this repo with the
   shared subwindow classes; do not reintroduce it. The exception is a module with no object to
-  build: `test_inventory_entry.py`, `test_turnover_entry.py` and `test_columns.py` have no fixture
-  at all.
+  build: `test_inventory_entry.py`, `test_turnover_entry.py`, `test_columns.py` and
+  `test_pdf_table_parser.py` have no fixture at all.
 - Keep the tests for one method together and in the order the methods appear in the module —
   the grouping the `###`-bordered banners used to mark before they were removed — and give
   each test a docstring describing what it verifies with an `Args:` block documenting every

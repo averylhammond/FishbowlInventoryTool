@@ -42,191 +42,183 @@ CONTINUATION_SEPARATOR = " "
 # One parsed table row: the leading text cells exactly as the report printed them,
 # then one converted value per numeric column -- None where the report printed
 # nothing, and the raw token where it printed something to_number cannot convert.
-# Named so the two page parsers can declare what they hand back without spelling
-# the union out twice per signature.
+# Named so the two page parsers can declare the rows they extend without spelling
+# the union out in each signature.
 ParsedRow = list[str | int | float | None]
 
 
-# PdfTableParser class to turn layout-extracted PDF page text into the positional
-# field lists the entry data classes are constructed from
-class PdfTableParser:
-    def parse_inventory_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
-        """
-        Parses one inventory availability page onto the running list of rows. A row
-        whose part or description wrapped across several lines is folded back into
-        the row it continues, which may sit on the previous page, so the caller
-        passes the rows parsed so far back in.
+def parse_inventory_page(page: str, rows: list[ParsedRow]) -> None:
+    """
+    Parses one inventory availability page onto the running list of rows,
+    extending that list in place rather than returning a new one. A row whose
+    part or description wrapped across several lines is folded back into the row
+    it continues, which may sit on the previous page, so the caller passes the
+    same list in for every page and that earlier row is amended where it lies.
 
-        Args:
-            page: Layout-extracted text for a single page
-            rows: The rows parsed so far
+    Args:
+        page: Layout-extracted text for a single page
+        rows: The rows parsed so far, each one a list of [part, description, uom,
+            on_hand, allocated, not_available, drop_ship, available, on_order,
+            committed, short], the quantities as numbers
+    """
 
-        Returns:
-            The rows parsed so far plus this page's, each one a list of
-            [part, description, uom, on_hand, allocated, not_available, drop_ship,
-            available, on_order, committed, short], the quantities as numbers
-        """
+    lines = page.splitlines()
 
-        lines = page.splitlines()
+    # Column offsets drift by a character or two from page to page, so they are
+    # re-read from each page's own header rather than hardcoded
+    header_index = next(
+        (i for i, line in enumerate(lines) if INVENTORY_HEADER.match(line)),
+        None,
+    )
+    if header_index is None:
+        return
 
-        # Column offsets drift by a character or two from page to page, so they are
-        # re-read from each page's own header rather than hardcoded
-        header_index = next(
-            (i for i, line in enumerate(lines) if INVENTORY_HEADER.match(line)),
-            None,
+    header = lines[header_index]
+    description_column = header.index("Description")
+
+    # Some inventory reports omit the UOM column; the header says which
+    has_uom_column = "UOM" in header
+    trailing_columns = INVENTORY_NUMERIC_COLUMNS + (1 if has_uom_column else 0)
+
+    for line in lines[header_index + 1 :]:
+        # The date/page stamp closes the table, and blank lines pad up to it
+        if PAGE_FOOTER.search(line):
+            break
+        if not line.strip():
+            continue
+
+        # Splitting Part from the rest at the Description offset rather than on
+        # the gap between them keeps a part number that itself contains a run of
+        # spaces ('3/4"  BLANK HINGE') in one piece
+        part = line[:description_column].strip()
+        fields = [field for field in COLUMN_GAP.split(line[description_column:].strip()) if field]
+
+        # A full row carries a description plus every trailing column; a
+        # continuation line carries only a fragment of the wrapped text
+        if len(fields) > trailing_columns:
+            split = len(fields) - trailing_columns
+
+            # Rejoin a description that itself contained a run of spaces
+            description = " ".join(fields[:split])
+            trailing = fields[split:]
+
+            # Hold the field positions steady for reports with no UOM column
+            if not has_uom_column:
+                trailing.insert(0, "")
+
+            # UOM is a label; everything after it is a quantity
+            uom, *numbers = trailing
+            rows.append([part, description, uom] + [to_number(number) for number in numbers])
+
+        elif rows:
+            if part:
+                rows[-1][0] += CONTINUATION_SEPARATOR + part
+            if fields:
+                rows[-1][1] += CONTINUATION_SEPARATOR + fields[0]
+
+
+def parse_turnover_page(page: str, rows: list[ParsedRow]) -> None:
+    """
+    Parses one turnover report page onto the running list of rows, extending that
+    list in place with a row for each part's "Totals:" line, the same way
+    parse_inventory_page does
+
+    Args:
+        page: Layout-extracted text for a single page
+        rows: The rows parsed so far, each one a list of [part_description,
+            units_sold, avg_qoh, avg_to_days, to_rate], the trailing four as
+            numbers
+    """
+
+    lines = page.splitlines()
+
+    header = next((line for line in lines if TURNOVER_HEADER.search(line)), None)
+    if header is None:
+        return
+
+    column_ends = [header.index(label) + len(label) for label in TURNOVER_COLUMN_LABELS]
+    numbers_column = header.index(TURNOVER_COLUMN_LABELS[0])
+
+    for index, line in enumerate(lines):
+        match = TOTALS_ROW.match(line)
+        if match is None:
+            continue
+
+        label = match.group("label").strip()
+        if label == GRAND_TOTAL_LABEL:
+            continue
+
+        numbers = match.group("numbers")
+        values = align_to_columns(numbers, column_ends, len(line) - len(numbers))
+
+        # A part name long enough to wrap pushes "Totals:" onto a line of its
+        # own, leaving the values on the line above alongside the first half of
+        # the name
+        if not any(values) and index > 0:
+            wrapped = lines[index - 1]
+            values = align_to_columns(wrapped[numbers_column:], column_ends, numbers_column)
+            label = f"{wrapped[:numbers_column].strip()} {label}".strip()
+
+        # Convert only once the wrapped-row check above is done, since that check
+        # reads the values as the strings align_to_columns produced
+        rows.append([label] + [to_number(value) for value in values])
+
+
+def align_to_columns(text: str, column_ends: list[int], offset: int) -> list[str]:
+    """
+    Assigns each value in a row's numeric region to the column its right edge
+    lines up with. Matching edges rather than counting values off the end of the
+    row keeps a column the report left blank blank, instead of shifting every
+    later value one column to the left.
+
+    Args:
+        text: The slice of the line holding the numeric columns
+        column_ends: End offset of each column's header label
+        offset: Offset of text within its line, so a value's right edge can be
+            compared against the header's
+
+    Returns:
+        One value per column, "" wherever the report printed nothing
+    """
+
+    values = [""] * len(column_ends)
+
+    for value in NUMERIC_VALUE.finditer(text):
+        right_edge = value.end() + offset
+        column = min(
+            range(len(column_ends)),
+            key=lambda index: abs(column_ends[index] - right_edge),
         )
-        if header_index is None:
-            return rows
+        values[column] = value.group()
 
-        header = lines[header_index]
-        description_column = header.index("Description")
+    return values
 
-        # Some inventory reports omit the UOM column; the header says which
-        has_uom_column = "UOM" in header
-        trailing_columns = INVENTORY_NUMERIC_COLUMNS + (1 if has_uom_column else 0)
 
-        for line in lines[header_index + 1 :]:
-            # The date/page stamp closes the table, and blank lines pad up to it
-            if PAGE_FOOTER.search(line):
-                break
-            if not line.strip():
-                continue
+def to_number(text: str) -> int | float | str | None:
+    """
+    Converts one numeric cell of the report into the number it holds, dropping
+    the thousands separators the report prints inside it. The cell is typed by
+    what it says rather than by which column it came from, so a column mixing
+    whole and fractional values keeps each one as written.
 
-            # Splitting Part from the rest at the Description offset rather than on
-            # the gap between them keeps a part number that itself contains a run of
-            # spaces ('3/4"  BLANK HINGE') in one piece
-            part = line[:description_column].strip()
-            fields = [field for field in COLUMN_GAP.split(line[description_column:].strip()) if field]
+    Args:
+        text: The cell as the report printed it
 
-            # A full row carries a description plus every trailing column; a
-            # continuation line carries only a fragment of the wrapped text
-            if len(fields) > trailing_columns:
-                split = len(fields) - trailing_columns
+    Returns:
+        An int for a cell holding no decimal point and a float for one that does;
+        None for a cell the report left blank, keeping that distinct from a value
+        of zero; or the cell unconverted when it holds a token that is neither
+    """
 
-                # Rejoin a description that itself contained a run of spaces
-                description = " ".join(fields[:split])
-                trailing = fields[split:]
+    text = text.replace(",", "")
 
-                # Hold the field positions steady for reports with no UOM column
-                if not has_uom_column:
-                    trailing.insert(0, "")
+    if not text:
+        return None
 
-                # UOM is a label; everything after it is a quantity
-                uom, *numbers = trailing
-                rows.append([part, description, uom] + [self.to_number(number) for number in numbers])
-
-            elif rows:
-                if part:
-                    rows[-1][0] += CONTINUATION_SEPARATOR + part
-                if fields:
-                    rows[-1][1] += CONTINUATION_SEPARATOR + fields[0]
-
-        return rows
-
-    def parse_turnover_page(self, page: str, rows: list[ParsedRow]) -> list[ParsedRow]:
-        """
-        Parses one turnover report page onto the running list of rows, adding a row
-        for each part's "Totals:" line
-
-        Args:
-            page: Layout-extracted text for a single page
-            rows: The rows parsed so far
-
-        Returns:
-            The rows parsed so far plus this page's, each one a list of
-            [part_description, units_sold, avg_qoh, avg_to_days, to_rate], the
-            trailing four as numbers
-        """
-
-        lines = page.splitlines()
-
-        header = next((line for line in lines if TURNOVER_HEADER.search(line)), None)
-        if header is None:
-            return rows
-
-        column_ends = [header.index(label) + len(label) for label in TURNOVER_COLUMN_LABELS]
-        numbers_column = header.index(TURNOVER_COLUMN_LABELS[0])
-
-        for index, line in enumerate(lines):
-            match = TOTALS_ROW.match(line)
-            if match is None:
-                continue
-
-            label = match.group("label").strip()
-            if label == GRAND_TOTAL_LABEL:
-                continue
-
-            numbers = match.group("numbers")
-            values = self.align_to_columns(numbers, column_ends, len(line) - len(numbers))
-
-            # A part name long enough to wrap pushes "Totals:" onto a line of its
-            # own, leaving the values on the line above alongside the first half of
-            # the name
-            if not any(values) and index > 0:
-                wrapped = lines[index - 1]
-                values = self.align_to_columns(wrapped[numbers_column:], column_ends, numbers_column)
-                label = f"{wrapped[:numbers_column].strip()} {label}".strip()
-
-            # Convert only once the wrapped-row check above is done, since that check
-            # reads the values as the strings align_to_columns produced
-            rows.append([label] + [self.to_number(value) for value in values])
-
-        return rows
-
-    def align_to_columns(self, text: str, column_ends: list[int], offset: int) -> list[str]:
-        """
-        Assigns each value in a row's numeric region to the column its right edge
-        lines up with. Matching edges rather than counting values off the end of the
-        row keeps a column the report left blank blank, instead of shifting every
-        later value one column to the left.
-
-        Args:
-            text: The slice of the line holding the numeric columns
-            column_ends: End offset of each column's header label
-            offset: Offset of text within its line, so a value's right edge can be
-                compared against the header's
-
-        Returns:
-            One value per column, "" wherever the report printed nothing
-        """
-
-        values = [""] * len(column_ends)
-
-        for value in NUMERIC_VALUE.finditer(text):
-            right_edge = value.end() + offset
-            column = min(
-                range(len(column_ends)),
-                key=lambda index: abs(column_ends[index] - right_edge),
-            )
-            values[column] = value.group()
-
-        return values
-
-    def to_number(self, text: str) -> int | float | str | None:
-        """
-        Converts one numeric cell of the report into the number it holds, dropping
-        the thousands separators the report prints inside it. The cell is typed by
-        what it says rather than by which column it came from, so a column mixing
-        whole and fractional values keeps each one as written.
-
-        Args:
-            text: The cell as the report printed it
-
-        Returns:
-            An int for a cell holding no decimal point and a float for one that does;
-            None for a cell the report left blank, keeping that distinct from a value
-            of zero; or the cell unconverted when it holds a token that is neither
-        """
-
-        text = text.replace(",", "")
-
-        if not text:
-            return None
-
-        # NUMERIC_VALUE matches runs of digits and punctuation, so a stray token
-        # like "-" can reach here. Handing it back unconverted keeps a malformed
-        # cell out of the numbers instead of failing the whole report over it.
-        try:
-            return float(text) if "." in text else int(text)
-        except ValueError:
-            return text
+    # NUMERIC_VALUE matches runs of digits and punctuation, so a stray token
+    # like "-" can reach here. Handing it back unconverted keeps a malformed
+    # cell out of the numbers instead of failing the whole report over it.
+    try:
+        return float(text) if "." in text else int(text)
+    except ValueError:
+        return text

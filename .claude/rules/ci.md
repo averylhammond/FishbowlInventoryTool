@@ -6,29 +6,39 @@ paths:
 
 # CI workflows
 
-Five workflows live in `.github/workflows/`. All pin Python **3.11.9** (the coverage job floats
-on `3.11`) and install `requirements/dev.txt`, except the lint job — see below.
+Five workflows live in `.github/workflows/`. All pin Python **3.11.9**, cache pip against
+`requirements/dev.txt`, and install that file, except the lint job — see below.
 
 | Workflow | Trigger | Runner | Does |
 | --- | --- | --- | --- |
 | `unit-tests.yml` | PRs to `main`, manual | `ubuntu-24.04` | `pytest tests/` |
 | `lint.yml` | PRs to `main`, manual | `ubuntu-24.04` | `ruff check` and `ruff format --check` |
-| `code-coverage.yml` | PRs to `main`, pushes to `main`, manual | `ubuntu-latest` | `pytest --cov` with the 90% gate, uploads to Codecov |
+| `code-coverage.yml` | PRs to `main`, pushes to `main`, manual | `ubuntu-24.04` | `pytest --cov` with the 90% gate, uploads to Codecov |
 | `integration-tests.yml` | PRs to `main`, manual | `ubuntu-24.04` | Runs the app headless and diffs the output |
 | `release.yml` | pushes of a `v*` tag | `windows-latest` | Verifies, tests, packages and publishes the release |
 
-**The `python-version` values are not consistent.** `unit-tests.yml`, `integration-tests.yml` and
-`release.yml` pin `"3.11.9"` on `actions/setup-python@v4`; `code-coverage.yml` floats on `"3.11"`
-on `@v5` with `cache: 'pip'`. The action-version and cache split is a deliberate mirror of the
-sibling's file; the `3.11` vs `3.11.9` drift is not deliberate — **#66 covers it**, along with the
-missing concurrency group and the `--cov=./` scope.
+**Every workflow pins the same `python-version: "3.11.9"`** (#66), so the coverage gate runs on
+the same interpreter as the tests. `unit-tests.yml`, `integration-tests.yml` and `release.yml` use
+`actions/setup-python@v4`; `code-coverage.yml` and `lint.yml` use `@v5`. That action-version split
+is a deliberate mirror of the sibling's files. Every one sets `cache: 'pip'` with
+`cache-dependency-path: requirements/dev.txt`. The cache saves the PyPI downloads, but not the
+`fishbowl-common` clone: pip does not cache a wheel built from a git tag, because a tag can move.
 
-**The three Linux jobs that pin `"3.11.9"` also pin `runs-on: ubuntu-24.04`.** `setup-python`
-installs an exact patch version only from a prebuilt manifest, and that manifest has no 3.11.9
-for Ubuntu 26.04 — so when `ubuntu-latest` moved to 26.04, those jobs failed at "Set up Python
-environment" before running anything, while coverage (floating on `"3.11"`) stayed green. Do not
-move them back to `ubuntu-latest` without also unpinning the patch version; resolving #66 is the
-point to revisit both together.
+**The four Linux jobs pin `runs-on: ubuntu-24.04`.** `setup-python` installs an exact patch
+version only from a prebuilt manifest, and that manifest has no 3.11.9 for Ubuntu 26.04 — so when
+`ubuntu-latest` moved to 26.04, the pinned jobs failed at "Set up Python environment" before
+running anything. Do not move any of them back to `ubuntu-latest` without also moving the Python
+pin to a version the new image's manifest carries.
+
+**The four non-release workflows share a concurrency group** of
+`${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, so a newer push to a
+PR cancels the run it supersedes. `release.yml` deliberately has none: cancelling a
+half-finished release is worse than letting it run.
+
+**Every workflow declares its `permissions:`** rather than inheriting the repository default:
+`contents: read` on all four test workflows, `contents: write` on `release.yml` so it can create
+the Release. The integration job's submodule checkout uses `CUSTOMER_DATA_PAT`, not
+`GITHUB_TOKEN`, so read-only is enough there too.
 
 Notes that are easy to get wrong:
 
@@ -44,12 +54,13 @@ Notes that are easy to get wrong:
 
 - **The coverage gate is `fail_under = 90` in `pyproject.toml`**, not a workflow flag, so a local
   `pytest --cov` enforces it too. `code-coverage.yml` runs
-  `pytest --cov=./ --cov-report=xml tests/`; the same file's `[tool.coverage.run]` scopes *what*
-  is measured, see `rules/tests.md`. The Codecov upload step is `if: always()` so the report
+  `pytest --cov=source --cov-report=xml tests/`. `--cov=source` states the measured package
+  directly, so `[tool.coverage.run]`'s `omit` list only drops the in-package files that are
+  deliberately unmeasured, see `rules/tests.md`. The Codecov upload step is `if: always()` so the report
   still lands when the gate fails — exactly when the PR comment is most useful. `CODECOV_TOKEN`
   is the upload token, and the extra `push: branches: [main]` trigger exists so Codecov records a
   main-branch baseline for PR diffs; without it the badge never updates.
-- **Every measured module is at 100%** (689 statements, 218 tests), so the 90% gate is headroom
+- **Every measured module is at 100%** (636 statements, 240 tests), so the 90% gate is headroom
   for an in-progress refactor rather than a target to climb toward, and it matches the sibling's.
   Keep it there: a new module landing untested should fail the check,
   not quietly lower the average. Nothing is omitted for being untestable — the inert styling data

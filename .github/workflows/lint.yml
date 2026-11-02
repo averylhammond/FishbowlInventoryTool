@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# Cancel a still-running check when a newer push to the same ref supersedes it
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
 

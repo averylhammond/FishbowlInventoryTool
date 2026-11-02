@@ -38,8 +38,7 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Virtual env: `python -m venv venv`, then `source venv/Scripts/activate` (Windows) or
   `source venv/bin/activate` (Linux/Mac).
 - Install deps: `pip install -r requirements/dev.txt` (pulls in `release.txt` plus
-  pytest/pytest-cov and ruff). CI pins Python `3.11.9`, except the coverage job which floats on
-  `3.11` (#66).
+  pytest/pytest-cov and ruff). Every CI workflow pins Python `3.11.9`.
 
 ## Common Commands
 
@@ -57,7 +56,7 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Run a single test file: `pytest tests/test_inventory_app_file_io.py`
 - Run a single test:
   `pytest tests/test_inventory_app_file_io.py::test_read_pdf_extracts_each_page_in_layout_mode`
-- Run with coverage: `pytest --cov=./ --cov-report=term-missing tests/` — the 90% gate is
+- Run with coverage: `pytest --cov=source --cov-report=term-missing tests/` — the 90% gate is
   `fail_under` in `pyproject.toml`, so it applies locally too
 - Lint: `ruff check .` (add `--fix` to apply the safe fixes, `--statistics` for a summary)
 - Format: `ruff format .` (`--check` to verify without writing, as CI does)
@@ -70,10 +69,11 @@ guidance here to name the open issue behind anything that has not caught up yet.
 
 ## CI
 
-Five workflows in `.github/workflows/`: unit tests, lint and integration tests on `ubuntu-24.04`,
-code coverage on `ubuntu-latest`, releases on `windows-latest`. The three `3.11.9` jobs pin the
-runner image because `setup-python` has no 3.11.9 build for Ubuntu 26.04, which `ubuntu-latest`
-now resolves to — see `.claude/rules/ci.md`. Coverage is gated at **90%** by `fail_under` in
+Five workflows in `.github/workflows/`: unit tests, lint, code coverage and integration tests on
+`ubuntu-24.04`, releases on `windows-latest`. All five pin Python `3.11.9`, and the four Linux
+jobs pin the runner image because `setup-python` has no 3.11.9 build for Ubuntu 26.04, which
+`ubuntu-latest` now resolves to. The four non-release workflows cancel a superseded run through a
+shared concurrency group — see `.claude/rules/ci.md`. Coverage is gated at **90%** by `fail_under` in
 `pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
 `code-coverage.yml`. The lint job fails on any `ruff check` finding or any formatting
 difference — the gate is the whole rule set, not a subset.

@@ -4,6 +4,11 @@ from pathlib import Path
 # application-agnostic and takes the name it shows by injection.
 APP_NAME = "Fishbowl Inventory Tool"
 
+# Window title and default geometry, used as the fallback when no geometry
+# has been persisted yet
+WINDOW_TITLE = "Automated Inventory Processor"
+DEFAULT_WINDOW_GEOMETRY = "700x700"
+
 # Current application version. Single source of truth for the version, kept
 # consistent with application releases and surfaced to the user via Help -> About.
 VERSION = "2.3.0"

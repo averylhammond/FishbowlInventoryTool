@@ -112,7 +112,7 @@ matching `vX.Y.Z` tag.** Details in `.claude/rules/ci.md`.
 | `source/inventory_entry.py` / `source/turnover_entry.py` | Plain data holders for one parsed row, plus `to_formatted_string()` |
 | `source/columns.py` | The `(key, label, field, always, tooltip)` record for every selectable column, and `all_columns_selected()` |
 | `source/spreadsheet_writer.py` | All `xlsxwriter` output: the `SpreadsheetWriter` class, built once around the open workbook |
-| `source/constants.py` | Paths, `APP_NAME`/`VERSION`/`GITHUB_REPO`/`INSTALLER_ASSET_PATTERN`, setting keys |
+| `source/constants.py` | Paths, `APP_NAME`/`VERSION`/`GITHUB_REPO`/`INSTALLER_ASSET_PATTERN`, window title and default geometry, setting keys |
 | `source/gui/inventory_app_display.py` | The `tk.Tk` root: main window, the two checkbox grids and the File/View/Preferences/Help menu bar |
 
 **Everything else is `fishbowl-common`, taken as a pinned git tag.** From the headless half:

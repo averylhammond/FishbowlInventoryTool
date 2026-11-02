@@ -69,8 +69,10 @@ guidance here to name the open issue behind anything that has not caught up yet.
 
 ## CI
 
-Five workflows in `.github/workflows/`: unit tests, code coverage, lint and integration tests on
-`ubuntu-latest`, releases on `windows-latest`. Coverage is gated at **90%** by `fail_under` in
+Five workflows in `.github/workflows/`: unit tests, lint and integration tests on `ubuntu-24.04`,
+code coverage on `ubuntu-latest`, releases on `windows-latest`. The three `3.11.9` jobs pin the
+runner image because `setup-python` has no 3.11.9 build for Ubuntu 26.04, which `ubuntu-latest`
+now resolves to — see `.claude/rules/ci.md`. Coverage is gated at **90%** by `fail_under` in
 `pyproject.toml`, so the gate applies to a local `pytest --cov` exactly as it does in
 `code-coverage.yml`. The lint job fails on any `ruff check` finding or any formatting
 difference — the gate is the whole rule set, not a subset.

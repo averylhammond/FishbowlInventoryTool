@@ -11,10 +11,10 @@ on `3.11`) and install `requirements/dev.txt`, except the lint job — see below
 
 | Workflow | Trigger | Runner | Does |
 | --- | --- | --- | --- |
-| `unit-tests.yml` | PRs to `main`, manual | `ubuntu-latest` | `pytest tests/` |
-| `lint.yml` | PRs to `main`, manual | `ubuntu-latest` | `ruff check` and `ruff format --check` |
+| `unit-tests.yml` | PRs to `main`, manual | `ubuntu-24.04` | `pytest tests/` |
+| `lint.yml` | PRs to `main`, manual | `ubuntu-24.04` | `ruff check` and `ruff format --check` |
 | `code-coverage.yml` | PRs to `main`, pushes to `main`, manual | `ubuntu-latest` | `pytest --cov` with the 90% gate, uploads to Codecov |
-| `integration-tests.yml` | PRs to `main`, manual | `ubuntu-latest` | Runs the app headless and diffs the output |
+| `integration-tests.yml` | PRs to `main`, manual | `ubuntu-24.04` | Runs the app headless and diffs the output |
 | `release.yml` | pushes of a `v*` tag | `windows-latest` | Verifies, tests, packages and publishes the release |
 
 **The `python-version` values are not consistent.** `unit-tests.yml`, `integration-tests.yml` and
@@ -22,6 +22,13 @@ on `3.11`) and install `requirements/dev.txt`, except the lint job — see below
 on `@v5` with `cache: 'pip'`. The action-version and cache split is a deliberate mirror of the
 sibling's file; the `3.11` vs `3.11.9` drift is not deliberate — **#66 covers it**, along with the
 missing concurrency group and the `--cov=./` scope.
+
+**The three Linux jobs that pin `"3.11.9"` also pin `runs-on: ubuntu-24.04`.** `setup-python`
+installs an exact patch version only from a prebuilt manifest, and that manifest has no 3.11.9
+for Ubuntu 26.04 — so when `ubuntu-latest` moved to 26.04, those jobs failed at "Set up Python
+environment" before running anything, while coverage (floating on `"3.11"`) stayed green. Do not
+move them back to `ubuntu-latest` without also unpinning the patch version; resolving #66 is the
+point to revisit both together.
 
 Notes that are easy to get wrong:
 

@@ -18,7 +18,10 @@ jobs:
 
     # Give the job a name to link into the Github Rules UI
     name: Lint CI Check
-    runs-on: ubuntu-latest
+
+    # Pinned rather than ubuntu-latest: setup-python publishes no 3.11.9 build for
+    # Ubuntu 26.04, which ubuntu-latest moved to
+    runs-on: ubuntu-24.04
 
     # Checkout repo. The private submodule holding the test data is deliberately
     # not checked out and no PAT is needed: extend-exclude skips it in any case,

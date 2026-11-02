@@ -18,7 +18,7 @@ jobs:
     # Windows is required here, not just preferred: PyInstaller must produce the Windows
     # executable the app ships as, and Inno Setup's ISCC.exe is Windows-only. This also
     # means the integration test below runs on the shipping platform, unlike the
-    # ubuntu-latest integration-tests.yml check.
+    # ubuntu-24.04 integration-tests.yml check.
     runs-on: windows-latest
 
     # Make sure that windows is using bash shell, since all terminal commands in this job are bash style
@@ -40,6 +40,8 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.11.9"
+        cache: 'pip'
+        cache-dependency-path: requirements/dev.txt
 
     # Install project dependencies (dev set, needed to run the tests below)
     - name: Install dependencies

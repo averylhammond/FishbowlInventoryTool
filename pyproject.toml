@@ -10,10 +10,6 @@ testpaths = ["tests"]
 [tool.coverage.run]
 source = ["./source"]
 omit = [
-    "./main.py",
-    "./tests/*",
-    "./venv/*",
-    ".venv/*",
     "./source/__init__.py",
     "./source/constants.py",
     "./source/gui/__init__.py",

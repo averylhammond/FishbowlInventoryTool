@@ -18,12 +18,20 @@ on:
 permissions:
   contents: read
 
+# Cancel a still-running check when a newer push to the same ref supersedes it
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
 
     # Give the job a name to link into the Github Rules UI
     name: Code Coverage CI Check
-    runs-on: ubuntu-latest
+
+    # Pinned rather than ubuntu-latest: setup-python publishes no 3.11.9 build for
+    # Ubuntu 26.04, which ubuntu-latest moved to
+    runs-on: ubuntu-24.04
 
     # Checkout repo. The unit tests mock all of their I/O, so the private
     # submodule holding the test data is deliberately not checked out and no
@@ -35,7 +43,7 @@ jobs:
     - name: Set up Python environment
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.11.9"
         cache: 'pip'
         cache-dependency-path: requirements/dev.txt
 
@@ -55,7 +63,7 @@ jobs:
     # which can be easier to manual use
     - name: Run tests and code coverage
       run: |
-        pytest --cov=./ --cov-report=xml tests/
+        pytest --cov=source --cov-report=xml tests/
 
     # Upload the coverage report to Codecov, which serves the README badge and
     # posts the PR coverage comment. CODECOV_TOKEN is the repo upload token.

@@ -16,8 +16,8 @@ invoke it as `pytest tests/` with no glob.
 `tests/` and puts the repo root on `sys.path`, which is what makes
 `from source.inventory_app_file_io import InventoryAppFileIO` resolve. There is deliberately no
 `conftest.py`; pytest and coverage configuration lives in `pyproject.toml`, whose
-`[tool.coverage.run]` scopes measurement to `./source`, omitting `main.py`, `constants.py`,
-`tests/`, the virtualenv and the empty `__init__.py` files; nothing else is omitted, since the
+`[tool.coverage.run]` scopes measurement to `./source` (as CI's `--cov=source` does), omitting
+only `constants.py` and the empty `__init__.py` files; nothing else is omitted, since the
 inert styling data that used to be excluded now lives upstream in `fishbowl_common.gui`. Its
 `fail_under = 90` is the gate CI relies on — see `rules/ci.md`.
 

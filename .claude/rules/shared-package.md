@@ -152,6 +152,8 @@ cannot:
 
 One module, every app-specific value the rest of the app and the shared classes read:
 
+- `WINDOW_TITLE` and `DEFAULT_WINDOW_GEOMETRY` — the main window's title and the geometry the
+  display falls back to when no geometry has been persisted yet.
 - `VERSION` — surfaced via Help -> About and compared against the latest release by the update
   check. The release workflow refuses a tag that disagrees with it.
 - `GITHUB_REPO` — the `"owner/name"` string naming the repo whose releases that check reads.

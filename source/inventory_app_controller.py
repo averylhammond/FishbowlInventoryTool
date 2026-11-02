@@ -14,12 +14,14 @@ from fishbowl_common import (
 from source.columns import all_columns_selected
 from source.constants import (
     APP_NAME,
+    DEFAULT_WINDOW_GEOMETRY,
     GITHUB_REPO,
     INSTALLER_ASSET_PATTERN,
     PATCH_NOTES_PATH,
     SETTING_KEY_LAST_SEEN_VERSION,
     SETTINGS_DB_PATH,
     VERSION,
+    WINDOW_TITLE,
 )
 from source.inventory_app_file_io import InventoryAppFileIO
 from source.inventory_processor import InventoryProcessor
@@ -270,8 +272,8 @@ class InventoryAppController:
             check_for_updates_callback=self.handle_check_for_updates,
             view_patch_notes_callback=self.handle_view_patch_notes,
             save_settings_callback=self.handle_save_setting,
-            title="Automated Inventory Processor",
-            window_resolution="700x700",
+            title=WINDOW_TITLE,
+            window_resolution=DEFAULT_WINDOW_GEOMETRY,
             settings=saved_settings,
         )
 

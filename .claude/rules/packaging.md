@@ -15,9 +15,9 @@ tooling** — it dumps the generated `.xlsx` files so CI can diff the spreadshee
 both when a `v*` tag is pushed (see `rules/ci.md` for the workflow side).
 
 `package_release.sh` takes **no arguments** and produces everything a release needs. It mirrors
-the sibling `FishbowlInvoiceTool`'s script — fresh venv, `pip install` of
-`requirements/release.txt` plus PyInstaller (deliberately unpinned and deliberately not in
-`requirements/`), then
+the sibling `FishbowlInvoiceTool`'s script — fresh venv, `pip install -r
+requirements/package.txt` (which is `-r release.txt` plus a **pinned** PyInstaller, kept out of
+`release.txt` and `dev.txt` because it is neither a runtime nor a development dependency), then
 `python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc main.py`, then a zip
 built with `shutil.make_archive` rather than `tar` so the artifact is a real DEFLATE `.zip`.
 `-OO` strips docstrings and `__debug__`-gated code from the shipped executable. The venv
@@ -94,8 +94,9 @@ rather than by reasoning. Treat all four as load-bearing:
   external, since Pascal Script cannot unset a variable itself. The deeper fix belongs upstream,
   in `fishbowl_common`'s `UpdateInstaller`, which should hand the installer a sanitized
   environment rather than its own; this one also covers users upgrading from an app version
-  released before that lands. Note `package_release.sh` leaves PyInstaller unpinned, which is how
-  that bootloader change landed mid-release-series in the sibling.
+  released before that lands. That bootloader change landed mid-release-series in the sibling
+  because its PyInstaller was unpinned; here the pin in `requirements/package.txt` (#67) means a
+  PyInstaller upgrade is an explicit commit — re-test a real silent upgrade whenever you bump it.
 - **`release.yml` publishes `SHA256SUMS.txt`** alongside the zip and the installer, written with
   `sha256sum` from inside `release/` so the names in it are bare and match the asset names on the
   Release. The updater verifies the installer against it **before executing it**, so a release

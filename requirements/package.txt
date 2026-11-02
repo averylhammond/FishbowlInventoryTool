@@ -1,0 +1,6 @@
+-r release.txt
+
+# The release build tool. Kept out of release.txt and dev.txt since it is neither a runtime
+# nor a development dependency, but pinned so a PyInstaller release cannot change the shipped
+# executable without a commit here. Matches the version that built v2.3.0.
+PyInstaller==6.22.3

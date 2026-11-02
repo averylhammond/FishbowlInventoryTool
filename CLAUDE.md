@@ -63,9 +63,10 @@ guidance here to name the open issue behind anything that has not caught up yet.
 - Format: `ruff format .` (`--check` to verify without writing, as CI does)
 - Byte-compile sanity check:
   `python -m py_compile main.py source/*.py source/gui/*.py tests/*.py scripts/*.py`
-- Package a release: `./scripts/package_release.sh` (no arguments). Builds via PyInstaller into
-  `release/FishbowlInventoryTool/` and zips it; on Windows with Inno Setup installed it also
-  builds `release/FishbowlInventoryTool_Setup.exe`.
+- Package a release: `./scripts/package_release.sh` (no arguments). Installs
+  `requirements/package.txt` (`release.txt` plus a pinned PyInstaller) into a fresh venv, builds
+  via PyInstaller into `release/FishbowlInventoryTool/` and zips it; on Windows with Inno Setup
+  installed it also builds `release/FishbowlInventoryTool_Setup.exe`.
 
 ## CI
 

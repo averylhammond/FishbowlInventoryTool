@@ -76,13 +76,9 @@ else
 fi
 echo "Activated virtual environment: $VIRTUAL_ENV"
 
-# Make sure that all project dependencies are installed in the virtual environment
-echo "Installing project dependencies into virtual environment..."
-pip install -r "$ROOT_DIR/requirements/release.txt"
-
-# Install PyInstaller
-echo "Installing PyInstaller into virtual environment..."
-pip install PyInstaller
+# Install the project dependencies plus the pinned PyInstaller into the virtual environment
+echo "Installing project dependencies and PyInstaller into virtual environment..."
+pip install -r "$ROOT_DIR/requirements/package.txt"
 
 # Use PyInstaller to package the application into an executable
 echo "Packaging the application into a release executable..."

@@ -126,7 +126,9 @@ Notes that are easy to get wrong:
    its section would ship silently and only surface when a customer updated into it.
 
 It then runs the unit tests and the integration test against the tagged commit, installs Inno
-Setup via Chocolatey, runs `scripts/package_release.sh`, writes `SHA256SUMS.txt` over the built
+Setup via Chocolatey (pinned with `--version`, plus `--allow-downgrade` since `windows-latest`
+preinstalls Inno Setup and an unconstrained install is a no-op on whatever the image carries),
+runs `scripts/package_release.sh`, writes `SHA256SUMS.txt` over the built
 artifacts **from inside `release/`** so the names in it are bare and match the asset names, and
 uploads `release/FishbowlInventoryTool.zip`, `release/FishbowlInventoryTool_Setup.exe` and
 `release/SHA256SUMS.txt` with `gh release create --generate-notes`. The updater verifies the

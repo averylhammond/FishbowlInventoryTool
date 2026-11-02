@@ -38,6 +38,10 @@ nothing. `ruff` is pinned there too, at the version both sibling repos pin: a ru
 add rules or change the formatter's output, so an unpinned version would fail CI on a commit
 that was clean the day before. `lint.yml` reads the pin straight out of this file.
 
+`requirements/package.txt` is `-r release.txt` plus the pinned PyInstaller, and is what
+`scripts/package_release.sh` installs (`rules/packaging.md`). PyInstaller is in neither of the
+other two sets, since it is a build tool rather than something the app or its tests import.
+
 ## Construction and gating in `InventoryAppController`
 
 `__init__` builds only what a headless run needs: the `InventoryAppFileIO` collaborator, the

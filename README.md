@@ -68,6 +68,7 @@ source venv/Scripts/activate   # Windows; use venv/bin/activate on Linux/Mac
 ```bash
 pip install -r requirements/dev.txt      # release.txt plus pytest and pytest-cov
 pip install -r requirements/release.txt  # runtime dependencies only
+pip install -r requirements/package.txt  # release.txt plus PyInstaller, for packaging
 ```
 
 > **Note:** on Linux, `tkinter` is not part of the standard library install and must be
@@ -142,8 +143,9 @@ Package a release build locally:
 ./scripts/package_release.sh
 ```
 
-This builds the executable with PyInstaller into `release/FishbowlInventoryTool/` and zips
-it. The release ships the executable and the user guide alongside **empty**
+This installs `requirements/package.txt` (the runtime dependencies plus a pinned
+PyInstaller) into a fresh virtual environment, builds the executable into
+`release/FishbowlInventoryTool/` and zips it. The release ships the executable and the user guide alongside **empty**
 `InventoryAvailability/` and `TurnoverReports/` folders for the customer to fill; no sample
 data is bundled, so packaging does not need the private submodule. On Windows with
 [Inno Setup](https://jrsoftware.org/isinfo.php) installed it additionally builds

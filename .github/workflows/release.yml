@@ -107,10 +107,11 @@ jobs:
 
     # Install Inno Setup so package_release.sh can additionally build the Windows installer
     # (FishbowlInventoryTool_Setup.exe). Chocolatey is preinstalled on windows-latest and installs
-    # ISCC.exe to the default location the packaging script probes.
+    # ISCC.exe to the default location the packaging script probes. Pinned to the version that
+    # built v2.3.0; --allow-downgrade makes the pin hold when the runner image preinstalls a newer one.
     - name: Install Inno Setup
       run: |
-        choco install innosetup --no-progress -y
+        choco install innosetup --version 6.7.1 --allow-downgrade --no-progress -y
 
     # Package the release executable into release/FishbowlInventoryTool.zip, and (since
     # Inno Setup is now installed) release/FishbowlInventoryTool_Setup.exe. The script

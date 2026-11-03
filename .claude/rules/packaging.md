@@ -18,7 +18,8 @@ both when a `v*` tag is pushed (see `rules/ci.md` for the workflow side).
 the sibling `FishbowlInvoiceTool`'s script — fresh venv, `pip install -r
 requirements/package.txt` (which is `-r release.txt` plus a **pinned** PyInstaller, kept out of
 `release.txt` and `dev.txt` because it is neither a runtime nor a development dependency), then
-`python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc main.py`, then a zip
+`python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc --icon
+scripts/assets/app.ico main.py`, then a zip
 built with `shutil.make_archive` rather than `tar` so the artifact is a real DEFLATE `.zip`.
 `-OO` strips docstrings and `__debug__`-gated code from the shipped executable. The venv
 deactivate and the `git clean -fdx` above the build are guarded behind `IS_CI="${CI:-false}"` —
@@ -60,6 +61,13 @@ notes. `data/` (the settings database) is a `[Dirs]` entry too but deliberately 
 customer's data. An upgrade preserves it regardless, because nothing in `[Files]` installs into
 that folder. The `AppId` GUID is what lets Inno upgrade an existing install in place — never
 change it, and never share it with the sibling's.
+
+`scripts/assets/app.ico` is the one icon, used twice: PyInstaller's `--icon` embeds it in
+`AutoInventoryProc.exe`, which is where the Start Menu and desktop shortcuts and the uninstall
+entry take theirs from, and `SetupIconFile` puts it on the setup `.exe`. Both reference it
+unconditionally, so the build fails loudly if the file goes missing. The current file is a
+generated placeholder (stacked boxes on a blue rounded square, 16–256 px); replace it with real
+artwork in place, under the same name.
 
 ## What the in-app updater needs from the release pipeline
 

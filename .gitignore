@@ -18,9 +18,12 @@ build/
 *.spec
 release/
 
-# Ignore Inventory and Turnover files used for testing
+# Ignore Inventory and Turnover files used for testing, but keep the directories
+# themselves so a fresh clone starts without a missing-directory error
 InventoryAvailability/*
+!InventoryAvailability/.gitkeep
 TurnoverReports/*
+!TurnoverReports/.gitkeep
 
 # Ignore output files
 *.xlsx

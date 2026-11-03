@@ -33,11 +33,6 @@
 ; Release payload produced by scripts/package_release.sh, relative to this .iss.
 #define SourceRoot "..\release\FishbowlInventoryTool"
 
-; Optional installer icon. No .ico ships in the repo yet, so reference it only
-; if present; once scripts\assets\app.ico is added it is picked up automatically.
-#define IconFile "assets\app.ico"
-#define HaveIcon FileExists(AddBackslash(SourcePath) + IconFile)
-
 [Setup]
 ; A stable AppId is what lets Inno recognize an existing install and upgrade it
 ; in place. Do NOT change this GUID across versions, and do NOT reuse the
@@ -79,9 +74,9 @@ OutputDir=..\release
 OutputBaseFilename=FishbowlInventoryTool_Setup
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExeName}
-#if HaveIcon
-SetupIconFile={#IconFile}
-#endif
+; Icon of Setup itself. The shortcuts take theirs from the application exe,
+; which PyInstaller builds with this same file.
+SetupIconFile=assets\app.ico
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

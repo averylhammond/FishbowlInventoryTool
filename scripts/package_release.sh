@@ -82,7 +82,8 @@ pip install -r "$ROOT_DIR/requirements/package.txt"
 
 # Use PyInstaller to package the application into an executable
 echo "Packaging the application into a release executable..."
-python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc main.py
+python -OO -m PyInstaller --onefile --noconsole --name AutoInventoryProc \
+    --icon "$ROOT_DIR/scripts/assets/app.ico" main.py
 
 # Set up the desired release project structure. The input folders are created empty with
 # mkdir and are never copied from the repo root: a CI release run has already staged real
